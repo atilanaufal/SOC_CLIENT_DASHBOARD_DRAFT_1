@@ -7,9 +7,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-screen bg-[#f4f5f7] flex flex-col font-sans overflow-hidden">
+    <div className="min-h-screen flex flex-col font-sans bg-transparent">
       <Header />
-      <main className="flex-1 w-full px-3 md:px-4 lg:px-5 py-2 min-h-0 overflow-y-auto md:overflow-hidden">
+      <main className="flex-1 w-full px-2.5 sm:px-3.5 md:px-5 lg:px-6 py-2.5 sm:py-3 pb-8 md:pb-4 overflow-y-auto">
         {children}
       </main>
     </div>

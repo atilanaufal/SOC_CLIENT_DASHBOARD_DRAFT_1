@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { SecurityReport } from '@/lib/mock-data';
 import { HiOutlineXMark, HiOutlineDocumentText } from 'react-icons/hi2';
 
@@ -50,7 +51,7 @@ function renderSummaryContent(text: string) {
     if (imgMatch) {
       elements.push(
         <div key={key++} className="my-3 flex flex-col items-center">
-          <img src={imgMatch[2]} alt={imgMatch[1] || 'Report Image'} className="max-w-full h-auto rounded border border-gray-300 shadow-sm max-h-[450px] object-contain" />
+          <img src={imgMatch[2]} alt={imgMatch[1] || 'Report Image'} className="max-w-full h-auto rounded border border-gray-300 max-h-[450px] object-contain" />
           {imgMatch[1] && <span className="text-xs text-gray-500 italic mt-1">{imgMatch[1]}</span>}
         </div>
       );
@@ -92,23 +93,29 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  if (!isOpen || !report) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted || !report) return null;
 
   const socIdDisplay = report.soc_id || 'N/A';
   const uuidDisplay = report.report_uuid || report.id;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-slate-950/25 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
     >
       {/* Large Modal Container (max-w-4xl) */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-md shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border border-gray-300"
+        className="bg-white/85 backdrop-blur-2xl rounded-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border border-white/80 shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)] cursor-default"
       >
         {/* Header */}
-        <div className="bg-navy-800 text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="bg-[#002B9A]/95 backdrop-blur-md text-white px-6 py-4 flex items-center justify-between flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
           <div className="flex items-center gap-3">
             <HiOutlineDocumentText className="w-6 h-6 text-blue-300 flex-shrink-0" />
             <div>
@@ -126,7 +133,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
         </div>
 
         {/* Info Toolbar */}
-        <div className="bg-gray-50 border-b border-gray-200 px-6 py-2.5 flex items-center justify-between text-xs font-bold text-gray-700 flex-shrink-0">
+        <div className="bg-slate-100/70 backdrop-blur-md border-b border-gray-200/60 px-6 py-2.5 flex items-center justify-between text-xs font-bold text-gray-700 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
           <div className="flex items-center gap-4">
             <div>
               <span className="text-gray-500 font-semibold mr-1">Severity:</span>
@@ -158,11 +165,11 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
         </div>
 
         {/* Content Area with Vertical Scroll */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-gray-900">
+        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-gray-900 bg-[#edf2f7]">
           {/* Full Summary Section */}
-          <div className="bg-blue-50/30 p-4 rounded-md border border-blue-100">
-            <h4 className="text-sm font-black uppercase text-navy-800 tracking-wider mb-3 flex items-center gap-2 border-b border-blue-200 pb-2">
-              <HiOutlineDocumentText className="w-4 h-4 text-blue-600" />
+          <div className="bg-white/90 p-4 rounded-md border border-gray-200">
+            <h4 className="text-sm font-black uppercase text-[#002B9A] tracking-wider mb-3 flex items-center gap-2 border-b border-blue-200 pb-2">
+              <HiOutlineDocumentText className="w-4 h-4 text-[#0066B1]" />
               <span>Full Report Summary</span>
             </h4>
             <div className="prose prose-sm max-w-none">
@@ -172,7 +179,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
           {/* Recommended Action Section */}
           {report.recommendedAction && (
-            <div className="bg-amber-50/40 p-4 rounded-md border border-amber-200">
+            <div className="bg-white/90 p-4 rounded-md border border-gray-200">
               <h4 className="text-sm font-black uppercase text-amber-800 tracking-wider mb-2">
                 Recommended Action
               </h4>
@@ -188,8 +195,8 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               <h4 className="font-extrabold text-xs text-gray-700 uppercase tracking-wider mb-2">Affected Devices</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {report.affectedDevices.map((dev, idx) => (
-                  <div key={idx} className="bg-gray-50 p-2.5 rounded-md border border-gray-200 text-xs">
-                    <p className="font-black text-navy-800">{dev.agent}</p>
+                  <div key={idx} className="bg-white/90 p-2.5 rounded-md border border-gray-200 text-xs">
+                    <p className="font-black text-[#002B9A]">{dev.agent}</p>
                     <p className="text-gray-600 font-medium">IP: {dev.ipAddress}</p>
                   </div>
                 ))}
@@ -199,15 +206,16 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-gray-50 border-t border-gray-200 px-6 py-3 flex items-center justify-end flex-shrink-0">
+        <div className="bg-slate-200/80 border-t border-gray-300 px-6 py-3 flex items-center justify-end flex-shrink-0">
           <button
             onClick={onClose}
-            className="bg-navy-800 hover:bg-navy-900 text-white font-extrabold px-5 py-2 rounded-md text-xs transition shadow-xs"
+            className="bg-[#002B9A] hover:bg-[#002175] text-white font-extrabold px-5 py-2 rounded-md text-xs transition border border-[#002175]"
           >
             Close Full Summary
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

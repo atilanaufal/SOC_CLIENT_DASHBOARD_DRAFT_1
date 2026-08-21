@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HiOutlineXMark,
   HiOutlineCalendar,
@@ -33,9 +34,14 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
   initialRange,
   onApply,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Month and Year state for embedded calendar
   const [viewMonth, setViewMonth] = useState<number>(new Date().getMonth());
@@ -73,7 +79,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
     }
   }, [isOpen, initialRange]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleApply = () => {
     if (!startDate || !endDate) {
@@ -193,13 +199,19 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
     return `${parseInt(d, 10)} ${MONTHS_LIST[parseInt(m, 10) - 1]} ${y}`;
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 backdrop-blur-xs">
-      <div className="bg-white rounded-xl border border-gray-200 max-w-md w-full overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-150 shadow-2xl">
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-slate-950/25 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white/85 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-md w-full overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-          <div className="flex items-center gap-2 text-navy-800 font-extrabold text-base">
-            <HiOutlineCalendar className="w-5 h-5 text-blue-700" />
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+          <div className="flex items-center gap-2 text-[#002B9A] font-extrabold text-base">
+            <HiOutlineCalendar className="w-5 h-5 text-[#0066B1]" />
             <span>Pilih Rentang Tanggal</span>
           </div>
           <button
@@ -220,28 +232,28 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
             <button
               type="button"
               onClick={() => applyPreset('today')}
-              className="px-2.5 py-1 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-navy-800 hover:text-white rounded-md transition border border-gray-200 shadow-xs"
+              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
             >
               Hari Ini
             </button>
             <button
               type="button"
               onClick={() => applyPreset('7days')}
-              className="px-2.5 py-1 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-navy-800 hover:text-white rounded-md transition border border-gray-200 shadow-xs"
+              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
             >
               7 Hari Terakhir
             </button>
             <button
               type="button"
               onClick={() => applyPreset('30days')}
-              className="px-2.5 py-1 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-navy-800 hover:text-white rounded-md transition border border-gray-200 shadow-xs"
+              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
             >
               30 Hari Terakhir
             </button>
             <button
               type="button"
               onClick={() => applyPreset('thisMonth')}
-              className="px-2.5 py-1 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-navy-800 hover:text-white rounded-md transition border border-gray-200 shadow-xs"
+              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
             >
               Bulan Ini
             </button>
@@ -249,7 +261,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
         </div>
 
         {/* Embedded Interactive Calendar */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-lg p-3">
           {/* Calendar Month/Year Controls */}
           <div className="flex items-center justify-between mb-3 px-1">
             <button
@@ -261,7 +273,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
               <HiOutlineChevronLeft className="w-4 h-4" />
             </button>
 
-            <span className="text-sm font-extrabold text-navy-800">
+            <span className="text-sm font-extrabold text-[#002B9A]">
               {MONTHS_LIST[viewMonth]} {viewYear}
             </span>
 
@@ -302,9 +314,9 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
               }
 
               if (isStart || isEnd) {
-                btnClass = 'bg-navy-800 text-white font-bold shadow-xs hover:bg-navy-900';
+                btnClass = 'bg-[#002B9A] text-white font-bold hover:bg-[#002175]';
               } else if (isInRange) {
-                btnClass = 'bg-blue-100 text-navy-900 font-semibold';
+                btnClass = 'bg-blue-100 text-[#002B9A] font-semibold';
               }
 
               return (
@@ -322,9 +334,9 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
         </div>
 
         {/* Range Selected Indicator */}
-        <div className="bg-navy-50 p-2.5 rounded-lg border border-navy-100 text-xs flex items-center justify-between text-navy-900">
+        <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 text-xs flex items-center justify-between text-gray-900">
           <span className="font-medium text-gray-600">Rentang Terpilih:</span>
-          <span className="font-extrabold text-navy-800">
+          <span className="font-extrabold text-[#002B9A]">
             {startDate === endDate
               ? formatDisplayDate(startDate)
               : `${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}`}
@@ -350,12 +362,13 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
           <button
             type="button"
             onClick={handleApply}
-            className="px-4 py-1.5 text-xs font-extrabold bg-navy-800 text-white hover:bg-navy-900 rounded-md shadow-sm transition"
+            className="px-4 py-1.5 text-xs font-extrabold bg-[#002B9A] text-white hover:bg-[#002175] rounded-md transition border border-[#002175]"
           >
             Terapkan Filter
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

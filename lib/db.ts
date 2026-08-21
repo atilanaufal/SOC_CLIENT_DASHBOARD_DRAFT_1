@@ -8,12 +8,12 @@ let activeUriUsed: string = PRIMARY_URI;
 let lastFailureTime: number = 0;
 const FAILURE_COOLDOWN_MS = 15000; // 15s cooldown to prevent repeated slow/hanging Mongo connection attempts
 
-function connectToMongo(uri: string, timeoutMs = 300): Promise<MongoClient> {
+function connectToMongo(uri: string, timeoutMs = 2500): Promise<MongoClient> {
   const client = new MongoClient(uri, {
     connectTimeoutMS: timeoutMs,
-    socketTimeoutMS: 500,
+    socketTimeoutMS: 5000,
     serverSelectionTimeoutMS: timeoutMs,
-    maxPoolSize: 5,
+    maxPoolSize: 10,
   });
 
   const connectPromise = client.connect();
@@ -73,6 +73,16 @@ export async function getMongoClient(): Promise<MongoClient> {
   }
 }
 
+export function getActiveMongoHost(): string {
+  try {
+    const parsed = new URL(activeUriUsed);
+    return parsed.host;
+  } catch {
+    const match = activeUriUsed.match(/\/\/(.*?)\//);
+    return match ? match[1] : '192.168.1.20:27017';
+  }
+}
+
 export async function getDb(): Promise<Db> {
   const client = await getMongoClient();
   const dbName = activeUriUsed.split('/').pop()?.split('?')[0] || 'wazuh';
@@ -91,5 +101,9 @@ export async function getVulnerabilitiesCollection() {
 
 export async function getReportsCollection() {
   const db = await getDb();
-  return db.collection('reports');
+  try {
+    const repCount = await db.collection('reports').countDocuments();
+    if (repCount > 0) return db.collection('reports');
+  } catch {}
+  return db.collection('reports_0');
 }

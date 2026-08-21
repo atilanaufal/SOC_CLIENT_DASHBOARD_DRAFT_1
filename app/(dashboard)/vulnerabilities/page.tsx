@@ -17,6 +17,7 @@ import { VulnerabilityDetailDrawer } from '@/components/drawers/VulnerabilityDet
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { useTimeFilter } from '@/lib/time-filter-context';
+import { Pagination } from '@/components/ui/Pagination';
 
 type SortKey = 'name' | 'severity' | 'status' | 'agent' | 'cveId' | 'detectionDate';
 type SortDirection = 'asc' | 'desc';
@@ -120,7 +121,7 @@ export default function VulnerabilitiesPage() {
 
     return [
       { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-      { key: 'status', label: 'Patch Status', type: 'buttons', options: statuses.length ? statuses : ['Patched', 'Not Patched'] },
+      { key: 'status', label: 'Status', type: 'buttons', options: statuses.length ? statuses : ['Not Patched', 'Solved'] },
       { key: 'classification', label: 'Category', type: 'buttons', options: classifications },
       { key: 'agent', label: 'Agent', type: 'select', options: agents },
     ];
@@ -142,7 +143,7 @@ export default function VulnerabilitiesPage() {
       const matchesStatus =
         !activeFilters.status || activeFilters.status === 'All'
           ? true
-          : vuln.status === activeFilters.status;
+          : String(vuln.status || '').toLowerCase() === activeFilters.status.toLowerCase();
 
       const matchesClass =
         !activeFilters.classification || activeFilters.classification === 'All'
@@ -154,7 +155,7 @@ export default function VulnerabilitiesPage() {
           ? true
           : vuln.agent === activeFilters.agent;
 
-      const matchesTime = isWithinTimeFilter(vuln.detectionDate, timeFilter, customRange);
+      const matchesTime = isWithinTimeFilter(vuln.detected_at || vuln.detectionDate, timeFilter, customRange);
 
       return matchesSearch && matchesSeverity && matchesStatus && matchesClass && matchesAgent && matchesTime;
     });
@@ -191,7 +192,7 @@ export default function VulnerabilitiesPage() {
 
   // Compute real metrics & dynamic Vuln Distribution by category
   const { stats, vulnDistSegments } = useMemo(() => {
-    let c = 0, h = 0, m = 0, patched = 0;
+    let c = 0, h = 0, m = 0, solved = 0;
     const catMap = new Map<string, number>();
 
     filteredVulns.forEach((v) => {
@@ -200,7 +201,8 @@ export default function VulnerabilitiesPage() {
       else if (sev === 'high') h++;
       else if (sev === 'medium') m++;
 
-      if (v.status === 'Patched') patched++;
+      const st = String(v.status || '').trim().toLowerCase();
+      if (st === 'solved' || st === 'patched' || st === 'pass') solved++;
 
       const cat = v.category || v.classification || 'Packages';
       catMap.set(cat, (catMap.get(cat) || 0) + 1);
@@ -220,7 +222,8 @@ export default function VulnerabilitiesPage() {
         critical: c,
         high: h,
         medium: m,
-        patched,
+        solved,
+        patched: solved,
       },
       vulnDistSegments: segments.length ? segments : [{ label: 'Software', value: 1, color: '#3B82F6' }]
     };
@@ -260,13 +263,13 @@ export default function VulnerabilitiesPage() {
   };
 
   return (
-    <div className="h-full flex flex-row gap-3 w-full overflow-hidden">
+    <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
       {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
         {/* Top KPI Cards (3 columns) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 flex-shrink-0">
           {/* Total Vulnerability */}
-          <div className="md:col-span-5 bg-white p-3.5 rounded-md border border-gray-200 flex items-center justify-around gap-3">
+          <div className="md:col-span-5 bg-white/70 backdrop-blur-xl p-3.5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-around gap-3">
             <BestDonutChart
               segments={totalVulnSegments}
               centerLabel={stats.total.toString()}
@@ -274,7 +277,7 @@ export default function VulnerabilitiesPage() {
               strokeWidth={12}
             />
             <div className="space-y-1 text-xs font-bold">
-              <h4 className="text-xs font-black uppercase text-gray-500 tracking-wider border-b border-gray-100 pb-0.5">
+              <h4 className="text-xs font-black uppercase text-gray-500 tracking-wider border-b border-gray-200/50 pb-0.5">
                 Total Vulnerability
               </h4>
               <div className="flex items-center justify-between gap-4 text-red-700 font-extrabold">
@@ -293,7 +296,7 @@ export default function VulnerabilitiesPage() {
           </div>
 
           {/* Vuln Distribution Widget (Functional by Category) */}
-          <div className="md:col-span-4 bg-white p-3.5 rounded-md border border-gray-200 flex items-center gap-3">
+          <div className="md:col-span-4 bg-white/70 backdrop-blur-xl p-3.5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3">
             <BestDonutChart
               segments={vulnDistSegments}
               centerLabel=""
@@ -301,7 +304,7 @@ export default function VulnerabilitiesPage() {
               strokeWidth={12}
             />
             <div className="flex-1 text-xs">
-              <h4 className="font-black text-xs uppercase tracking-wider text-gray-500 mb-1.5 border-b border-gray-100 pb-0.5">
+              <h4 className="font-black text-xs uppercase tracking-wider text-gray-500 mb-1.5 border-b border-gray-200/50 pb-0.5">
                 Vuln Distribution
               </h4>
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs max-h-16 overflow-y-auto">
@@ -315,15 +318,15 @@ export default function VulnerabilitiesPage() {
             </div>
           </div>
 
-          {/* Patched Vuln */}
-          <div className="md:col-span-3 bg-white p-3.5 rounded-md border border-gray-200 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-md bg-emerald-50 border border-emerald-300 flex-shrink-0 flex items-center justify-center text-emerald-600">
+          {/* Solved Vuln */}
+          <div className="md:col-span-3 bg-white/70 backdrop-blur-xl p-3.5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-emerald-50/90 backdrop-blur-sm border border-emerald-300 flex-shrink-0 flex items-center justify-center text-emerald-600 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]">
               <HiOutlineCheckCircle className="w-7 h-7" />
             </div>
             <div>
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-gray-500">Patched Vuln</h4>
+              <h4 className="font-extrabold text-xs uppercase tracking-wider text-gray-500">Solved Vuln</h4>
               <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-3xl font-black text-emerald-700">{stats.patched}</span>
+                <span className="text-3xl font-black text-emerald-700">{stats.solved}</span>
               </div>
             </div>
           </div>
@@ -339,13 +342,13 @@ export default function VulnerabilitiesPage() {
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Search CVE / Agent / Package"
-                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy-800"
+                className="w-full bg-white/75 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-lg pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]"
               />
             </div>
 
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+              className="bg-black/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
             >
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
               <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
@@ -354,7 +357,7 @@ export default function VulnerabilitiesPage() {
 
           <button
             onClick={() => loadData()}
-            className="bg-gray-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+            className="bg-black/90 backdrop-blur-sm text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
           >
             <HiOutlineArrowPath className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -362,42 +365,42 @@ export default function VulnerabilitiesPage() {
         </div>
 
         {/* Data Table Container */}
-        <div className="bg-white rounded-md border border-gray-200 flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse table-fixed">
               <thead>
-                <tr className="bg-navy-800 text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none">
-                  <th onClick={() => handleSort('name')} className="w-[30%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  <th onClick={() => handleSort('name')} className="w-[30%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>Vulnerability</span>
                       {renderSortIndicator('name')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('severity')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                  <th onClick={() => handleSort('severity')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>Severity</span>
                       {renderSortIndicator('severity')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('status')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                  <th onClick={() => handleSort('status')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>Status</span>
                       {renderSortIndicator('status')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('agent')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                  <th onClick={() => handleSort('agent')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>Agent</span>
                       {renderSortIndicator('agent')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('cveId')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                  <th onClick={() => handleSort('cveId')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>CVE ID</span>
                       {renderSortIndicator('cveId')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('detectionDate')} className="w-[16%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
+                  <th onClick={() => handleSort('detectionDate')} className="w-[16%] py-2.5 px-3.5 cursor-pointer hover:bg-[#002175] transition">
                     <div className="flex items-center">
                       <span>Detection Date</span>
                       {renderSortIndicator('detectionDate')}
@@ -409,7 +412,7 @@ export default function VulnerabilitiesPage() {
                 {isLoading ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center font-bold text-gray-500">
-                      Loading vulnerabilities from database...
+                      Loading vulnerabilities...
                     </td>
                   </tr>
                 ) : error ? (
@@ -421,7 +424,7 @@ export default function VulnerabilitiesPage() {
                 ) : paginatedVulns.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center font-bold text-gray-500">
-                      No vulnerabilities found for the selected filter ({timeFilter}).
+                      No vulnerabilities found.
                     </td>
                   </tr>
                 ) : (
@@ -436,12 +439,12 @@ export default function VulnerabilitiesPage() {
                         key={vuln.id}
                         onClick={() => handleToggleDetail(vuln)}
                         className={`cursor-pointer transition ${
-                          isSelected ? 'bg-blue-100/80 border-l-4 border-l-navy-800' : 'hover:bg-blue-50/50'
+                          isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
                         }`}
                       >
                         <td className="py-2 px-3.5 text-gray-900 font-extrabold">
                           <div className="flex items-center gap-2">
-                            <HiOutlineShieldExclamation className="w-4 h-4 text-navy-800 flex-shrink-0" />
+                            <HiOutlineShieldExclamation className="w-4 h-4 text-[#002B9A] flex-shrink-0" />
                             <span className="truncate">{vuln.name}</span>
                           </div>
                         </td>
@@ -459,17 +462,17 @@ export default function VulnerabilitiesPage() {
 
                         <td className="py-2 px-3.5 font-bold">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                            vuln.status === 'Patched'
+                            vuln.status === 'Solved' || vuln.status === 'Patched'
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                               : 'bg-red-100 text-red-800 border border-red-300'
                           }`}>
-                            {vuln.status === 'Patched' ? <HiOutlineCheckCircle className="w-3.5 h-3.5" /> : <HiOutlineXCircle className="w-3.5 h-3.5" />}
+                            {vuln.status === 'Solved' || vuln.status === 'Patched' ? <HiOutlineCheckCircle className="w-3.5 h-3.5" /> : <HiOutlineXCircle className="w-3.5 h-3.5" />}
                             {vuln.status}
                           </span>
                         </td>
 
-                        <td className="py-2 px-3.5 text-gray-900 font-bold">{vuln.agent}</td>
-                        <td className="py-2 px-3.5 text-navy-800 font-extrabold">{vuln.cveId}</td>
+                        <td className="py-2 px-3.5 text-[#0066B1] font-bold">{vuln.agent}</td>
+                        <td className="py-2 px-3.5 text-[#002B9A] font-extrabold">{vuln.cveId}</td>
                         <td className="py-2 px-3.5">
                           <div className="flex flex-col leading-tight">
                             <span className="font-extrabold text-gray-900 text-xs">{datePart}</span>
@@ -485,42 +488,15 @@ export default function VulnerabilitiesPage() {
           </div>
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white border-t border-gray-200 px-3.5 py-2 flex items-center justify-between text-xs font-bold text-gray-800 flex-shrink-0">
+          <div className="bg-white/60 backdrop-blur-md border-t border-white/60 px-3.5 py-2 flex items-center justify-between text-xs font-bold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {filteredVulns.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredVulns.length)} of {filteredVulns.length} Vulnerabilities
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ◄
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-2 py-0.5 rounded-md transition ${
-                      currentPage === pageNum
-                        ? 'bg-navy-800 text-white font-extrabold'
-                        : 'hover:bg-gray-100 text-gray-700 font-bold'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ►
-              </button>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>
