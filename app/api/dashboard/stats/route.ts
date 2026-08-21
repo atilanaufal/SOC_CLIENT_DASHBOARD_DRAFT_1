@@ -317,7 +317,8 @@ export async function GET(request: Request) {
         else if (s === 'high') vulnHigh += 1;
         else if (s === 'medium') vulnMedium += 1;
 
-        if (v.status === 'PASS' || v.status === 'Patched') vulnPatched += 1;
+        const st = String(v.status || '').trim().toLowerCase();
+        if (st === 'solved' || st === 'pass' || st === 'patched') vulnPatched += 1;
       });
     } catch {
       // fallback

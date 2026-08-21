@@ -78,9 +78,9 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
   const currentCategory = getRiskCategory(score);
 
   return (
-    <div className="bg-white rounded-md border border-gray-200 overflow-hidden flex flex-col h-full">
+    <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex flex-col h-full">
       {/* Top Navy Header */}
-      <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-center text-base tracking-wide flex-shrink-0">
+      <div className="bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 py-2.5 text-center text-base tracking-wide flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
         Risk Score
       </div>
 
@@ -140,27 +140,27 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
         </div>
 
         {/* Dynamic Period Label Panel */}
-        <div className="w-full bg-gray-50/80 text-gray-900 px-3.5 py-2 rounded-md text-xs font-bold flex items-center justify-between border border-gray-200">
+        <div className="w-full bg-white/65 backdrop-blur-md text-gray-900 px-3.5 py-2 rounded-lg text-xs font-bold flex items-center justify-between border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_8px_rgba(0,0,0,0.02)]">
           <span className="text-gray-700 font-extrabold text-xs">
             {periodLabel}: <strong className="text-gray-900 text-sm">{lastMonthScore}</strong>
           </span>
           {isUp ? (
-            <span className="bg-red-50 text-red-600 border border-red-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1">
+            <span className="bg-red-50/80 backdrop-blur-sm text-red-600 border border-red-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
               <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" /> +{diff} ({percentage}%)
             </span>
           ) : isDown ? (
-            <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1">
+            <span className="bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border border-emerald-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
               <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" /> {diff} ({percentage}%)
             </span>
           ) : (
-            <span className="bg-gray-100 text-gray-700 border border-gray-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1">
+            <span className="bg-gray-100/80 backdrop-blur-sm text-gray-700 border border-gray-200 font-black px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1">
               <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" /> 0 (0%)
             </span>
           )}
         </div>
 
         {/* Risk Scale (5 Categories) */}
-        <div className="w-full flex gap-3 items-stretch border-t border-gray-100 pt-2.5">
+        <div className="w-full flex gap-3 items-stretch border-t border-gray-200/50 pt-2.5">
           <div className="w-2.5 rounded-md bg-gradient-to-b from-[#22C55E] via-[#EAB308] via-[#F97316] via-[#EF4444] to-[#991B1B] flex-shrink-0" />
 
           <div className="flex-1 space-y-1 text-xs font-black">
@@ -173,7 +173,7 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
                   style={isActive ? { backgroundColor: styleConfig.color, borderColor: styleConfig.color, color: '#ffffff' } : undefined}
                   className={`py-1.5 px-3 rounded-md transition-all border ${
                     isActive
-                      ? `${styleConfig.activeBg} text-white font-black ${styleConfig.activeBorder} scale-[1.02] shadow-sm opacity-100`
+                      ? `${styleConfig.activeBg} text-white font-black ${styleConfig.activeBorder} scale-[1.02] opacity-100`
                       : `${styleConfig.inactiveBg} ${styleConfig.inactiveText} ${styleConfig.inactiveBorder} opacity-60`
                   }`}
                   title={cat.meaning}

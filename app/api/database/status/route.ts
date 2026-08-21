@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDb, getIncidentsCollection, getVulnerabilitiesCollection, getReportsCollection } from '@/lib/db';
-import { isRedisAvailable, getRedisClient } from '@/lib/redis';
+import { getDb, getIncidentsCollection, getVulnerabilitiesCollection, getReportsCollection, getActiveMongoHost } from '@/lib/db';
+import { isRedisAvailable, getActiveRedisClient, getActiveRedisHost } from '@/lib/redis';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -181,7 +181,7 @@ export async function GET() {
 
     if (redisConnected) {
       try {
-        const r = getRedisClient();
+        const r = await getActiveRedisClient();
         if (r) {
           const keys = await r.keys('wazuh:incident:*');
           redisKeyCount = keys.length;
@@ -264,20 +264,22 @@ export async function GET() {
       defaultScript3Rows
     );
 
+    const activeRedis = getActiveRedisHost();
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       databases: {
         mongoDB: {
           name: 'MongoDB (Master Historic)',
-          host: '192.168.1.20:27017',
+          host: getActiveMongoHost(),
           status: mongoConnected ? 'Connected' : 'Disconnected',
           latencyMs: mongoLatencyMs,
           counts: mongoDocCounts,
         },
         caching: {
           name: 'Caching (Redis 7 Days)',
-          host: '192.168.1.20:6379',
+          host: `${activeRedis.host}:${activeRedis.port}`,
           status: redisConnected ? 'Connected' : 'Disconnected',
           latencyMs: redisLatencyMs,
           activeKeys: redisKeyCount,

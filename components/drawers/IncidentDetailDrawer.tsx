@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Incident } from '@/lib/mock-data';
 import { HiOutlineXMark, HiOutlineDocumentText } from 'react-icons/hi2';
 import { useRouter } from 'next/navigation';
@@ -16,8 +17,13 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const [showLogsModal, setShowLogsModal] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!isOpen || !incident) return null;
 
@@ -37,16 +43,16 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
       {/* Mobile Backdrop Overlay (< lg) */}
       <div
         onClick={onClose}
-        className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-150 cursor-pointer"
+        className="lg:hidden fixed inset-0 bg-slate-950/30 backdrop-blur-sm z-40 animate-in fade-in duration-150 cursor-pointer"
       />
 
       {/* Detail Panel Container */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] bg-white border border-gray-300 rounded-md flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
+        className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-gray-900 px-4 py-3 flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between border-b-2 border-[#002B9A] px-4 py-3 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
           <h3 className="text-xl font-black text-gray-900 tracking-tight">Details</h3>
           <button
             onClick={onClose}
@@ -67,7 +73,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             </div>
             <div>
               <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Agent IP</p>
-              <p className="font-black text-sm text-navy-800">{agentIpDisplay}</p>
+              <p className="font-black text-sm text-[#002B9A]">{agentIpDisplay}</p>
             </div>
           </div>
 
@@ -108,7 +114,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
           {/* Description */}
           <div className="pt-3 border-t border-gray-200">
             <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-1">Description</h4>
-            <p className="text-xs text-gray-700 font-medium leading-relaxed bg-blue-50/50 p-2.5 rounded-md border border-blue-100">
+            <p className="text-xs text-gray-700 font-medium leading-relaxed bg-blue-50/70 p-2.5 rounded-md border border-blue-100">
               {incident.description || 'Host-based anomaly detection event'}
             </p>
           </div>
@@ -117,7 +123,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
           {incident.affected_file && (
             <div className="pt-3 border-t border-gray-200">
               <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-1">Affected File</h4>
-              <p className="text-xs font-mono text-gray-800 bg-gray-50 p-2 rounded-md border border-gray-200 break-all">
+              <p className="text-xs font-mono text-gray-800 bg-white/70 backdrop-blur-sm p-2 rounded-md border border-gray-200 break-all">
                 {incident.affected_file}
               </p>
             </div>
@@ -127,7 +133,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
           {incident.mitre && (
             <div className="pt-3 border-t border-gray-200">
               <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-1">MITRE ATT&CK</h4>
-              <p className="text-xs font-black text-navy-800 bg-gray-50 p-2 rounded-md border border-gray-200">
+              <p className="text-xs font-black text-[#002B9A] bg-white/70 backdrop-blur-sm p-2 rounded-md border border-gray-200">
                 {incident.mitre}
               </p>
             </div>
@@ -153,10 +159,10 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
         </div>
 
         {/* Full Logs Action Button */}
-        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-white/70 backdrop-blur-sm">
           <button
             onClick={() => setShowLogsModal(true)}
-            className="w-full bg-navy-800 hover:bg-navy-900 text-white font-extrabold py-2.5 rounded-md text-sm transition shadow-xs flex items-center justify-center gap-2"
+            className="w-full bg-[#002B9A] hover:bg-[#002175] text-white font-extrabold py-2.5 rounded-md text-sm transition flex items-center justify-center gap-2 border border-[#002175]"
           >
             <HiOutlineDocumentText className="w-4 h-4 text-blue-300" />
             <span>Full Logs</span>
@@ -165,10 +171,16 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
       </div>
 
       {/* Full Logs Modal */}
-      {showLogsModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md max-w-2xl w-full overflow-hidden border border-gray-300 shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="bg-navy-800 text-white px-4 py-3 flex items-center justify-between">
+      {showLogsModal && mounted && createPortal(
+        <div
+          onClick={() => setShowLogsModal(false)}
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#edf2f7] backdrop-blur-xl rounded-md max-w-2xl w-full overflow-hidden border border-gray-300 flex flex-col max-h-[85vh] cursor-default"
+          >
+            <div className="bg-[#002B9A] text-white px-4 py-3 flex items-center justify-between">
               <h3 className="font-bold text-base">Full Logs — Rule {ruleIdDisplay} ({incident.agent})</h3>
               <button
                 onClick={() => setShowLogsModal(false)}
@@ -182,16 +194,17 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
                 {incident.full_logs || `Rule ID: ${ruleIdDisplay}\nAgent: ${incident.agent}\nDescription: ${incident.description}`}
               </pre>
             </div>
-            <div className="p-3 border-t border-gray-200 flex justify-end bg-gray-50">
+            <div className="p-3 border-t border-gray-200 flex justify-end bg-white/80">
               <button
                 onClick={() => setShowLogsModal(false)}
-                className="bg-navy-800 text-white px-4 py-1.5 rounded-md text-xs font-bold hover:bg-navy-900"
+                className="bg-[#002B9A] text-white px-4 py-1.5 rounded-md text-xs font-bold hover:bg-[#002175]"
               >
                 Close
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

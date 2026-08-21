@@ -71,13 +71,13 @@ export async function syncVulnerabilitiesToRedis(): Promise<any[]> {
   }
 }
 
-import { getRedisClient } from './redis';
+import { getActiveRedisClient } from './redis';
 
 async function fetchFromRedisHashes(): Promise<any[]> {
   try {
-    const client = getRedisClient();
+    const client = await getActiveRedisClient();
     if (!client) return [];
-    if (client.status === 'wait') {
+    if (client.status === 'wait' || client.status === 'close') {
       await client.connect();
     }
     const keys = await client.keys('wazuh:incident:*');
@@ -131,38 +131,22 @@ export async function fetchIncidentsData(timeRange: string): Promise<{ data: any
  * - 1-7 Days: Query Redis (fallback Mongo & cache)
  * - 1 Month / All: Query MongoDB directly (fallback Redis)
  */
-export async function fetchVulnerabilitiesData(timeRange: string): Promise<{ data: any[]; source: 'redis' | 'mongodb' }> {
-  const isShortTerm = isOneToSevenDaysFilter(timeRange);
-
-  if (isShortTerm) {
-    const cached = await getCache<any[]>(REDIS_KEYS.VULNERABILITIES_7D);
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      return { data: cached, source: 'redis' };
-    }
-
-    try {
-      const synced = await syncVulnerabilitiesToRedis();
-      if (synced && synced.length > 0) {
-        return { data: synced, source: 'mongodb' };
-      }
-    } catch {}
-
-    if (cached && Array.isArray(cached)) {
-      return { data: cached, source: 'redis' };
-    }
-    return { data: [], source: 'redis' };
-  }
-
+export async function fetchVulnerabilitiesData(timeRange?: string): Promise<{ data: any[]; source: 'redis' | 'mongodb' }> {
   try {
     const collection = await getVulnerabilitiesCollection();
     const docs = await collection.find({}).sort({ _id: -1 }).toArray();
-    return { data: docs, source: 'mongodb' };
-  } catch (err: any) {
-    console.warn('[MongoDB Fetch Error] Falling back to Redis cache:', err.message);
-    const cached = await getCache<any[]>(REDIS_KEYS.VULNERABILITIES_7D);
-    if (cached && Array.isArray(cached)) {
-      return { data: cached, source: 'redis' };
+    if (docs && docs.length > 0) {
+      setCache(REDIS_KEYS.VULNERABILITIES_7D, docs, SEVEN_DAYS_TTL).catch(() => {});
+      return { data: docs, source: 'mongodb' };
     }
-    return { data: [], source: 'redis' };
+  } catch (err: any) {
+    console.warn('[MongoDB Fetch Error] Falling back to Redis cache for vulnerabilities:', err.message);
   }
+
+  const cached = await getCache<any[]>(REDIS_KEYS.VULNERABILITIES_7D);
+  if (cached && Array.isArray(cached) && cached.length > 0) {
+    return { data: cached, source: 'redis' };
+  }
+
+  return { data: [], source: 'mongodb' };
 }

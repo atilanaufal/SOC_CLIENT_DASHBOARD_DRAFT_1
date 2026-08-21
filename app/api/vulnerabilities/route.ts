@@ -93,11 +93,11 @@ export async function GET(request: Request) {
     }
 
     if (status && status !== 'All') {
-      const isPatched = status.toLowerCase() === 'patched';
+      const isSolvedFilter = status.toLowerCase() === 'solved' || status.toLowerCase() === 'patched';
       docs = docs.filter((d: any) => {
-        const st = String(d.status || '').toLowerCase();
-        const docIsPatched = st === 'patched' || st === 'pass';
-        return isPatched ? docIsPatched : !docIsPatched;
+        const st = String(d.status || '').trim().toLowerCase();
+        const docIsSolved = st === 'solved' || st === 'pass' || st === 'patched';
+        return isSolvedFilter ? docIsSolved : !docIsSolved;
       });
     }
 
@@ -127,7 +127,8 @@ export async function GET(request: Request) {
 
     const vulnerabilities = timeFilteredDocs.map((doc: any) => {
       const idStr = doc._id ? doc._id.toString() : String(doc.id || Math.random());
-      const statusFormatted = (doc.status === 'PASS' || doc.status === 'Patched') ? 'Patched' : 'Not Patched';
+      const rawStatus = String(doc.status || '').trim().toLowerCase();
+      const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
 
       return {
         id: idStr,

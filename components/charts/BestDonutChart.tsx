@@ -49,7 +49,7 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
           cx="50"
           cy="50"
           r={radius}
-          stroke="#f1f5f9"
+          stroke={total === 0 ? "#cbd5e1" : "#e2e8f0"}
           strokeWidth={strokeWidth}
           fill="none"
         />
