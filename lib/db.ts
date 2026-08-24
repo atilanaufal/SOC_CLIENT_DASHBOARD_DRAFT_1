@@ -1,6 +1,6 @@
 import { MongoClient, Db } from 'mongodb';
 
-const PRIMARY_URI = process.env.MONGODB_URI || 'mongodb://192.168.1.20:27017/wazuh';
+const PRIMARY_URI = process.env.MONGODB_URI || 'mongodb://10.21.126.82:27017/wazuh';
 const FALLBACK_URI = process.env.MONGODB_FALLBACK_URI || 'mongodb://192.168.1.20:27017/wazuh';
 
 let activeClientPromise: Promise<MongoClient> | null = null;
@@ -8,12 +8,12 @@ let activeUriUsed: string = PRIMARY_URI;
 let lastFailureTime: number = 0;
 const FAILURE_COOLDOWN_MS = 15000; // 15s cooldown to prevent repeated slow/hanging Mongo connection attempts
 
-function connectToMongo(uri: string, timeoutMs = 300): Promise<MongoClient> {
+function connectToMongo(uri: string, timeoutMs = 2500): Promise<MongoClient> {
   const client = new MongoClient(uri, {
     connectTimeoutMS: timeoutMs,
-    socketTimeoutMS: 500,
+    socketTimeoutMS: 5000,
     serverSelectionTimeoutMS: timeoutMs,
-    maxPoolSize: 5,
+    maxPoolSize: 10,
   });
 
   const connectPromise = client.connect();
@@ -73,23 +73,37 @@ export async function getMongoClient(): Promise<MongoClient> {
   }
 }
 
-export async function getDb(): Promise<Db> {
-  const client = await getMongoClient();
-  const dbName = activeUriUsed.split('/').pop()?.split('?')[0] || 'wazuh';
-  return client.db(dbName || 'wazuh');
+export function getActiveMongoHost(): string {
+  try {
+    const parsed = new URL(activeUriUsed);
+    return parsed.host;
+  } catch {
+    const match = activeUriUsed.match(/\/\/(.*?)\//);
+    return match ? match[1] : '10.21.126.82:27017';
+  }
 }
 
-export async function getIncidentsCollection() {
-  const db = await getDb();
+export async function getDb(databaseName?: string): Promise<Db> {
+  const client = await getMongoClient();
+  const targetDb = databaseName || 'universitas_indonesia';
+  return client.db(targetDb);
+}
+
+export async function getIncidentsCollection(databaseName?: string) {
+  const db = await getDb(databaseName);
   return db.collection('incident');
 }
 
-export async function getVulnerabilitiesCollection() {
-  const db = await getDb();
+export async function getVulnerabilitiesCollection(databaseName?: string) {
+  const db = await getDb(databaseName);
   return db.collection('vulnerability');
 }
 
-export async function getReportsCollection() {
-  const db = await getDb();
+export async function getReportsCollection(databaseName?: string) {
+  const db = await getDb(databaseName);
+  try {
+    const repCount = await db.collection('reports').countDocuments();
+    if (repCount > 0) return db.collection('reports');
+  } catch {}
   return db.collection('reports');
 }

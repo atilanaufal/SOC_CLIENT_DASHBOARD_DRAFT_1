@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Device } from '@/lib/mock-data';
 import { useRouter } from 'next/navigation';
 
@@ -15,19 +16,31 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  if (!isOpen || !device) return null;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted || !device) return null;
 
   const handleViewIncident = () => {
     onClose();
     router.push('/incidents');
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-md shadow-2xl max-w-xl w-full overflow-hidden border border-gray-200">
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#edf2f7] backdrop-blur-xl rounded-md max-w-xl w-full overflow-hidden border border-gray-300 cursor-default"
+      >
         {/* Navy Header */}
-        <div className="bg-navy-800 text-white px-6 py-3.5 flex items-center justify-between">
+        <div className="bg-[#002B9A] text-white px-6 py-3.5 flex items-center justify-between">
           <h3 className="text-2xl font-bold">Device Details</h3>
           <button
             onClick={onClose}
@@ -109,13 +122,14 @@ export const DeviceDetailModal: React.FC<DeviceDetailModalProps> = ({
           <div className="pt-2 text-center">
             <button
               onClick={handleViewIncident}
-              className="bg-black hover:bg-zinc-800 text-white font-bold px-8 py-2.5 rounded text-lg transition shadow-md"
+              className="bg-black hover:bg-zinc-800 text-white font-bold px-8 py-2.5 rounded text-lg transition border border-zinc-800"
             >
               View Incident
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

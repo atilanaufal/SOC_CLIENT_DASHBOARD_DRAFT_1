@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getReportsCollection } from '@/lib/db';
-import { ObjectId } from 'mongodb';
+import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +77,9 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const collection = await getReportsCollection();
+    const tenant = getTenantContext(request);
+
+    const collection = await getReportsCollection(tenant.databaseName);
 
     const query: Record<string, any> = {};
 
@@ -98,7 +100,7 @@ export async function GET(request: Request) {
 
     const docs = await collection.find(query).sort({ _id: -1 }).toArray();
 
-    // Filter reports by time range while guaranteeing Report ID 1 is always preserved
+    // Filter reports by time range
     const timeFilteredDocs = docs.filter((doc) => matchesTimeRange(doc, timeRange, startDate, endDate));
 
     const reports = timeFilteredDocs.map((doc) => {
@@ -121,12 +123,14 @@ export async function GET(request: Request) {
         summary: doc.summary || 'No summary description provided.',
         recommendedAction: doc.recommended_action || 'No recommended action specified.',
         recommended_action: doc.recommended_action || 'No recommended action specified.',
-        type: 'Security Alert Incident'
+        type: 'Security Alert Incident',
+        tenant: tenant.campusName
       };
     });
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
       total: reports.length,
       data: reports
     });

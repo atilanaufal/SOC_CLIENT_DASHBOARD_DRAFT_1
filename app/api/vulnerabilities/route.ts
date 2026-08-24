@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getVulnerabilitiesCollection } from '@/lib/db';
-import { ObjectId } from 'mongodb';
+import { fetchVulnerabilitiesData } from '@/lib/redis-sync';
+import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,8 +68,6 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   return true;
 }
 
-import { fetchVulnerabilitiesData } from '@/lib/redis-sync';
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -82,8 +80,11 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // Fetch from Redis for 1-7 days, or MongoDB for 1 month
-    const { data: rawDocs, source } = await fetchVulnerabilitiesData(timeRange);
+    // Get Tenant Context from logged in user session
+    const tenant = getTenantContext(request);
+
+    // Fetch from Redis / MongoDB strictly for this tenant
+    const { data: rawDocs, source } = await fetchVulnerabilitiesData(timeRange, tenant.databaseName, tenant.redisPrefix);
 
     let docs = rawDocs;
 
@@ -93,11 +94,11 @@ export async function GET(request: Request) {
     }
 
     if (status && status !== 'All') {
-      const isPatched = status.toLowerCase() === 'patched';
+      const isSolvedFilter = status.toLowerCase() === 'solved' || status.toLowerCase() === 'patched';
       docs = docs.filter((d: any) => {
-        const st = String(d.status || '').toLowerCase();
-        const docIsPatched = st === 'patched' || st === 'pass';
-        return isPatched ? docIsPatched : !docIsPatched;
+        const st = String(d.status || '').trim().toLowerCase();
+        const docIsSolved = st === 'solved' || st === 'pass' || st === 'patched';
+        return isSolvedFilter ? docIsSolved : !docIsSolved;
       });
     }
 
@@ -127,7 +128,8 @@ export async function GET(request: Request) {
 
     const vulnerabilities = timeFilteredDocs.map((doc: any) => {
       const idStr = doc._id ? doc._id.toString() : String(doc.id || Math.random());
-      const statusFormatted = (doc.status === 'PASS' || doc.status === 'Patched') ? 'Patched' : 'Not Patched';
+      const rawStatus = String(doc.status || '').trim().toLowerCase();
+      const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
 
       return {
         id: idStr,
@@ -146,12 +148,15 @@ export async function GET(request: Request) {
         description: doc.description || 'No detailed rationale provided for this vulnerability.',
         category: doc.category || 'Software',
         classification: doc.category || 'Software',
-        ip: doc.ip || 'N/A'
+        ip: doc.ip || 'N/A',
+        tenant: tenant.campusName
       };
     });
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
+      database: tenant.databaseName,
       dataSource: source, // 'redis' (1-7d) or 'mongodb' (1 month)
       total: vulnerabilities.length,
       data: vulnerabilities

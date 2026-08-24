@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -24,10 +25,40 @@ export const Header: React.FC = () => {
   const router = useRouter();
   const { timeFilter, customRange, setTimeFilter, filterLabel } = useTimeFilter();
   const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
+  const [timeCoords, setTimeCoords] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState('12:00:00');
+  const timeButtonRef = useRef<HTMLButtonElement>(null);
+  const timeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updateTimePosition = () => {
+    if (timeButtonRef.current) {
+      const rect = timeButtonRef.current.getBoundingClientRect();
+      setTimeCoords({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isTimeDropdownOpen) {
+      updateTimePosition();
+      window.addEventListener('resize', updateTimePosition);
+      window.addEventListener('scroll', updateTimePosition);
+      return () => {
+        window.removeEventListener('resize', updateTimePosition);
+        window.removeEventListener('scroll', updateTimePosition);
+      };
+    }
+  }, [isTimeDropdownOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,6 +66,21 @@ export const Header: React.FC = () => {
       setCurrentTime(now.toTimeString().split(' ')[0]);
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        timeDropdownRef.current &&
+        !timeDropdownRef.current.contains(event.target as Node) &&
+        timeButtonRef.current &&
+        !timeButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsTimeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const navItems = [
@@ -57,14 +103,14 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40 px-3 md:px-5 lg:px-6 py-2">
+    <header className="bg-white/70 backdrop-blur-xl border-b border-white/60 shadow-[0_4px_24px_-4px_rgba(0,43,154,0.03),inset_0_1px_1px_rgba(255,255,255,0.9)] sticky top-0 z-40 px-3 md:px-5 lg:px-6 py-2">
       <div className="flex items-center justify-between gap-3 w-full">
         {/* Left Section: Mobile Hamburger + Brand Logo & Page Title */}
         <div className="flex items-center gap-2 md:gap-4">
           {/* Mobile Menu Hamburger Trigger */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-1.5 text-gray-700 hover:text-gray-900 bg-gray-100 rounded-md border border-gray-200"
+            className="lg:hidden p-1.5 text-gray-700 hover:text-gray-900 bg-white/70 backdrop-blur-md rounded-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]"
             aria-label="Toggle Navigation Menu"
           >
             {isMobileMenuOpen ? (
@@ -81,25 +127,25 @@ export const Header: React.FC = () => {
             title="Go to Dashboard"
           >
             <Image
-              src="/tguard.png"
+              src="/ITSEC.png"
               alt="ASOC Logo"
               width={32}
               height={32}
-              className="object-contain w-8 h-8 drop-shadow-xs"
+              className="object-contain w-8 h-8"
             />
           </button>
 
           {/* Page Title — clicks to refresh current page */}
           <button
             onClick={handleTitleClick}
-            className="text-lg md:text-xl font-black text-gray-900 border-l-2 border-gray-300 pl-3 tracking-tight hover:text-blue-700 transition cursor-pointer"
+            className="text-lg md:text-xl font-black text-gray-900 border-l-2 border-gray-300 pl-3 tracking-tight hover:text-[#0066B1] transition cursor-pointer"
             title="Refresh this page"
           >
             {currentNav.label}
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md border border-gray-200 ml-2">
+          <nav className="hidden lg:flex items-center gap-0.5 bg-slate-100/60 backdrop-blur-md p-0.5 rounded-lg border border-white/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] ml-2">
             {navItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
@@ -108,8 +154,8 @@ export const Header: React.FC = () => {
                   href={item.href}
                   className={`px-3 py-1 text-xs font-bold rounded-md transition ${
                     isActive
-                      ? 'text-navy-800 font-extrabold bg-white shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/70'
+                      ? 'text-[#002B9A] font-extrabold bg-white/90 backdrop-blur-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,43,154,0.06),inset_0_1px_1px_rgba(255,255,255,0.9)]'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
                   }`}
                 >
                   {item.label}
@@ -125,16 +171,21 @@ export const Header: React.FC = () => {
           {isTimeFilterVisible && (
             <div className="relative">
               <button
+                ref={timeButtonRef}
                 onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
-                className="bg-gray-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+                className="bg-black/90 backdrop-blur-md text-white text-xs font-bold px-2.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] cursor-pointer"
               >
                 <HiOutlineCalendar className="w-3.5 h-3.5 text-blue-400" />
                 <span>{filterLabel}</span>
                 <HiOutlineChevronDown className="w-3.5 h-3.5" />
               </button>
 
-              {isTimeDropdownOpen && (
-                <div className="absolute right-0 mt-1 w-44 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+              {isTimeDropdownOpen && mounted && timeCoords && createPortal(
+                <div
+                  ref={timeDropdownRef}
+                  style={{ position: 'fixed', top: `${timeCoords.top}px`, right: `${timeCoords.right}px` }}
+                  className="w-44 bg-white/80 backdrop-blur-2xl rounded-md border border-white/80 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5"
+                >
                   {(['Today', 'This Week', 'This Month'] as TimeFilterOption[]).map((filter) => (
                     <button
                       key={filter}
@@ -142,8 +193,8 @@ export const Header: React.FC = () => {
                         setTimeFilter(filter);
                         setIsTimeDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-gray-100 rounded-md transition ${
-                        timeFilter === filter ? 'text-navy-700 font-bold bg-navy-50' : 'text-gray-700'
+                      className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+                        timeFilter === filter ? 'text-[#002B9A] bg-blue-50/90 font-black' : 'text-gray-700 hover:bg-blue-50/80'
                       }`}
                     >
                       {filter}
@@ -151,20 +202,21 @@ export const Header: React.FC = () => {
                   ))}
                   
                   {/* Custom Option */}
-                  <div className="border-t border-gray-100 my-1"></div>
+                  <div className="border-t border-gray-200/80 my-1"></div>
                   <button
                     onClick={() => {
                       setIsTimeDropdownOpen(false);
                       setIsCustomModalOpen(true);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-gray-100 rounded-md transition flex items-center gap-1.5 ${
-                      timeFilter === 'Custom' ? 'text-navy-700 bg-navy-50 font-extrabold' : 'text-gray-800'
+                    className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer ${
+                      timeFilter === 'Custom' ? 'text-[#002B9A] bg-blue-50/90 font-black' : 'text-gray-800 hover:bg-blue-50/80'
                     }`}
                   >
-                    <HiOutlineCalendar className="w-3.5 h-3.5 text-navy-800" />
+                    <HiOutlineCalendar className="w-3.5 h-3.5 text-[#002B9A]" />
                     <span>Custom...</span>
                   </button>
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           )}
@@ -180,17 +232,18 @@ export const Header: React.FC = () => {
           {/* Database Status Debugging Button */}
           <button
             onClick={() => setIsDbModalOpen(true)}
-            className="bg-navy-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-navy-800 transition border border-navy-700 shadow-xs"
+            className="bg-[#002B9A]/95 backdrop-blur-md text-white text-xs font-bold px-2 sm:px-2.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-[#002175] transition border border-white/20 shadow-[0_2px_10px_rgba(0,43,154,0.25)] cursor-pointer"
             title="Open Database & Caching Debugger Modal"
           >
-            <HiOutlineServer className="w-3.5 h-3.5 text-blue-400" />
-            <span>Database Status</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <HiOutlineServer className="w-3.5 h-3.5 text-blue-300 flex-shrink-0" />
+            <span className="hidden sm:inline">Database Status</span>
+            <span className="sm:hidden text-[11px]">DB Status</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
           </button>
 
           {/* Clock */}
-          <div className="hidden md:flex items-center gap-1.5 text-xs font-bold text-gray-800 bg-gray-100 px-2.5 py-1.5 rounded-md border border-gray-200">
-            <HiOutlineClock className="w-3.5 h-3.5 text-navy-800" />
+          <div className="hidden md:flex items-center gap-1.5 text-xs font-bold text-gray-800 bg-white/70 backdrop-blur-md px-2.5 py-1.5 rounded-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)]">
+            <HiOutlineClock className="w-3.5 h-3.5 text-[#002B9A]" />
             <span>{currentTime}</span>
           </div>
 
@@ -214,8 +267,8 @@ export const Header: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`px-3 py-2 text-sm font-bold rounded-md transition ${
                   isActive
-                    ? 'bg-navy-800 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-[#002B9A] text-white'
+                    : 'text-gray-700 hover:bg-white/80'
                 }`}
               >
                 {item.label}

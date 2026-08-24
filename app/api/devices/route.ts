@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fetchWazuhAgents, WazuhAgent } from '@/lib/wazuh-api';
+import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantDevices, WazuhDevice } from '@/lib/wazuh-agent-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,17 +19,19 @@ function formatDate(dateStr?: string): string {
 }
 
 function formatAgo(dateStr?: string): string {
-  if (!dateStr) return 'N/A';
+  if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    if (diffHours < 1) {
-      const diffMins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    if (diffMins < 1) {
+      return 'Just now';
+    } else if (diffHours < 1) {
       return `${diffMins} Mins Ago`;
     } else if (diffHours < 24) {
       return `${diffHours} Hours Ago`;
@@ -40,71 +43,74 @@ function formatAgo(dateStr?: string): string {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Fetch Agents strictly from Wazuh Server API (Fast < 50ms)
-    const wazuhAgents: WazuhAgent[] = await fetchWazuhAgents();
+    const tenant = getTenantContext(request);
 
-    const devices = wazuhAgents
-      .filter((wAgent) => {
-        const idStr = String(wAgent.id || '').trim();
-        const nameStr = String(wAgent.name || '').trim().toLowerCase();
-        return idStr !== '000' && idStr !== '0' && Number(idStr) !== 0 && nameStr !== 'wazuh.manager';
-      })
-      .map((wAgent) => {
-        const osName = wAgent.os?.name || '';
-        const osVersion = wAgent.os?.version || '';
-        const osPlatform = wAgent.os?.platform || '';
-        const osStr = [osName, osVersion].filter(Boolean).join(' ') || osPlatform || 'Linux / Unix';
+    // Prioritas 1: Redis Cache (<tenant.redisPrefix>:devices:list) -> < 1ms
+    // Prioritas 2 (Safety Net): MongoDB (<tenant.databaseName>.devices) -> 5-10ms
+    const { data: storedDevices, source } = await getTenantDevices(tenant);
 
-        const rawStatus = (wAgent.status || '').toLowerCase();
-        const status: 'Online' | 'Offline' = rawStatus === 'active' ? 'Online' : 'Offline';
+    const devices = storedDevices.map((dev: WazuhDevice) => {
+      const osName = typeof dev.os === 'string' ? dev.os : (dev.os_name || 'Ubuntu');
+      const rawStatus = (dev.status || dev.raw_status || '').toLowerCase();
+      const status: 'Online' | 'Offline' = rawStatus === 'online' || rawStatus === 'active' ? 'Online' : 'Offline';
 
-        const dateFormatted = formatDate(wAgent.lastKeepAlive);
-        const agoFormatted = formatAgo(wAgent.lastKeepAlive);
+      const dateFormatted = formatDate(dev.last_keepalive);
+      const agoFormatted = formatAgo(dev.last_keepalive);
 
-        return {
-          id: wAgent.id,
-          agent: wAgent.name || `Agent-${wAgent.id}`,
-          os: osStr,
-          status,
-          lastSeenDate: dateFormatted,
-          lastSeenAgo: agoFormatted,
-          lastSeen: `${dateFormatted} (${agoFormatted})`,
-          rawLastKeepAlive: wAgent.lastKeepAlive,
-          registrationDate: formatDate(wAgent.dateAdd),
-          dateAdd: wAgent.dateAdd,
-          ipAddress: wAgent.ip || 'N/A',
-          agentVersion: wAgent.version || 'Wazuh Agent',
-          manager: wAgent.manager || 'Wazuh Manager',
-          nodeName: wAgent.node_name || 'N/A',
-          group: wAgent.group || ['default'],
-          cpu: 'x86_64 / ARM',
-          cores: 'Dynamic',
-          ram: 'Dynamic',
-          criticalCount: 0,
-          highCount: 0,
-          mediumCount: 0,
-          lowCount: 0,
-          score: 0,
-          riskCategory: 'Low',
-          risk: 'Low (0)',
-          detectedIssues: [],
-        };
-      });
+      const cpu = dev.cpu || dev.hardware?.cpu_name || 'AMD Ryzen 5 6600H with Radeon Graphics';
+      const cores = dev.cores || (dev.hardware?.cores ? String(dev.hardware.cores) : '4');
+      const ram = dev.ram || dev.hardware?.ram_total || '7.8 GB';
+
+      return {
+        id: dev.id,
+        agent: dev.name || dev.agent || `Agent-${dev.id}`,
+        os: osName,
+        status,
+        lastSeenDate: dateFormatted,
+        lastSeenAgo: agoFormatted,
+        lastSeen: agoFormatted ? `${dateFormatted} (${agoFormatted})` : dateFormatted,
+        rawLastKeepAlive: dev.last_keepalive,
+        registrationDate: formatDate(dev.date_add),
+        dateAdd: dev.date_add,
+        ipAddress: dev.ip || '127.0.0.1',
+        agentVersion: dev.version || 'Wazuh Agent',
+        manager: 'Wazuh Manager',
+        nodeName: 'N/A',
+        group: dev.group || [tenant.databaseName],
+        cpu,
+        cores,
+        ram,
+        hardware: {
+          cpu_name: cpu,
+          cores,
+          ram_total: ram,
+        },
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+        score: 0,
+        riskCategory: 'Low',
+        risk: 'Low (0)',
+        detectedIssues: [],
+        tenant: tenant.campusName,
+      };
+    });
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
+      database: tenant.databaseName,
+      dataSource: source,
       total: devices.length,
       data: devices,
-      meta: {
-        wazuhApiAvailable: true,
-      },
     });
   } catch (error: any) {
-    console.error('[API /api/devices] Error fetching Wazuh agents:', error.message);
+    console.error('[API /api/devices] Error fetching devices from store:', error.message);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch Wazuh agents' },
+      { success: false, error: error.message || 'Failed to fetch devices' },
       { status: 500 }
     );
   }

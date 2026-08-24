@@ -65,7 +65,7 @@ export interface Vulnerability {
   cve?: string;
   detectionDate: string;
   detected_at?: string;
-  status: 'Patched' | 'Not Patched' | 'Active' | string;
+  status: 'Solved' | 'Not Patched' | 'Patched' | 'Active' | string;
   currentVersion?: string;
   version?: string;
   description?: string;

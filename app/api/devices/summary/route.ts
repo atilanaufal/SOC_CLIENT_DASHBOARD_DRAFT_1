@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { fetchWazuhAgents, WazuhAgent } from '@/lib/wazuh-api';
 import { getIncidentsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
+import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantDeviceSummary } from '@/lib/wazuh-agent-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,43 +63,21 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let totalDevices = 0;
-    let onlineDevices = 0;
-    let offlineDevices = 0;
-    const osCounts: Record<string, number> = {};
+    const tenant = getTenantContext(request);
 
-    let wazuhApiAvailable = true;
-    let mongoDbAvailable = true;
+    // Prioritas 1: Redis (<tenant.redisPrefix>:devices:summary) -> < 1ms
+    // Prioritas 2 (Fallback): MongoDB (<tenant.databaseName>.device_summary) -> 5-10ms
+    const { data: summaryData, source } = await getTenantDeviceSummary(tenant);
 
-    // 1. Get Wazuh agents list fast
-    try {
-      const agents: WazuhAgent[] = await fetchWazuhAgents();
-      totalDevices = agents.length;
-
-      agents.forEach((agent: WazuhAgent) => {
-        const st = (agent.status || '').toLowerCase();
-        if (st === 'active') {
-          onlineDevices++;
-        } else {
-          offlineDevices++;
-        }
-
-        const osName = agent.os?.name || agent.os?.platform || 'Unknown OS';
-        osCounts[osName] = (osCounts[osName] || 0) + 1;
-      });
-    } catch (err: any) {
-      console.warn('[API /api/devices/summary] Wazuh API error:', err.message);
-      wazuhApiAvailable = false;
-    }
-
-    // 2. Fetch severity breakdown from MongoDB with timeout
+    // 2. Fetch severity breakdown from MongoDB
     let totalCritical = 0;
     let totalHigh = 0;
     let totalMedium = 0;
+    let mongoDbAvailable = true;
 
     try {
       const mongoPromise = (async () => {
-        const incCol = await getIncidentsCollection();
+        const incCol = await getIncidentsCollection(tenant.databaseName);
         return incCol.find({}, { projection: { full_logs: 0 } }).maxTimeMS(800).toArray();
       })();
 
@@ -111,7 +90,7 @@ export async function GET(request: Request) {
 
       incidents.forEach((inc) => {
         const sev = parseSeverity(inc.severity).toLowerCase();
-        const count = 1; // 1 document = 1 incident count!
+        const count = 1;
         if (sev === 'critical') totalCritical += count;
         else if (sev === 'high') totalHigh += count;
         else if (sev === 'medium') totalMedium += count;
@@ -123,7 +102,7 @@ export async function GET(request: Request) {
     const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
     let colorIdx = 0;
 
-    const osDistribution = Object.entries(osCounts).map(([label, value]) => ({
+    const osDistribution = Object.entries(summaryData.os_distribution || {}).map(([label, value]) => ({
       label,
       value,
       color: colors[colorIdx++ % colors.length],
@@ -131,10 +110,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
+      database: tenant.databaseName,
+      dataSource: source,
       data: {
-        totalDevices,
-        onlineDevices,
-        offlineDevices,
+        totalDevices: summaryData.total_devices || 0,
+        onlineDevices: summaryData.online_devices || 0,
+        offlineDevices: summaryData.offline_devices || 0,
         osDistribution,
         devicesAtRisk: {
           critical: totalCritical,
@@ -143,7 +125,7 @@ export async function GET(request: Request) {
         },
       },
       meta: {
-        wazuhApiAvailable,
+        dataSource: source,
         mongoDbAvailable,
       },
     });

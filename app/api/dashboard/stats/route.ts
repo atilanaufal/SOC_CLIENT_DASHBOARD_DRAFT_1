@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { fetchWazuhAgents, WazuhAgent } from '@/lib/wazuh-api';
-import { getIncidentsCollection, getVulnerabilitiesCollection, getReportsCollection } from '@/lib/db';
+import { getReportsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
 import { fetchIncidentsData, fetchVulnerabilitiesData } from '@/lib/redis-sync';
+import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,37 +100,23 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let totalDevices = 0;
-    let onlineDevices = 0;
-    let offlineDevices = 0;
-    let rawActiveAgentsList: WazuhAgent[] = [];
+    // Get Tenant Context from logged-in user session
+    const tenant = getTenantContext(request);
 
-    // 1. Fetch Agents from Wazuh Server API (Fast)
-    try {
-      rawActiveAgentsList = await fetchWazuhAgents();
-    } catch (err: any) {
-      console.warn('[API /api/dashboard/stats] Wazuh API error:', err.message);
-    }
+    // 1. Fetch Devices strictly from Redis (Prioritas 1) / MongoDB (Prioritas 2)
+    // Zero Direct Wazuh API Call saat halaman web dibuka!
+    const { data: summaryData } = await getTenantDeviceSummary(tenant);
+    const { data: devicesList, source: deviceSource } = await getTenantDevices(tenant);
 
-    // Exclude Agent 000 / health-checker from active agents
-    const activeAgentsList = rawActiveAgentsList.filter((ag) => {
-      const idStr = String(ag.id || '').trim();
-      const nameStr = String(ag.name || '').trim().toLowerCase();
-      return idStr !== '000' && idStr !== '0' && nameStr !== 'health-checker';
-    });
+    const totalDevices = summaryData.total_devices || devicesList.length;
+    const onlineDevices = summaryData.online_devices;
+    const offlineDevices = summaryData.offline_devices;
 
-    totalDevices = activeAgentsList.length;
-    activeAgentsList.forEach((agent) => {
-      const st = (agent.status || '').toLowerCase();
-      if (st === 'active') onlineDevices++;
-      else offlineDevices++;
-    });
-
-    // 2. Fetch Incidents from Redis (1-7 days) or MongoDB (1 month)
+    // 2. Fetch Incidents strictly for this tenant
     let rawIncidents: any[] = [];
     let dataSource: string = 'mongodb';
     try {
-      const res = await fetchIncidentsData(timeFilter);
+      const res = await fetchIncidentsData(timeFilter, tenant.databaseName, tenant.redisPrefix);
       rawIncidents = res.data;
       dataSource = res.source;
     } catch (err: any) {
@@ -165,24 +152,7 @@ export async function GET(request: Request) {
       return d >= startOfPrevious && d < endOfPrevious;
     });
 
-    // Map each agent identifier (ID / Name / IP) to a single canonical agent key
-    const normalizeAgentId = (raw: any): string => {
-      const s = String(raw || '').trim().toLowerCase();
-      if (!s || s === '000' || s === '0' || s === 'health-checker') return '';
-
-      for (const ag of activeAgentsList) {
-        const aid = String(ag.id || '').trim().toLowerCase();
-        const aname = String(ag.name || '').trim().toLowerCase();
-        const aip = String(ag.ip || '').trim().toLowerCase();
-        if (s === aid || s === aname || (aip && s === aip)) {
-          return aname || aid; // Use agent name as canonical key (e.g., 'tguard', 'fd-1664')
-        }
-      }
-      return s;
-    };
-
-    // Valid Registered Active Agents Names (e.g., 'tguard', 'fd-1664' -> Exactly 2 registered agents!)
-    const registeredAgentKeys = activeAgentsList.map((a) => String(a.name || a.id).trim().toLowerCase());
+    const registeredAgentKeys = devicesList.map((a) => String(a.name || a.agent || a.id).trim().toLowerCase());
 
     const calculateDashboardMetrics = (list: any[]) => {
       let critical = 0;
@@ -193,14 +163,14 @@ export async function GET(request: Request) {
 
       list.forEach((inc) => {
         const sev = parseSeverity(inc.severity).toLowerCase();
-        const count = 1; // Strictly 1 document = 1 incident count for KPI totals!
+        const count = 1;
 
         if (sev === 'critical') critical += count;
         else if (sev === 'high') high += count;
         else if (sev === 'medium') medium += count;
         else low += count;
 
-        const canonicalKey = normalizeAgentId(inc.agent_id || inc.host || inc.agent);
+        const canonicalKey = String(inc.host || inc.agent || inc.agent_id || '').trim().toLowerCase();
         if (canonicalKey) {
           if (!agentSeverityMap[canonicalKey]) {
             agentSeverityMap[canonicalKey] = { critical: 0, high: 0, medium: 0 };
@@ -211,7 +181,6 @@ export async function GET(request: Request) {
         }
       });
 
-      // Target agents list: exact list of registered agents (e.g. 2 agents: tguard and fd-1664)
       const targetAgents = registeredAgentKeys.length > 0
         ? registeredAgentKeys
         : Object.keys(agentSeverityMap);
@@ -225,7 +194,6 @@ export async function GET(request: Request) {
         sumAgentScores += agentScore;
       });
 
-      // Dashboard Risk Score = SUM(Score(Agent_i)) / Total Agents (e.g. (36 + 3) / 2 = 19.5!)
       const avgDashboardRiskScore = Math.round((sumAgentScores / totalAgentsCount) * 10) / 10;
 
       return {
@@ -248,9 +216,8 @@ export async function GET(request: Request) {
 
     const riskScore = currentStats.score;
     const riskLastMonth = previousStats.score;
-    const riskCat = getRiskCategory(riskScore);
 
-    // 3. Top Incidents (Separate by Name AND Date, always use latest timestamp)
+    // 3. Top Incidents for this tenant
     const topIncidentsMap = new Map<string, any>();
     currentIncidents.forEach((inc) => {
       const incType = Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : (inc.incident_type || '');
@@ -261,9 +228,7 @@ export async function GET(request: Request) {
       const dateFormatted = formatDate(rawDateVal);
       const rawTimestamp = rawDateVal ? new Date(rawDateVal).getTime() : 0;
 
-      // Group key includes Name AND Date string so different dates are NOT merged!
       const groupKey = `${name}_${dateFormatted.split(' ')[0] || ''}_${agentName}`;
-
       const incCount = typeof inc.count === 'number' && inc.count > 0 ? inc.count : 1;
 
       if (!topIncidentsMap.has(groupKey)) {
@@ -276,9 +241,10 @@ export async function GET(request: Request) {
           host: agentName,
           count: incCount,
           firstObserved: formatDate(inc.first_observed || rawDateVal),
-          lastObserved: dateFormatted, // Always latest timestamp
+          lastObserved: dateFormatted,
           rawDate: rawTimestamp,
-          ruleId: inc.rule_id ? String(inc.rule_id) : 'N/A'
+          ruleId: inc.rule_id ? String(inc.rule_id) : 'N/A',
+          tenant: tenant.campusName,
         });
       } else {
         const item = topIncidentsMap.get(groupKey);
@@ -295,14 +261,14 @@ export async function GET(request: Request) {
 
     const topIncidents = Array.from(topIncidentsMap.values()).sort((a, b) => b.rawDate - a.rawDate);
 
-    // 4. Fetch Vulnerabilities count fast (from Redis for 1-7 days, or Mongo for 1 month)
+    // 4. Fetch Vulnerabilities for this tenant
     let vulnTotal = 0;
     let vulnCritical = 0;
     let vulnHigh = 0;
     let vulnMedium = 0;
     let vulnPatched = 0;
     try {
-      const resVulns = await fetchVulnerabilitiesData(timeFilter);
+      const resVulns = await fetchVulnerabilitiesData(timeFilter, tenant.databaseName, tenant.redisPrefix);
       const vulns = resVulns.data;
       const filteredVulns = vulns.filter((v) => {
         if (timeFilter.toLowerCase() === 'all') return true;
@@ -317,17 +283,18 @@ export async function GET(request: Request) {
         else if (s === 'high') vulnHigh += 1;
         else if (s === 'medium') vulnMedium += 1;
 
-        if (v.status === 'PASS' || v.status === 'Patched') vulnPatched += 1;
+        const st = String(v.status || '').trim().toLowerCase();
+        if (st === 'solved' || st === 'pass' || st === 'patched') vulnPatched += 1;
       });
     } catch {
       // fallback
     }
 
-    // 5. Fetch Reports count fast (filtered by time range)
+    // 5. Fetch Reports for this tenant
     let reportsCount = 0;
     let recommendedActions: any[] = [];
     try {
-      const repCol = await getReportsCollection();
+      const repCol = await getReportsCollection(tenant.databaseName);
       const reps = await repCol.find({}).sort({ _id: -1 }).maxTimeMS(500).toArray();
       const filteredReps = reps.filter((r) => {
         if (timeFilter.toLowerCase() === 'all') return true;
@@ -350,7 +317,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      dataSource, // 'redis' (1-7d) or 'mongodb' (1 month)
+      tenant: tenant.campusName,
+      database: tenant.databaseName,
+      dataSource: {
+        devices: deviceSource,
+        incidents: dataSource,
+      },
       data: {
         devices: {
           total: totalDevices,
@@ -383,7 +355,7 @@ export async function GET(request: Request) {
           total: reportsCount,
         },
         recommendedActions,
-        riskScore: riskScore, // Returned strictly as average number: (36 + 3) / 2 = 19.5!
+        riskScore: riskScore,
         riskLastMonth: riskLastMonth,
         periodLabel,
         topIncidents,

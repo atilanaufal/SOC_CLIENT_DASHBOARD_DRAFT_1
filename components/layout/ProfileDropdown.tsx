@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { HiOutlineKey, HiOutlineArrowRightOnRectangle, HiOutlineClock, HiOutlineUser } from 'react-icons/hi2';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -12,9 +13,44 @@ interface ProfileDropdownProps {
 
 export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = 'PT Astra', currentTime = '12:00:00' }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [userSession, setUserSession] = useState<{ username: string; role: string } | null>(null);
+  const [userSession, setUserSession] = useState<{
+    username: string;
+    role: string;
+    campus_name?: string;
+    tenant_code?: string;
+    email?: string;
+  } | null>(null);
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updatePosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition);
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition);
+      };
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     // Read session info from /api/auth/me or localStorage
@@ -42,7 +78,12 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
       });
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -54,18 +95,23 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
+    try {
+      const { authClient } = await import('@/lib/auth-client');
+      await authClient.signOut();
+    } catch {}
     localStorage.removeItem('user_session');
     router.push('/login');
   };
 
-  const displayName = userSession ? userSession.username : tenantName;
+  const displayName = userSession?.campus_name || userSession?.username || tenantName;
   const userRole = userSession ? userSession.role.toUpperCase() : 'TENANT';
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block text-left">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-navy-900 text-white px-2.5 py-1.5 rounded-md text-xs font-bold hover:bg-navy-800 transition flex items-center gap-2 border border-navy-700 shadow-xs cursor-pointer"
+        className="bg-black text-white px-2.5 py-1.5 rounded-md text-xs font-bold hover:bg-zinc-800 transition flex items-center gap-2 border border-zinc-800 cursor-pointer"
       >
         <div className="w-4 h-4 relative flex items-center justify-center">
           <Image
@@ -79,11 +125,15 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
         <span>{displayName}</span>
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-60 bg-white rounded-md shadow-2xl z-50 text-gray-900 p-3 border border-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-2">
+      {isOpen && mounted && coords && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: 'fixed', top: `${coords.top}px`, right: `${coords.right}px` }}
+          className="w-60 bg-white/80 backdrop-blur-2xl rounded-md z-50 text-gray-900 p-3 border border-white/80 animate-in fade-in zoom-in-95 duration-100 space-y-2 shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)]"
+        >
           {/* User & Tenant Info Header */}
-          <div className="flex items-center gap-2.5 pb-2 border-b border-gray-200">
-            <div className="w-8 h-8 rounded-md bg-navy-900 p-1 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-gray-200/80">
+            <div className="w-8 h-8 rounded-md bg-[#002B9A] p-1 flex items-center justify-center shrink-0">
               <Image
                 src="/tguard.png"
                 alt="Profile Icon"
@@ -94,15 +144,18 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-extrabold text-gray-900 truncate">{displayName}</p>
-              <span className="inline-block bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
-                Role: {userRole}
+              {userSession?.username && (
+                <p className="text-[10px] text-gray-500 font-semibold truncate">@{userSession.username}</p>
+              )}
+              <span className="inline-block bg-blue-100/90 text-[#002B9A] text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 border border-blue-200">
+                Tenant: {userSession?.tenant_code || 'UI'}
               </span>
             </div>
           </div>
 
-          {/* Clock item */}
-          <div className="text-xs font-bold text-gray-800 bg-gray-100 px-2.5 py-1.5 rounded-md flex items-center gap-2 border border-gray-200">
-            <HiOutlineClock className="w-4 h-4 text-navy-800" />
+          {/* Clock item - only visible on mobile (HP) */}
+          <div className="md:hidden text-xs font-bold text-gray-800 bg-white/70 backdrop-blur-md px-2.5 py-1.5 rounded-md flex items-center gap-2 border border-white/80">
+            <HiOutlineClock className="w-4 h-4 text-[#002B9A]" />
             <span>Time: {currentTime}</span>
           </div>
 
@@ -113,7 +166,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
                 alert('Reset password link has been sent to your admin email.');
                 setIsOpen(false);
               }}
-              className="w-full text-left py-1.5 px-2 text-red-600 font-bold text-xs hover:bg-red-50 rounded-md transition flex items-center gap-2 cursor-pointer"
+              className="w-full text-left py-1.5 px-2 text-red-600 font-bold text-xs hover:bg-red-50/80 rounded-md transition flex items-center gap-2 cursor-pointer"
             >
               <HiOutlineKey className="w-4 h-4" />
               Reset Password
@@ -121,13 +174,14 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
 
             <button
               onClick={handleLogout}
-              className="w-full text-left py-1.5 px-2 text-gray-800 font-bold text-xs hover:bg-gray-100 rounded-md transition flex items-center gap-2 cursor-pointer"
+              className="w-full text-left py-1.5 px-2 text-gray-800 font-bold text-xs hover:bg-blue-50/80 rounded-md transition flex items-center gap-2 cursor-pointer"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
               Log Out
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

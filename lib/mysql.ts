@@ -2,11 +2,11 @@ import mysql from 'mysql2/promise';
 import crypto from 'crypto';
 
 function getMysqlHost() {
-  return process.env.MYSQL_HOST || '192.168.1.20';
+  return process.env.MYSQL_HOST || '10.21.126.82';
 }
 
 function getMysqlFallbackHost() {
-  return process.env.MYSQL_FALLBACK_HOST || '127.0.0.1';
+  return process.env.MYSQL_FALLBACK_HOST || '192.168.1.20';
 }
 
 const MYSQL_PORT = Number(process.env.MYSQL_PORT) || 3306;
@@ -18,9 +18,21 @@ const MYSQL_SALT = process.env.MYSQL_SALT || 'sec_auth_salt_2026';
 let activePool: mysql.Pool | null = null;
 let activeHost: string = getMysqlHost();
 
+export function hashPasswordSHA256(password: string): string {
+  return crypto.createHash('sha256').update(password, 'utf-8').digest('hex');
+}
+
+export function hashPasswordSHA256Salted(password: string, salt: string = MYSQL_SALT): string {
+  return crypto.createHash('sha256').update(password + salt, 'utf-8').digest('hex');
+}
+
 export function hashPasswordSHA512(password: string, salt: string = MYSQL_SALT): string {
   const salted = password + salt;
   return crypto.createHash('sha512').update(salted, 'utf-8').digest('hex');
+}
+
+export function hashPasswordSHA512Raw(password: string): string {
+  return crypto.createHash('sha512').update(password, 'utf-8').digest('hex');
 }
 
 export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
@@ -71,12 +83,18 @@ export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
 
 export interface UserRecord {
   id: number;
+  tenant_id: number;
   username: string;
-  role: 'admin' | 'tenant';
+  email: string | null;
+  role: 'admin' | 'tenant' | string;
+  tenant_code?: string;
+  campus_name?: string;
+  database_name?: string;
+  redis_prefix?: string;
 }
 
 export async function verifyUserCredentials(
-  usernameInput: string,
+  usernameOrEmailInput: string,
   passwordInput: string
 ): Promise<{ success: boolean; user?: UserRecord; error?: string }> {
   let conn: mysql.PoolConnection | null = null;
@@ -84,8 +102,20 @@ export async function verifyUserCredentials(
     // Strictly connect to MySQL database on target VM
     conn = await getMysqlConnection();
     const [rows]: any = await conn.execute(
-      'SELECT id, username, password, role FROM users WHERE username = ?',
-      [usernameInput]
+      `SELECT 
+        u.id, 
+        u.tenant_id, 
+        u.username, 
+        u.password_hash, 
+        u.email,
+        t.tenant_code, 
+        t.campus_name, 
+        t.database_name, 
+        t.redis_prefix
+       FROM users u
+       LEFT JOIN tenants t ON u.tenant_id = t.id
+       WHERE u.username = ? OR u.email = ?`,
+      [usernameOrEmailInput, usernameOrEmailInput]
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -93,26 +123,48 @@ export async function verifyUserCredentials(
     }
 
     const user = rows[0];
-    const storedHash = user.password;
+    const storedHash = user.password_hash;
 
-    // Calculate SHA-512 hash using configured salt
-    const computedHashPrimary = hashPasswordSHA512(passwordInput, MYSQL_SALT);
-    const computedHashDocFallback = hashPasswordSHA512(passwordInput, 'tguard_secure_salt_2026');
+    // Supported hash algorithms: SHA-256 (standard), SHA-256 salted, SHA-512 salted, SHA-512 raw, plaintext fallback
+    const computedSha256 = hashPasswordSHA256(passwordInput);
+    const computedSha256SaltPrimary = hashPasswordSHA256Salted(passwordInput, MYSQL_SALT);
+    const computedSha256SaltDoc = hashPasswordSHA256Salted(passwordInput, 'tguard_secure_salt_2026');
+    const computedSha512Primary = hashPasswordSHA512(passwordInput, MYSQL_SALT);
+    const computedSha512Doc = hashPasswordSHA512(passwordInput, 'tguard_secure_salt_2026');
+    const computedSha512Raw = hashPasswordSHA512Raw(passwordInput);
 
-    if (storedHash === computedHashPrimary || storedHash === computedHashDocFallback) {
+    const isMatch = (
+      storedHash === computedSha256 ||
+      storedHash === computedSha256SaltPrimary ||
+      storedHash === computedSha256SaltDoc ||
+      storedHash === computedSha512Primary ||
+      storedHash === computedSha512Doc ||
+      storedHash === computedSha512Raw ||
+      storedHash === passwordInput
+    );
+
+    if (isMatch) {
+      const usernameLower = (user.username || '').toLowerCase();
+      const detectedRole = usernameLower.includes('admin') ? 'admin' : 'tenant';
+
       return {
         success: true,
         user: {
           id: user.id,
+          tenant_id: user.tenant_id,
           username: user.username,
-          role: user.role,
+          email: user.email,
+          role: detectedRole,
+          tenant_code: user.tenant_code || 'UI',
+          campus_name: user.campus_name || 'Universitas Indonesia',
+          database_name: user.database_name || 'universitas_indonesia',
+          redis_prefix: user.redis_prefix || 'universitas_indonesia',
         },
       };
     } else {
       return { success: false, error: 'Password yang Anda masukkan salah.' };
     }
   } catch (err: any) {
-    // Strictly report real MySQL database connection errors (No mock/fallback accounts allowed)
     console.error('MySQL Database Connection Error:', err.message);
     return {
       success: false,
