@@ -1,0 +1,13 @@
+tidak perlu buat frontendnya dari awal, pakai frontend yg saya berikan. Di frontend itu masih banyak kesalahan layout dan desain, jadi perbaiki dan percantik lagi, dan fungsikan semua tombol dan fiturnya
+
+list yg perlu diperbaiki dari yg saya temukan:
+
+
+
+1. space kosong / space tidak terpakai
+
+2. layout kurang rapih dan cocok
+
+3. scaling(ukuran elemen dan font) yg tidak pas
+
+4. kurang responsive, tampilan layar kecil banyak yg overflow hidden(harus di scroll elemennya, padaha lseharusnya tidak ada yg perlu di scroll)

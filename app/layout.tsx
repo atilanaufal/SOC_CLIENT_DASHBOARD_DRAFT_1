@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased bg-[#f4f5f7] text-gray-900 font-sans">
+      <body className="antialiased text-gray-900 font-sans min-h-screen">
         <TimeFilterProvider>
           {children}
         </TimeFilterProvider>

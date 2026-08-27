@@ -49,8 +49,10 @@ export default function LoginPage() {
         localStorage.setItem('user_session', JSON.stringify(data.user));
       }
 
-      // Redirect to dashboard on successful login
-      router.push('/dashboard');
+      // Redirect to target destination or dashboard on successful login
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const fromPath = params?.get('from') || '/dashboard';
+      router.push(fromPath);
     } catch (err: any) {
       console.error('Login submit error:', err);
       setErrorMessage('Terjadi kesalahan koneksi ke server. Silakan coba lagi.');
@@ -59,55 +61,60 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 selection:bg-navy-800 selection:text-white">
-      <div className="w-full max-w-md space-y-6 text-center">
-        {/* Top Logo & Subtitle: Plain Gambar 1 Icon Only (No ASOC text) */}
-        <div className="flex flex-col items-center gap-2">
-          {/* Plain Gambar 1 Logo Icon */}
-          <div className="w-16 h-16 relative flex items-center justify-center mb-1">
+    <main className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-[#002B9A] selection:text-white">
+      <div className="w-full max-w-md space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+        {/* Top Logo & Subtitle */}
+        <div className="flex flex-col items-center gap-2.5">
+          {/* Logo Container with Glass Accent */}
+          <div className="w-14 h-14 rounded-lg bg-white/80 backdrop-blur-xl border border-white/80 flex items-center justify-center p-2">
             <Image
-              src="/tguard.png"
-              alt="Logo"
-              width={64}
-              height={64}
+              src="/infoguard.png"
+              alt="InfoGuard Logo"
+              width={48}
+              height={48}
               className="object-contain"
               priority
             />
           </div>
           
-          <p className="text-base font-semibold text-gray-800">
-            Sign in to your tenant security console
-          </p>
+          <div>
+            <h1 className="text-xl font-black text-[#002B9A] tracking-tight">
+              Tenant Security Console
+            </h1>
+            <p className="text-xs font-bold text-gray-600 mt-1">
+              Sign in to manage and monitor your security posture
+            </p>
+          </div>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-8 text-left space-y-5">
+        {/* Login Frosted Glass Card - 80% Opacity & rounded-lg */}
+        <div className="bg-white/80 backdrop-blur-2xl rounded-lg border border-white/80 p-6 sm:p-7 text-left space-y-4">
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-semibold animate-in fade-in duration-150 flex items-start gap-2">
-              <span className="font-bold">⚠️</span>
+            <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <span className="font-bold flex-shrink-0">⚠️</span>
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-5">
+          <form onSubmit={handleSignIn} className="space-y-3.5">
             <div>
-              <label htmlFor="email-input" className="block text-base font-bold text-gray-900 mb-1.5">
-                Email
+              <label htmlFor="email-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
+                Username / Email
               </label>
               <input
                 id="email-input"
                 type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter you email"
-                className="w-full bg-[#f3f4f6] border border-gray-300 rounded-lg px-4 py-3 text-gray-900 font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:bg-white transition"
+                placeholder="Enter your username or email"
+                className="w-full bg-white/60 hover:bg-white/80 focus:bg-white/95 backdrop-blur-md border border-white/80 rounded-md px-3.5 py-2.5 text-xs text-gray-900 font-semibold placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#002B9A] focus:border-[#002B9A] transition"
                 required
                 disabled={isLoading}
               />
             </div>
 
             <div>
-              <label htmlFor="password-input" className="block text-base font-bold text-gray-900 mb-1.5">
+              <label htmlFor="password-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -116,22 +123,22 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter you password"
-                  className="w-full bg-[#f3f4f6] border border-gray-300 rounded-lg pl-4 pr-11 py-3 text-gray-900 font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:bg-white transition"
+                  placeholder="Enter your password"
+                  className="w-full bg-white/60 hover:bg-white/80 focus:bg-white/95 backdrop-blur-md border border-white/80 rounded-md pl-3.5 pr-10 py-2.5 text-xs text-gray-900 font-semibold placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#002B9A] focus:border-[#002B9A] transition"
                   required
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-800 transition cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 transition cursor-pointer"
                   title={showPassword ? 'Hide password' : 'Show password'}
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    <HiOutlineEyeSlash className="w-5 h-5" />
+                    <HiOutlineEyeSlash className="w-4 h-4" />
                   ) : (
-                    <HiOutlineEye className="w-5 h-5" />
+                    <HiOutlineEye className="w-4 h-4" />
                   )}
                 </button>
               </div>
@@ -140,11 +147,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-lg py-3 rounded-lg transition shadow-md disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-[#002B9A] hover:bg-[#002175] active:bg-[#001854] text-white font-extrabold text-xs py-2.5 rounded-md transition disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer border border-[#002175] mt-2"
             >
               {isLoading ? (
                 <>
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   <span>Signing In...</span>
                 </>
               ) : (
@@ -155,8 +162,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer Note */}
-        <p className="text-sm font-semibold text-gray-800 pt-1">
-          Don&apos;t have an account? Ask your admin to create one for you.
+        <p className="text-xs font-bold text-gray-500">
+          Don&apos;t have an account? Ask your administrator for access.
         </p>
       </div>
     </main>

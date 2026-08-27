@@ -13,6 +13,7 @@ interface BestDonutChartProps {
   centerLabel: string;
   size?: number;
   strokeWidth?: number;
+  customFontSizeClass?: string;
 }
 
 export const BestDonutChart: React.FC<BestDonutChartProps> = ({
@@ -26,6 +27,7 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
   centerLabel,
   size = 130,
   strokeWidth = 14,
+  customFontSizeClass,
 }) => {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   const radius = (100 - strokeWidth) / 2;
@@ -33,13 +35,14 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
 
   let currentOffset = 0;
 
-  // Scale center label font size with chart size
+  // Scale center label font size across sm, md, lg, xl, 2xl
   const fontSizeClass =
-    size >= 140
-      ? 'text-3xl font-black'
+    customFontSizeClass ||
+    (size >= 140
+      ? 'text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black'
       : size >= 100
-      ? 'text-2xl font-black'
-      : 'text-lg font-black';
+      ? 'text-xl sm:text-2xl md:text-2xl xl:text-3xl 2xl:text-4xl font-black'
+      : 'text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black');
 
   return (
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
@@ -49,7 +52,7 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
           cx="50"
           cy="50"
           r={radius}
-          stroke="#f1f5f9"
+          stroke={total === 0 ? "#cbd5e1" : "#e2e8f0"}
           strokeWidth={strokeWidth}
           fill="none"
         />

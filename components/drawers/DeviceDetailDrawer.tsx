@@ -50,33 +50,33 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
       {/* Mobile Backdrop (< lg) */}
       <div
         onClick={onClose}
-        className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-150"
+        className="lg:hidden fixed inset-0 bg-slate-950/30 backdrop-blur-sm z-40 animate-in fade-in duration-150"
       />
 
       {/* Detail Panel Container */}
-      <div className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] bg-white border border-gray-300 rounded-md flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-gray-900 px-4 py-3 flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between border-b-2 border-[#002B9A] px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
           <div>
-            <h3 className="text-lg font-black text-gray-900 tracking-tight">Device Details</h3>
+            <h3 className="text-lg 2xl:text-xl font-black text-gray-900 tracking-tight">Device Details</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-900 font-bold hover:text-gray-600 p-1 rounded-md transition"
+            className="text-gray-900 font-bold hover:text-gray-600 p-1 rounded-md transition cursor-pointer"
             aria-label="Close device details"
           >
-            <HiOutlineXMark className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5 2xl:w-6 2xl:h-6" />
           </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-gray-900">
           {/* Agent Name & Agent ID side-by-side */}
-          <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+          <div className="bg-white/70 backdrop-blur-sm p-3 rounded-md border border-gray-200">
             <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-1">Agent Information</p>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-base font-black text-navy-800 break-all">{device.agent}</span>
-              <span className="bg-navy-800 text-white text-xs font-black px-2.5 py-1 rounded-md shadow-xs flex-shrink-0">
+              <span className="text-base font-black text-[#002B9A] break-all">{device.agent}</span>
+              <span className="bg-[#002B9A] text-white text-xs font-black px-2.5 py-1 rounded-md flex-shrink-0">
                 ID: {device.id}
               </span>
             </div>
@@ -84,7 +84,7 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
 
           {/* Status & Last Seen Aligned Side-by-Side */}
           <div className="pt-1">
-            <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-md border border-gray-200">
+            <div className="grid grid-cols-2 gap-2 text-xs bg-white/70 backdrop-blur-sm p-3 rounded-md border border-gray-200">
               <div>
                 <p className="text-gray-500 font-bold mb-1 uppercase tracking-wider text-[10px]">Status</p>
                 <span
@@ -111,7 +111,7 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
           {/* Agent Risk Score Section */}
           <div className="pt-2 border-t border-gray-200">
             <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-1.5">Agent Risk Score</p>
-            <div className="bg-gray-50 p-3 rounded-md border border-gray-200 flex items-center justify-between">
+            <div className="bg-white/70 backdrop-blur-sm p-3 rounded-md border border-gray-200 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-2xl font-black text-gray-900">{scoreVal}</span>
@@ -121,7 +121,7 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
               </div>
               <span
                 style={{ backgroundColor: currentCat.color }}
-                className="text-white font-black px-3 py-1 rounded-md text-xs tracking-wide shadow-xs"
+                className="text-white font-black px-3 py-1 rounded-md text-xs tracking-wide"
               >
                 {currentCat.label}
               </span>
@@ -137,9 +137,9 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
           <div className="pt-2 border-t border-gray-200">
             <div className="flex items-center justify-between mb-1.5">
               <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider">System Specifications</p>
-              {loadingHw && <HiOutlineArrowPath className="w-3.5 h-3.5 animate-spin text-navy-800" />}
+              {loadingHw && <HiOutlineArrowPath className="w-3.5 h-3.5 animate-spin text-[#002B9A]" />}
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs bg-gray-50 p-2.5 rounded-md border border-gray-200">
+            <div className="grid grid-cols-3 gap-2 text-xs bg-white/70 backdrop-blur-sm p-2.5 rounded-md border border-gray-200">
               <div className="col-span-3 pb-1 border-b border-gray-200">
                 <p className="text-gray-500 font-bold text-[10px]">CPU Model</p>
                 <p className="font-black text-gray-900 truncate" title={hardware?.cpuName || device.cpu || 'N/A'}>
@@ -160,14 +160,14 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
           {/* Installed Agent Metadata & Registration Date */}
           <div className="pt-2 border-t border-gray-200">
             <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-1.5">Installed Agent Metadata</p>
-            <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-2.5 rounded-md border border-gray-200">
+            <div className="grid grid-cols-2 gap-2 text-xs bg-white/70 backdrop-blur-sm p-2.5 rounded-md border border-gray-200">
               <div>
                 <p className="text-gray-500 font-bold text-[10px]">Wazuh Version</p>
                 <p className="font-black text-gray-900">{device.agentVersion || 'Wazuh Agent'}</p>
               </div>
               <div>
                 <p className="text-gray-500 font-bold text-[10px]">IP Address</p>
-                <p className="font-black text-navy-800">{device.ipAddress || 'N/A'}</p>
+                <p className="font-black text-[#002B9A]">{device.ipAddress || 'N/A'}</p>
               </div>
               <div className="col-span-2 pt-1 border-t border-gray-200">
                 <p className="text-gray-500 font-bold text-[10px]">Registration Date</p>
@@ -218,7 +218,7 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
                     </ul>
                     {remaining > 0 && (
                       <div className="mt-1 flex items-center gap-1">
-                        <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[10px] px-2 py-0.5 rounded-md shadow-xs">
+                        <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
                           + {remaining} isu lainnya terdeteksi
                         </span>
                       </div>
@@ -230,13 +230,13 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
           </div>
         </div>
 
-        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-white/70 backdrop-blur-sm">
           <button
             onClick={() => {
               onClose();
               router.push(`/incidents?agent=${encodeURIComponent(device.agent)}`);
             }}
-            className="w-full bg-navy-800 hover:bg-navy-900 text-white font-extrabold py-2.5 rounded-md text-sm transition shadow-xs"
+            className="w-full bg-[#002B9A] hover:bg-[#002175] text-white font-extrabold py-2.5 rounded-md text-sm transition border border-[#002175]"
           >
             View Incidents for this Agent
           </button>

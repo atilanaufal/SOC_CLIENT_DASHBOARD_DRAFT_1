@@ -1,19 +1,44 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 
-export async function POST() {
-  const response = NextResponse.json({
-    success: true,
-    message: 'Logout berhasil',
-  });
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Sign out on Better Auth server
+    try {
+      await auth.api.signOut({
+        headers: req.headers,
+      });
+    } catch {}
 
-  // Clear session cookie
-  response.cookies.set('auth_session', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
+    const response = NextResponse.json({
+      success: true,
+      message: 'Logout berhasil',
+    });
 
-  return response;
+    // 2. Clear all session cookies
+    const cookieNames = [
+      'better-auth.session_token',
+      '__Secure-better-auth.session_token',
+      'better-auth.session_data',
+      'auth_session',
+    ];
+
+    cookieNames.forEach((name) => {
+      response.cookies.set(name, '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+      });
+    });
+
+    return response;
+  } catch (err: any) {
+    console.error('Logout error:', err);
+    return NextResponse.json(
+      { success: false, error: err.message },
+      { status: 500 }
+    );
+  }
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   HiOutlineChevronDown,
@@ -29,6 +30,51 @@ export default function DashboardPage() {
   const [selectedMoreAgentsIncident, setSelectedMoreAgentsIncident] = useState<Incident | null>(null);
   const [severityFilter, setSeverityFilter] = useState('Critical');
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
+  const [severityCoords, setSeverityCoords] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const severityButtonRef = useRef<HTMLButtonElement>(null);
+  const severityDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updateSeverityPosition = () => {
+    if (severityButtonRef.current) {
+      const rect = severityButtonRef.current.getBoundingClientRect();
+      setSeverityCoords({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isSeverityDropdownOpen) {
+      updateSeverityPosition();
+      window.addEventListener('resize', updateSeverityPosition);
+      window.addEventListener('scroll', updateSeverityPosition);
+      return () => {
+        window.removeEventListener('resize', updateSeverityPosition);
+        window.removeEventListener('scroll', updateSeverityPosition);
+      };
+    }
+  }, [isSeverityDropdownOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        severityDropdownRef.current &&
+        !severityDropdownRef.current.contains(event.target as Node) &&
+        severityButtonRef.current &&
+        !severityButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsSeverityDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     async function loadStats() {
@@ -90,7 +136,7 @@ export default function DashboardPage() {
   const mediumDelta = typeof incStats.mediumDelta === 'number' ? incStats.mediumDelta : 0;
 
   const donutSegments = [
-    { label: 'Medium', value: mediumCount, color: '#FFC700' },
+    { label: 'Medium', value: mediumCount, color: '#D97706' },
     { label: 'High', value: highCount, color: '#FF6B00' },
     { label: 'Critical', value: criticalCount, color: '#FF1E1E' },
   ];
@@ -115,31 +161,31 @@ export default function DashboardPage() {
 
   const renderSeverityBadge = (sev: string) => {
     const s = String(sev || '').toLowerCase();
-    if (s === 'critical') return <span className="bg-[#FF1E1E] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Critical</span>;
-    if (s === 'high') return <span className="bg-[#FF6B00] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">High</span>;
-    if (s === 'medium') return <span className="bg-[#FFC700] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Medium</span>;
-    if (s === 'low') return <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Low</span>;
-    return <span className="bg-slate-600 text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Info</span>;
+    if (s === 'critical') return <span className="bg-[#FF1E1E] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(255,30,30,0.3)]">Critical</span>;
+    if (s === 'high') return <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(255,107,0,0.3)]">High</span>;
+    if (s === 'medium') return <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(217,119,6,0.3)]">Medium</span>;
+    if (s === 'low') return <span className="bg-[#0066B1] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Low</span>;
+    return <span className="bg-slate-600 text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Info</span>;
   };
 
   const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-        <span className="bg-red-50 text-red-600 border border-red-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" /> +{delta}
+        <span className="bg-red-50/80 text-red-600 border border-red-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+          <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> +{delta}
         </span>
       );
     }
     if (delta < 0) {
       return (
-        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" /> {delta}
+        <span className="bg-emerald-50/80 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+          <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> {delta}
         </span>
       );
     }
     return (
-      <span className="bg-gray-100 text-gray-700 border border-gray-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-        <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" /> 0
+      <span className="bg-gray-100/80 text-gray-700 border border-gray-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5">
+        <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> 0
       </span>
     );
   };
@@ -147,61 +193,61 @@ export default function DashboardPage() {
   const renderTrendComparison = (trend: number) => {
     if (trend > 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-red-600">
-          <HiOutlineArrowTrendingUp className="w-4 h-4 text-red-600 stroke-[2.5]" />
+        <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-red-600">
+          <HiOutlineArrowTrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-red-600 stroke-[2.5]" />
         </div>
       );
     }
     if (trend < 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-emerald-600">
-          <HiOutlineArrowTrendingDown className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+        <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-emerald-600">
+          <HiOutlineArrowTrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-emerald-600 stroke-[2.5]" />
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-1 text-xs font-black text-gray-400">
-        <HiOutlineMinus className="w-4 h-4 text-gray-400 stroke-[3]" />
+      <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-gray-400">
+        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-gray-400 stroke-[3]" />
       </div>
     );
   };
 
   return (
-    <div className="h-full flex flex-col gap-3 overflow-hidden w-full">
+    <div className="w-full flex flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-4.5 2xl:gap-6">
       {/* Top Row: Total Severity | Risk Score | Top Incident */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-3.5 md:gap-4 xl:gap-4.5 2xl:gap-6 items-stretch w-full">
         {/* 1. Total Severity */}
-        <div className="lg:col-span-4 xl:col-span-3.5 bg-white rounded-md border border-gray-200 overflow-hidden flex flex-col justify-between">
-          <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base flex-shrink-0">
+        <div className="md:col-span-1 lg:col-span-4 xl:col-span-4 2xl:col-span-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 flex flex-col justify-between overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
             Total Severity
           </div>
 
-          <div className="p-3.5 flex-1 flex flex-col justify-start gap-3">
+          <div className="p-3 sm:p-3.5 md:p-4 xl:p-4.5 2xl:p-5 flex-1 flex flex-col justify-start gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5">
             <div className="flex items-center justify-around py-1">
               <BestDonutChart
                 segments={donutSegments}
                 centerLabel={totalSeverity.toString()}
-                size={140}
+                size={145}
                 strokeWidth={14}
               />
-              <div className="text-center bg-gray-50/80 px-5 py-2.5 rounded-md border border-gray-200 flex flex-col items-center gap-1 min-w-[120px]">
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
-                <div className="flex items-center justify-center gap-1.5 text-gray-900 font-black text-2xl my-0.5">
+              <div className="text-center bg-white/65 backdrop-blur-md px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 py-2 sm:py-2.5 xl:py-3 2xl:py-4 rounded-lg border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(0,0,0,0.02)] flex flex-col items-center gap-1 min-w-[110px] sm:min-w-[120px] xl:min-w-[135px] 2xl:min-w-[150px]">
+                <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
+                <div className="flex items-center justify-center gap-1.5 text-gray-900 font-black text-xl sm:text-2xl md:text-2xl xl:text-3xl 2xl:text-4xl my-0.5">
                   <span>{lastPeriodCount}</span>
                 </div>
-                <div className={`px-3 py-0.5 rounded-md font-black text-xs border flex items-center gap-1 ${
+                <div className={`px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 xl:py-1 2xl:py-1.5 rounded-md font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base border flex items-center gap-1 ${
                   totalDelta > 0
-                    ? 'bg-red-50 text-red-600 border-red-200'
+                    ? 'bg-red-50/80 backdrop-blur-sm text-red-600 border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]'
                     : totalDelta < 0
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                    : 'bg-gray-100 text-gray-700 border-gray-200'
+                    ? 'bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border-emerald-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]'
+                    : 'bg-gray-100/80 backdrop-blur-sm text-gray-700 border-gray-200'
                 }`}>
                   {totalDelta > 0 ? (
-                    <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" />
+                    <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
                   ) : totalDelta < 0 ? (
-                    <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" />
+                    <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
                   ) : (
-                    <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" />
+                    <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
                   )}
                   <span>{totalDelta > 0 ? `+${totalDelta}` : totalDelta}</span>
                 </div>
@@ -209,13 +255,13 @@ export default function DashboardPage() {
             </div>
 
             {/* Breakdown Cards */}
-            <div className="flex flex-col gap-2.5 border-t border-gray-100 pt-2.5">
+            <div className="flex flex-col gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 border-t border-gray-200/50 pt-2 sm:pt-2.5 2xl:pt-3">
               {/* Critical Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FF1E1E] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
+              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#FF1E1E] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
                   Critical: {criticalCount}
                 </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
                   {renderTrendComparison(criticalDelta)}
                   <span>{criticalPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -224,11 +270,11 @@ export default function DashboardPage() {
               </div>
 
               {/* High Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FF6B00] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
+              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
                   High: {highCount}
                 </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
                   {renderTrendComparison(highDelta)}
                   <span>{highPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -237,11 +283,11 @@ export default function DashboardPage() {
               </div>
 
               {/* Medium Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FFC700] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
+              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
                   Medium: {mediumCount}
                 </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
                   {renderTrendComparison(mediumDelta)}
                   <span>{mediumPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -253,7 +299,7 @@ export default function DashboardPage() {
         </div>
 
         {/* 2. Risk Score Widget */}
-        <div className="lg:col-span-3 xl:col-span-3">
+        <div className="md:col-span-1 lg:col-span-3 xl:col-span-3 2xl:col-span-3 h-full">
           <RiskScoreWidget
             score={typeof statsData?.riskScore === 'number' ? statsData.riskScore : (statsData?.riskScore?.score ?? 0)}
             lastMonthScore={statsData?.riskLastMonth ?? 0}
@@ -262,20 +308,25 @@ export default function DashboardPage() {
         </div>
 
         {/* 3. Top Incident */}
-        <div className="lg:col-span-5 xl:col-span-5.5 bg-white rounded-md border border-gray-200 overflow-hidden flex flex-col justify-between h-full">
-          <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base flex items-center justify-between flex-shrink-0">
-            <span>Top Incident</span>
-            <div className="relative">
+        <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col justify-between relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+            <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top Incident</span>
+            <div className="relative z-30">
               <button
+                ref={severityButtonRef}
                 onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-                className="bg-white text-gray-900 text-xs font-bold px-3 py-1 rounded-md flex items-center gap-1 hover:bg-gray-100 transition"
+                className="bg-white/90 backdrop-blur-md text-gray-900 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-md flex items-center gap-1 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer"
               >
                 <span>{severityFilter}</span>
-                <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                <HiOutlineChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
 
-              {isSeverityDropdownOpen && (
-                <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50 text-gray-800 text-xs font-semibold">
+              {isSeverityDropdownOpen && mounted && severityCoords && createPortal(
+                <div
+                  ref={severityDropdownRef}
+                  style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
+                  className="w-32 2xl:w-36 bg-white/80 backdrop-blur-2xl rounded-md border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm 2xl:text-base font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5"
+                >
                   {['Critical', 'High', 'Medium'].map((sev) => (
                     <button
                       key={sev}
@@ -283,32 +334,35 @@ export default function DashboardPage() {
                         setSeverityFilter(sev);
                         setIsSeverityDropdownOpen(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded-md font-bold"
+                      className={`w-full text-left px-3 py-1.5 rounded-md font-bold transition cursor-pointer ${
+                        severityFilter === sev ? 'bg-blue-50/90 text-[#002B9A] font-black' : 'text-gray-700 hover:bg-blue-50/80'
+                      }`}
                     >
                       {sev}
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>
 
-          {/* Item Container */}
-          <div className="divide-y divide-gray-100 flex-1 flex flex-col justify-start px-1 overflow-hidden">
+          {/* Item Container - Clean natural spacing with justify-start */}
+          <div className="divide-y divide-gray-100/80 flex-1 flex flex-col justify-start px-1 overflow-hidden rounded-b-xl relative z-10">
             {isLoading ? (
-              <div className="p-4 text-center text-xs font-bold text-gray-500">Loading top incidents from database...</div>
+              <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">Loading top incidents...</div>
             ) : filteredIncidents.length === 0 ? (
-              <div className="p-4 text-center text-xs font-bold text-gray-500">No {severityFilter} incidents recorded in database.</div>
+              <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">No {severityFilter} incidents found.</div>
             ) : (
-              filteredIncidents.map((inc) => (
+              filteredIncidents.slice(0, 3).map((inc) => (
                 <div
                   key={inc.id}
-                  className="p-2.5 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-blue-50/40 transition flex-shrink-0"
+                  className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-2.5 sm:px-3 md:px-3.5 xl:px-4 2xl:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-blue-50/50 transition flex-shrink-0"
                 >
                   <div className="flex items-start gap-2 flex-1 min-w-0">
                     <div className="mt-0.5 flex-shrink-0">
                       <HiOutlineExclamationCircle
-                        className={`w-3.5 h-3.5 ${
+                        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 ${
                           inc.severity === 'Critical'
                             ? 'text-red-600'
                             : inc.severity === 'High'
@@ -318,7 +372,7 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-xs font-extrabold text-gray-900 leading-tight truncate">
+                      <p className="text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-extrabold text-gray-900 leading-tight truncate">
                         <span
                           className={
                             inc.severity === 'Critical'
@@ -333,13 +387,13 @@ export default function DashboardPage() {
                         {inc.incidentName}
                       </p>
 
-                      <div className="flex items-center gap-1 text-[11px] text-gray-600 truncate">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-[11px] md:text-[11px] xl:text-xs 2xl:text-sm text-gray-600 truncate">
                         <span className="font-bold text-gray-500">Agent:</span>
                         {(inc.agentsList || [inc.agent]).slice(0, 3).map((ag: string, idx: number) => (
                           <React.Fragment key={idx}>
                             <button
                               onClick={() => handleAgentClick(ag, inc.incidentName)}
-                              className="text-blue-700 hover:text-blue-900 hover:underline font-extrabold transition"
+                              className="text-[#0066B1] hover:text-[#002B9A] hover:underline font-extrabold transition"
                             >
                               {ag}
                             </button>
@@ -348,11 +402,11 @@ export default function DashboardPage() {
                         ))}
                       </div>
 
-                      <div className="flex items-center gap-2.5 text-[10px]">
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 font-extrabold border border-gray-200">
+                      <div className="flex items-center gap-2 text-[9px] sm:text-[10px] md:text-[10px] xl:text-[11px] 2xl:text-xs">
+                        <span className="bg-white/75 backdrop-blur-md px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-gray-800 font-extrabold border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)]">
                           Count: <span className="font-black text-gray-900">{inc.count || 1} Detected</span>
                         </span>
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 font-extrabold border border-gray-200">
+                        <span className="bg-white/75 backdrop-blur-md px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-gray-800 font-extrabold border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)]">
                           Observed: <span className="font-black text-gray-900">{inc.lastObserved || inc.firstObserved || 'Recently'}</span>
                         </span>
                       </div>
@@ -365,13 +419,13 @@ export default function DashboardPage() {
                         setSelectedMoreAgentsIncident(inc);
                         setIsMoreAgentsOpen(true);
                       }}
-                      className="bg-gray-800 hover:bg-gray-900 text-white font-black text-xs px-3 py-1 rounded-md transition"
+                      className="bg-black/90 backdrop-blur-sm hover:bg-black text-white font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-1 xl:py-1.5 2xl:py-2 rounded-md transition shadow-[0_2px_6px_rgba(0,0,0,0.15)] cursor-pointer"
                     >
                       More Agents
                     </button>
                     <button
                       onClick={() => router.push(`/incidents?search=${encodeURIComponent(inc.incidentName)}`)}
-                      className="bg-navy-800 hover:bg-navy-900 text-white font-black text-xs px-3.5 py-1 rounded-md transition"
+                      className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-3 sm:px-3.5 xl:px-4 2xl:px-5 py-1 xl:py-1.5 2xl:py-2 rounded-md transition shadow-[0_2px_6px_rgba(0,43,154,0.25)] cursor-pointer"
                     >
                       View
                     </button>
@@ -384,26 +438,26 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Row: Recommended Action - Latest */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden flex-shrink-0">
-        <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base">
+      <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex-shrink-0">
+        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
           Recommended Action - Latest
         </div>
 
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-200/50">
           {isLoading ? (
-            <div className="p-4 text-center text-xs font-bold text-gray-500">Loading recommended actions...</div>
+            <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">Loading recommended actions...</div>
           ) : recommendedActionsSource.length === 0 ? (
-            <div className="p-4 text-center text-xs font-bold text-gray-500">No recommended actions available in database.</div>
+            <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">No recommended actions found.</div>
           ) : (
             recommendedActionsSource.slice(0, 3).map((act, idx) => (
-              <div key={idx} className="p-2.5 px-4 flex items-center justify-between gap-4 hover:bg-gray-50/80 transition">
-                <div className="flex items-center gap-3 min-w-0">
+              <div key={idx} className="p-2 sm:p-2.5 md:p-3 xl:p-3.5 2xl:p-4 px-3 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   {renderSeverityBadge(act.severity)}
                   <div className="min-w-0">
-                    <p className="text-sm font-extrabold text-gray-900 truncate">
+                    <p className="text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-900 truncate">
                       {act.action}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mt-0.5">
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base text-gray-500 font-semibold mt-0.5">
                       <span>{act.date}</span>
                       {act.time && <span>{act.time}</span>}
                     </div>
@@ -411,10 +465,10 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => handleRecommendedActionView(act.id || act.reportId)}
-                  className="bg-navy-800 hover:bg-navy-900 text-white font-bold text-xs px-3.5 py-1.5 rounded-md transition flex items-center gap-1.5 flex-shrink-0"
+                  className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md transition flex items-center gap-1 sm:gap-1.5 flex-shrink-0 shadow-[0_2px_8px_rgba(0,43,154,0.2)] cursor-pointer"
                 >
                   <span>View Report</span>
-                  <HiOutlineArrowUpRight className="w-3.5 h-3.5" />
+                  <HiOutlineArrowUpRight className="w-3.5 h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5" />
                 </button>
               </div>
             ))

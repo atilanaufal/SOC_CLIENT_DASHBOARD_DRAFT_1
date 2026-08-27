@@ -44,23 +44,23 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
       {/* Mobile Backdrop (< lg) */}
       <div
         onClick={onClose}
-        className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-150 cursor-pointer"
+        className="lg:hidden fixed inset-0 bg-slate-950/30 backdrop-blur-sm z-40 animate-in fade-in duration-150 cursor-pointer"
       />
 
       {/* Detail Panel Container */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] bg-white border border-gray-300 rounded-md flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
+        className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-gray-900 px-4 py-3 flex-shrink-0 bg-white">
-          <h3 className="text-lg font-black text-gray-900 tracking-tight">Report Details</h3>
+        <div className="flex items-center justify-between border-b-2 border-[#002B9A] px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <h3 className="text-lg 2xl:text-xl font-black text-gray-900 tracking-tight">Report Details</h3>
           <button
             onClick={onClose}
-            className="text-gray-900 font-bold hover:text-gray-600 p-1 rounded-md transition"
+            className="text-gray-900 font-bold hover:text-gray-600 p-1 rounded-md transition cursor-pointer"
             aria-label="Close report details"
           >
-            <HiOutlineXMark className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5 2xl:w-6 2xl:h-6" />
           </button>
         </div>
 
@@ -69,13 +69,13 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
           {/* Report Name */}
           <div>
             <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Report Name</p>
-            <p className="text-sm font-black text-navy-800">{report.reportName}</p>
+            <p className="text-sm font-black text-[#002B9A]">{report.reportName}</p>
           </div>
 
           {/* Report UUID (placed right after Report Name) */}
           <div className="pt-2">
             <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Report UUID</p>
-            <p className="font-mono text-[11px] text-gray-700 bg-gray-50 p-2 rounded-md border border-gray-200 break-all font-semibold">
+            <p className="font-mono text-[11px] text-gray-700 bg-white/70 backdrop-blur-sm p-2 rounded-md border border-gray-200 break-all font-semibold">
               {uuidDisplay}
             </p>
           </div>
@@ -83,18 +83,18 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
           {/* Severity & SOC ID */}
           <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200 text-xs">
             <div>
-              <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
+              <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
               {renderSeverityBadge(report.severity)}
             </div>
             <div>
-              <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">SOC ID</p>
+              <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">SOC ID</p>
               <p className="font-black text-gray-900 mt-0.5">{socIdDisplay}</p>
             </div>
           </div>
 
           {/* Date Generated */}
           <div className="pt-3 border-t border-gray-200 text-xs">
-            <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">Date Generated</p>
+            <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Date Generated</p>
             <p className="font-bold text-gray-800">{report.dateGenerated}</p>
           </div>
 
@@ -105,7 +105,7 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
               {onOpenFullSummary && (
                 <button
                   onClick={() => onOpenFullSummary(report)}
-                  className="text-[11px] font-extrabold text-navy-800 hover:text-blue-700 flex items-center gap-1"
+                  className="text-[11px] font-extrabold text-[#002B9A] hover:text-[#0066B1] flex items-center gap-1"
                 >
                   <span>Expand</span>
                   <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
@@ -115,14 +115,14 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
 
             <div
               onClick={() => onOpenFullSummary && onOpenFullSummary(report)}
-              className="group cursor-pointer bg-blue-50/60 hover:bg-blue-100/70 p-3 rounded-md border border-blue-200 transition relative"
+              className="group cursor-pointer bg-blue-50/70 hover:bg-blue-100/80 p-3 rounded-md border border-blue-200 transition relative"
             >
               <p className="text-xs text-gray-800 font-medium leading-relaxed">
                 {truncateSummary(report.summary, 160)}
               </p>
 
               {isLongSummary && (
-                <div className="mt-2 pt-2 border-t border-blue-200/80 flex items-center justify-between text-navy-800 font-extrabold text-xs group-hover:text-blue-900">
+                <div className="mt-2 pt-2 border-t border-blue-200/80 flex items-center justify-between text-[#002B9A] font-extrabold text-xs group-hover:text-[#002175]">
                   <span className="flex items-center gap-1.5">
                     <HiOutlineDocumentText className="w-4 h-4 text-blue-600" />
                     Read Full Summary
@@ -136,17 +136,17 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
           {/* Recommended Action */}
           <div className="pt-3 border-t border-gray-200">
             <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-1">Recommended Action</h4>
-            <p className="text-xs font-bold text-gray-800 bg-amber-50/50 p-2.5 rounded-md border border-amber-200 leading-relaxed">
+            <p className="text-xs font-bold text-gray-800 bg-amber-50/70 p-2.5 rounded-md border border-amber-200 leading-relaxed">
               {report.recommendedAction || 'No specific recommended action.'}
             </p>
           </div>
         </div>
 
         {/* Action Button to Open Full Modal */}
-        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-white/70 backdrop-blur-sm">
           <button
             onClick={() => onOpenFullSummary && onOpenFullSummary(report)}
-            className="w-full bg-navy-800 hover:bg-navy-900 text-white font-extrabold py-2.5 rounded-md text-sm transition shadow-xs flex items-center justify-center gap-2"
+            className="w-full bg-[#002B9A] hover:bg-[#002175] text-white font-extrabold py-2.5 rounded-md text-sm transition flex items-center justify-center gap-2 border border-[#002175]"
           >
             <HiOutlineDocumentText className="w-4 h-4 text-blue-300" />
             <span>View Full Report Summary</span>
