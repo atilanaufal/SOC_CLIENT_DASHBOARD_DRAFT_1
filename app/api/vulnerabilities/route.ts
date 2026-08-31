@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-<<<<<<< Updated upstream
-import { fetchVulnerabilitiesData } from '@/lib/redis-sync';
-=======
+
 import { getTenantVulnerabilities } from '@/lib/data-service';
->>>>>>> Stashed changes
+
 import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
@@ -85,13 +83,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    // Get Tenant Context from logged in user session
-    const tenant = getTenantContext(request);
 
-    // Fetch from Redis / MongoDB strictly for this tenant
-    const { data: rawDocs, source } = await fetchVulnerabilitiesData(timeRange, tenant.databaseName, tenant.redisPrefix);
-=======
     // Authenticated Tenant Context
     const tenant = await getTenantContext(request);
     if (!tenant) {
@@ -100,7 +92,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
->>>>>>> Stashed changes
+
 
     // Query vulnerabilities directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
     const rawDocs = await getTenantVulnerabilities(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
@@ -142,12 +134,7 @@ export async function GET(request: Request) {
       docs = docs.filter((d: any) => matchesTimeRange(d, timeRange, startDate, endDate));
     }
 
-<<<<<<< Updated upstream
-    const vulnerabilities = timeFilteredDocs.map((doc: any) => {
-      const idStr = doc._id ? doc._id.toString() : String(doc.id || Math.random());
-      const rawStatus = String(doc.status || '').trim().toLowerCase();
-      const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
-=======
+
     const mapped = docs.map((doc: any, index: number) => {
       let sev = String(doc.severity || 'Medium');
       sev = sev.charAt(0).toUpperCase() + sev.slice(1).toLowerCase();
@@ -156,7 +143,7 @@ export async function GET(request: Request) {
         String(doc.status).toLowerCase() === 'solved' ||
         String(doc.status).toLowerCase() === 'pass' ||
         String(doc.status).toLowerCase() === 'patched';
->>>>>>> Stashed changes
+
 
       return {
         id: String(doc.id || doc._id || `vuln-${index + 1}`),
@@ -176,14 +163,11 @@ export async function GET(request: Request) {
         impact: doc.impact || '',
         category: doc.category || 'Software',
         classification: doc.category || 'Software',
-<<<<<<< Updated upstream
-        ip: doc.ip || 'N/A',
-        tenant: tenant.campusName
-=======
+
         package: doc.package || '',
         ip: doc.ip || doc.agent_ip || 'N/A',
         tenant: tenant.campusName,
->>>>>>> Stashed changes
+
       };
     });
 
@@ -204,14 +188,10 @@ export async function GET(request: Request) {
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
-<<<<<<< Updated upstream
-      dataSource: source, // 'redis' (1-7d) or 'mongodb' (1 month)
-      total: vulnerabilities.length,
-      data: vulnerabilities
-=======
+
       data: result,
       total: result.length,
->>>>>>> Stashed changes
+
     });
   } catch (error: any) {
     console.error('Error fetching vulnerabilities:', error);

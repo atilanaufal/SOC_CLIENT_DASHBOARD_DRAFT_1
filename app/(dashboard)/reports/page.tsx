@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  HiOutlineMagnifyingGlass,
-  HiOutlineArrowPath,
   HiOutlineDocumentText,
+  HiOutlineMagnifyingGlass,
   HiOutlineAdjustmentsHorizontal,
   HiChevronUp,
-  HiChevronDown
+  HiChevronDown,
 } from 'react-icons/hi2';
 import { SecurityReport } from '@/lib/types';
 import { fetchReports } from '@/lib/api-client';
@@ -23,9 +22,9 @@ type SortDirection = 'asc' | 'desc';
 
 function renderSeverityBadge(sev: string) {
   const s = String(sev || '').toLowerCase();
-  if (s === 'critical') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-red-100 text-red-800 border border-red-300">Critical</span>;
-  if (s === 'high') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-orange-100 text-orange-800 border border-orange-300">High</span>;
-  if (s === 'medium') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">Medium</span>;
+  if (s === 'critical') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]">Critical</span>;
+  if (s === 'high') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]">High</span>;
+  if (s === 'medium') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]">Medium</span>;
   if (s === 'low') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-blue-100 text-blue-800 border border-blue-300">Low</span>;
   return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-slate-100 text-slate-800 border border-slate-300">Info</span>;
 }
@@ -59,13 +58,20 @@ function ReportsContent() {
       setError(null);
       const data = await fetchReports({
         timeRange: timeFilter,
-        startDate: customRange?.startDate,
-        endDate: customRange?.endDate,
+        startDate: customRange?.startDate || undefined,
+        endDate: customRange?.endDate || undefined,
       });
-      setReports(data);
+      setReports(data || []);
+
+      if (targetReportId && data && data.length > 0) {
+        const found = data.find((r) => r.id === targetReportId || String(r.report_id) === targetReportId);
+        if (found) {
+          setSelectedReport(found);
+          setIsDrawerOpen(true);
+        }
+      }
     } catch (err: any) {
-      console.error('Failed to load reports:', err);
-      setError(err.message || 'Failed to load reports');
+      setError(err.message || 'Failed to fetch reports');
     } finally {
       setIsLoading(false);
     }
@@ -73,76 +79,74 @@ function ReportsContent() {
 
   useEffect(() => {
     loadData();
-  }, [timeFilter, customRange]);
+  }, [timeFilter, customRange, targetReportId]);
 
-  useEffect(() => {
-    if (targetReportId && reports.length > 0) {
-      const found = reports.find((r) => r.id === targetReportId || r.report_id === Number(targetReportId) || r._id === targetReportId);
-      if (found) {
-        setSelectedReport(found);
-        setIsDrawerOpen(true);
+  const filterSections: FilterSection[] = useMemo(() => {
+    const severities = Array.from(new Set(reports.map((r) => r.severity).filter(Boolean)));
+
+    return [
+      {
+        key: 'severity',
+        label: 'Severity Level',
+        type: 'buttons',
+        options: severities.length ? severities : ['Critical', 'High', 'Medium'],
+      },
+    ];
+  }, [reports]);
+
+  const handleApplyFilters = (filters: Record<string, string>) => {
+    setActiveFilters(filters);
+    setCurrentPage(1);
+  };
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((r) => {
+      // Search
+      const search = searchTerm.toLowerCase();
+      const matchSearch =
+        !searchTerm ||
+        r.reportName.toLowerCase().includes(search) ||
+        (r.summary && r.summary.toLowerCase().includes(search)) ||
+        (r.recommendedAction && r.recommendedAction.toLowerCase().includes(search));
+
+      if (!matchSearch) return false;
+
+      // Filter
+      if (activeFilters.severity && activeFilters.severity !== 'All') {
+        if (r.severity.toLowerCase() !== activeFilters.severity.toLowerCase()) return false;
       }
-    }
-  }, [targetReportId, reports]);
 
+      return true;
+    });
+  }, [reports, searchTerm, activeFilters]);
+
+  // Handle Sort
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      if (key === 'dateGenerated') {
-        setSortDirection('desc');
-      } else {
-        setSortDirection('asc');
-      }
+      setSortDirection('asc');
     }
+    setCurrentPage(1);
   };
 
-  const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(reports.map((r) => r.severity))).filter(Boolean);
-
-    return [
-      { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-    ];
-  }, [reports]);
-
-  const filteredReports = useMemo(() => {
-    return reports.filter((rep) => {
-      const matchesSearch =
-        rep.reportName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rep.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (rep.recommendedAction && rep.recommendedAction.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : String(rep.severity || '').toLowerCase() === activeFilters.severity.toLowerCase();
-
-      return matchesSearch && matchesSeverity;
-    });
-  }, [reports, searchTerm, activeFilters]);
-
   const sortedReports = useMemo(() => {
-    return [...filteredReports].sort((a: any, b: any) => {
-      if (sortKey === 'dateGenerated') {
-        const getTime = (r: any) => {
-          const raw = r.date_generated || r.dateGenerated || r.created_at || r.date;
-          if (!raw) return 0;
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? 0 : d.getTime();
-        };
-        const aTime = getTime(a);
-        const bTime = getTime(b);
-        return sortDirection === 'desc' ? bTime - aTime : aTime - bTime;
-      }
-
-      let aVal: any = a[sortKey] || '';
-      let bVal: any = b[sortKey] || '';
+    return [...filteredReports].sort((a, b) => {
+      let aVal = a[sortKey] || '';
+      let bVal = b[sortKey] || '';
 
       if (sortKey === 'severity') {
-        const order: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, informational: 0, info: 0 };
-        aVal = order[String(aVal).toLowerCase()] || 0;
-        bVal = order[String(bVal).toLowerCase()] || 0;
+        const severityWeight: Record<string, number> = {
+          critical: 4,
+          high: 3,
+          medium: 2,
+          low: 1,
+          unspecified: 0,
+        };
+        const aWeight = severityWeight[String(aVal).toLowerCase()] || 0;
+        const bWeight = severityWeight[String(bVal).toLowerCase()] || 0;
+        return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
       }
 
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
@@ -179,15 +183,10 @@ function ReportsContent() {
   };
 
   return (
-<<<<<<< Updated upstream
-    <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
-      {/* Left Container: KPI Card + Search Bar + Table */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
-=======
     <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
       {/* Left Container: KPI Card + Search Bar + Table */}
-      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
->>>>>>> Stashed changes
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px] min-h-0" : ""}`}>
+
         {/* KPI */}
         <div className="max-w-md bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 2xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3 sm:gap-3.5 2xl:gap-4 flex-shrink-0">
           <div className="w-10 h-10 sm:w-12 sm:h-12 2xl:w-14 2xl:h-14 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center font-black text-xs border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)]">
@@ -228,31 +227,30 @@ function ReportsContent() {
             onClick={() => loadData()}
             className="bg-black/90 backdrop-blur-sm text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md flex items-center gap-1 sm:gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] cursor-pointer"
           >
-            <HiOutlineArrowPath className={`w-3 h-3 sm:w-3.5 sm:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <span className="font-bold">Refresh</span>
           </button>
         </div>
 
         {/* Data Table Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse min-w-[650px]">
-              <thead>
-                <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                  <th onClick={() => handleSort('reportName')} className="py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                <tr className="bg-[#002B9A] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  <th onClick={() => handleSort('reportName')} className="bg-[#002B9A] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Report Name</span>
                       {renderSortIndicator('reportName')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('severity')} className="py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+                  <th onClick={() => handleSort('severity')} className="bg-[#002B9A] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Severity</span>
                       {renderSortIndicator('severity')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('dateGenerated')} className="py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+                  <th onClick={() => handleSort('dateGenerated')} className="bg-[#002B9A] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Date Generated</span>
                       {renderSortIndicator('dateGenerated')}
                     </div>
@@ -279,43 +277,29 @@ function ReportsContent() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedReports.map((rep) => {
-                    const repId = rep.id || rep.reportName;
-                    const selectedId = selectedReport?.id || selectedReport?.reportName;
-                    const isSelected = Boolean(isDrawerOpen && selectedId && repId && selectedId === repId);
-                    const parts = (rep.dateGenerated || '').split(' ');
+                  paginatedReports.map((report) => {
+                    const isSelected = Boolean(isDrawerOpen && selectedReport?.id === report.id);
+                    const parts = (report.dateGenerated || '').split(' ');
                     const datePart = parts.slice(0, 3).join(' ');
                     const timePart = parts.slice(3).join(' ');
 
                     return (
                       <tr
-                        key={rep.id}
-                        onClick={() => handleToggleDetail(rep)}
+                        key={report.id}
+                        onClick={() => handleToggleDetail(report)}
                         className={`cursor-pointer transition ${
-<<<<<<< Updated upstream
-                          isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
+                          isSelected
+                            ? 'bg-blue-100/80'
+                            : 'hover:bg-blue-50/40'
                         }`}
                       >
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
-                          <div className="flex items-center gap-2">
-                            <HiOutlineDocumentText className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
-=======
-                          isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
-                        }`}
-                      >
-                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
                           {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
-                          <div className="flex items-center gap-2">
-                            
->>>>>>> Stashed changes
-                            <span>{rep.reportName}</span>
-                          </div>
+                          <span>{report.reportName}</span>
                         </td>
-
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
-                          {renderSeverityBadge(rep.severity)}
+                          {renderSeverityBadge(report.severity)}
                         </td>
-
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">
                           <div className="flex flex-col leading-tight">
                             <span className="font-extrabold text-gray-900 text-xs sm:text-xs xl:text-sm 2xl:text-base">{datePart}</span>
@@ -331,7 +315,7 @@ function ReportsContent() {
           </div>
 
           {/* Interactive Pagination Controls */}
-          <div className="p-2 sm:p-2.5 xl:p-3 2xl:p-3.5 border-t border-white/60 bg-white/60 backdrop-blur-md flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-700 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <div className="bg-white/60 backdrop-blur-md border-t border-white/60 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-2 xl:py-2.5 2xl:py-3 flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {filteredReports.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredReports.length)} of {filteredReports.length} Reports
             </div>
@@ -344,28 +328,32 @@ function ReportsContent() {
         </div>
       </div>
 
-      {/* Right Container: Detail Drawer */}
+      {/* Slide-out Drawer */}
       <ReportDetailDrawer
-        report={selectedReport}
         isOpen={isDrawerOpen}
-        onClose={() => { setIsDrawerOpen(false); setSelectedReport(null); }}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedReport(null);
+        }}
+        report={selectedReport}
         onOpenFullSummary={(rep) => setSelectedFullReport(rep)}
       />
 
-      {/* Large Full Summary Modal */}
+      {/* Full Screen Report Detail Modal */}
       <ReportDetailsModal
-        report={selectedFullReport}
-        isOpen={!!selectedFullReport}
+        isOpen={Boolean(selectedFullReport)}
         onClose={() => setSelectedFullReport(null)}
+        report={selectedFullReport}
       />
 
+      {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={(filters) => { setActiveFilters(filters); setCurrentPage(1); }}
-        initialFilters={activeFilters}
-        sections={adaptiveFilterSections}
         title="Filter Reports"
+        sections={filterSections}
+        initialFilters={activeFilters}
+        onApply={handleApplyFilters}
       />
     </div>
   );
@@ -373,7 +361,7 @@ function ReportsContent() {
 
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="p-4 font-bold text-gray-700">Loading Reports...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-sm font-bold text-gray-500">Loading reports...</div>}>
       <ReportsContent />
     </Suspense>
   );

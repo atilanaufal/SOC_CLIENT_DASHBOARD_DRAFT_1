@@ -2,11 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-<<<<<<< Updated upstream
-import { HiOutlineKey, HiOutlineArrowRightOnRectangle, HiOutlineClock, HiOutlineUser } from 'react-icons/hi2';
-=======
+
 import { HiOutlineArrowRightOnRectangle, HiOutlineClock, HiOutlineUser } from 'react-icons/hi2';
->>>>>>> Stashed changes
+
 import { useRouter } from 'next/navigation';
 
 interface ProfileDropdownProps {
@@ -138,17 +136,13 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
               {userSession?.username && (
                 <p className="text-[10px] sm:text-[10px] xl:text-[11px] 2xl:text-xs text-gray-500 font-semibold truncate">@{userSession.username}</p>
               )}
-<<<<<<< Updated upstream
-              <span className="inline-block bg-blue-100/90 text-[#002B9A] text-[10px] sm:text-[10px] xl:text-[11px] 2xl:text-xs font-bold px-1.5 py-0.5 rounded mt-0.5 border border-blue-200">
-                Tenant: {userSession?.tenant_code || 'UI'}
-              </span>
-=======
+
               {userSession?.tenant_code && (
                 <span className="inline-block bg-blue-100/90 text-[#002B9A] text-[10px] sm:text-[10px] xl:text-[11px] 2xl:text-xs font-bold px-1.5 py-0.5 rounded mt-0.5 border border-blue-200">
                   Tenant: {userSession.tenant_code}
                 </span>
               )}
->>>>>>> Stashed changes
+
             </div>
           </div>
 
@@ -161,28 +155,12 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
           {/* Actions */}
           <div className="pt-1 space-y-1">
             <button
-<<<<<<< Updated upstream
-              onClick={() => {
-                alert('Reset password link has been sent to your admin email.');
-                setIsOpen(false);
-              }}
-              className="w-full text-left py-1.5 sm:py-2 px-2 text-red-600 font-bold text-xs sm:text-xs xl:text-sm 2xl:text-base hover:bg-red-50/80 rounded-md transition flex items-center gap-2 cursor-pointer"
-            >
-              <HiOutlineKey className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
-              Reset Password
-            </button>
 
-            <button
-              onClick={handleLogout}
-              className="w-full text-left py-1.5 sm:py-2 px-2 text-gray-800 font-bold text-xs sm:text-xs xl:text-sm 2xl:text-base hover:bg-blue-50/80 rounded-md transition flex items-center gap-2 cursor-pointer"
-            >
-              <HiOutlineArrowRightOnRectangle className="w-4 h-4 xl:w-4.5 xl:h-4.5" />
-=======
               onClick={handleLogout}
               className="w-full text-left py-1.5 sm:py-2 px-2 text-gray-800 font-bold text-xs sm:text-xs xl:text-sm 2xl:text-base hover:bg-blue-50/80 rounded-md transition flex items-center gap-2 cursor-pointer"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4 xl:w-4.5 xl:h-4.5 text-[#002B9A]" />
->>>>>>> Stashed changes
+
               Log Out
             </button>
           </div>

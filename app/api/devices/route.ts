@@ -45,9 +45,7 @@ function formatAgo(dateStr?: string): string {
 
 export async function GET(request: Request) {
   try {
-<<<<<<< Updated upstream
-    const tenant = getTenantContext(request);
-=======
+
     const tenant = await getTenantContext(request);
     if (!tenant) {
       return NextResponse.json(
@@ -55,7 +53,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
->>>>>>> Stashed changes
+
 
     // Prioritas 1: Redis Cache (<tenant.redisPrefix>:devices:list) -> < 1ms
     // Prioritas 2 (Safety Net): MongoDB (<tenant.databaseName>.devices) -> 5-10ms
@@ -69,15 +67,11 @@ export async function GET(request: Request) {
       const dateFormatted = formatDate(dev.last_keepalive);
       const agoFormatted = formatAgo(dev.last_keepalive);
 
-<<<<<<< Updated upstream
-      const cpu = dev.cpu || dev.hardware?.cpu_name || 'AMD Ryzen 5 6600H with Radeon Graphics';
-      const cores = dev.cores || (dev.hardware?.cores ? String(dev.hardware.cores) : '4');
-      const ram = dev.ram || dev.hardware?.ram_total || '7.8 GB';
-=======
+
       const cpu = dev.cpu || dev.hardware?.cpu_name || 'N/A';
       const cores = dev.cores || (dev.hardware?.cores ? String(dev.hardware.cores) : 'N/A');
       const ram = dev.ram || dev.hardware?.ram_total || 'N/A';
->>>>>>> Stashed changes
+
 
       return {
         id: dev.id,
@@ -90,11 +84,9 @@ export async function GET(request: Request) {
         rawLastKeepAlive: dev.last_keepalive,
         registrationDate: formatDate(dev.date_add),
         dateAdd: dev.date_add,
-<<<<<<< Updated upstream
-        ipAddress: dev.ip || '127.0.0.1',
-=======
+
         ipAddress: dev.ip || '',
->>>>>>> Stashed changes
+
         agentVersion: dev.version || 'Wazuh Agent',
         manager: 'Wazuh Manager',
         nodeName: 'N/A',
@@ -128,11 +120,7 @@ export async function GET(request: Request) {
       data: devices,
     });
   } catch (error: any) {
-<<<<<<< Updated upstream
-    console.error('[API /api/devices] Error fetching devices from store:', error.message);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch devices' },
-=======
+
     console.error('[API /api/devices] Error fetching devices:', error.message);
     return NextResponse.json(
       {
@@ -141,7 +129,7 @@ export async function GET(request: Request) {
           ? 'Gagal memuat data perangkat.'
           : error.message || 'Failed to fetch devices',
       },
->>>>>>> Stashed changes
+
       { status: 500 }
     );
   }

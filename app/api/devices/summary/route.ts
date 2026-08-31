@@ -63,9 +63,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    const tenant = getTenantContext(request);
-=======
+
     const tenant = await getTenantContext(request);
     if (!tenant) {
       return NextResponse.json(
@@ -73,7 +71,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
->>>>>>> Stashed changes
+
 
     // Prioritas 1: Redis (<tenant.redisPrefix>:devices:summary) -> < 1ms
     // Prioritas 2 (Fallback): MongoDB (<tenant.databaseName>.device_summary) -> 5-10ms

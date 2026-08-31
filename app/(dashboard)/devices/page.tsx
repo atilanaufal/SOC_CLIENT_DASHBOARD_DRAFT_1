@@ -6,9 +6,7 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlineArrowPath,
   HiOutlineComputerDesktop,
-  HiOutlineServer,
   HiOutlineAdjustmentsHorizontal,
-  HiOutlineExclamationCircle,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
@@ -270,15 +268,10 @@ function DevicesContent() {
   };
 
   return (
-<<<<<<< Updated upstream
-    <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
-      {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
-=======
     <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
       {/* Left Container: KPI Cards + Search Bar + Table */}
       <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
->>>>>>> Stashed changes
+
         {/* Critical Error Banner */}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-900 px-3 py-2 rounded-md text-xs font-bold flex items-center justify-between flex-shrink-0">
@@ -338,26 +331,17 @@ function DevicesContent() {
               Devices At Risk !
             </p>
             <div className="grid grid-cols-3 gap-1 sm:gap-1.5 xl:gap-2 2xl:gap-2.5 mt-1 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black">
-              <div className="flex items-center gap-1 text-red-600 bg-red-50/80 backdrop-blur-sm p-1 sm:p-1.5 xl:p-2 2xl:p-2.5 rounded-lg border border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Critical</span>
-                  <span>{totalCritical}</span>
-                </div>
+              <div className="flex flex-col text-[#B8251B] bg-red-50/80 backdrop-blur-sm p-1.5 sm:p-2 xl:p-2.5 rounded-lg border border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Critical</span>
+                <span className="text-base sm:text-lg xl:text-xl font-black">{totalCritical}</span>
               </div>
-              <div className="flex items-center gap-1 text-orange-600 bg-orange-50/80 backdrop-blur-sm p-1.5 xl:p-2 rounded-lg border border-orange-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">High</span>
-                  <span>{totalHigh}</span>
-                </div>
+              <div className="flex flex-col text-[#EA580C] bg-orange-50/80 backdrop-blur-sm p-1.5 sm:p-2 xl:p-2.5 rounded-lg border border-orange-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">High</span>
+                <span className="text-base sm:text-lg xl:text-xl font-black">{totalHigh}</span>
               </div>
-              <div className="flex items-center gap-1 text-amber-600 bg-amber-50/80 backdrop-blur-sm p-1.5 xl:p-2 rounded-lg border border-amber-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Medium</span>
-                  <span>{totalMedium}</span>
-                </div>
+              <div className="flex flex-col text-[#1E429F] bg-blue-50/80 backdrop-blur-sm p-1.5 sm:p-2 xl:p-2.5 rounded-lg border border-blue-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Medium</span>
+                <span className="text-base sm:text-lg xl:text-xl font-black">{totalMedium}</span>
               </div>
             </div>
           </div>
@@ -413,35 +397,35 @@ function DevicesContent() {
               </div>
             ) : (
               <table className="w-full text-left border-collapse min-w-[850px]">
-                <thead>
-                  <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                    <th onClick={() => handleSort('agent')} className="w-[18%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                  <tr className="bg-[#002B9A] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[18%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Agent</span>
                         {renderSortIndicator('agent')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('os')} className="w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('os')} className="bg-[#002B9A] w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Operating System</span>
                         {renderSortIndicator('os')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('status')} className="w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('status')} className="bg-[#002B9A] w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Status</span>
                         {renderSortIndicator('status')}
                       </div>
                     </th>
-                    <th className="w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">Severity Breakdown</th>
-                    <th onClick={() => handleSort('score')} className="w-[14%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th className="bg-[#002B9A] text-white w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">Severity Breakdown</th>
+                    <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[14%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Score</span>
                         {renderSortIndicator('score')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('lastSeen')} className="w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Last Seen</span>
                         {renderSortIndicator('lastSeen')}
                       </div>
@@ -466,30 +450,16 @@ function DevicesContent() {
                         key={dev.id}
                         onClick={() => handleToggleDetail(dev)}
                         className={`cursor-pointer transition ${
-<<<<<<< Updated upstream
-                          isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
-                        }`}
-                      >
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
-                          <div className="flex items-center gap-2 truncate">
-                            <HiOutlineServer className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
-                            <span className="truncate" title={dev.agent}>{dev.agent}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 truncate" title={dev.os}>
-=======
                           isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
                         }`}
                       >
                         <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
                           {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
                           <div className="flex items-center gap-2 truncate">
-                            
                             <span className="truncate" title={dev.agent}>{dev.agent}</span>
                           </div>
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 break-words max-w-[180px] whitespace-normal" title={dev.os}>
->>>>>>> Stashed changes
                           {dev.os}
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-black">
@@ -500,15 +470,6 @@ function DevicesContent() {
                                 : 'bg-red-100 text-red-800 border border-red-300'
                             }`}
                           >
-<<<<<<< Updated upstream
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                dev.status === 'Online' ? 'bg-emerald-500' : 'bg-red-500'
-                              }`}
-                            />
-=======
-                            
->>>>>>> Stashed changes
                             {dev.status}
                           </span>
                         </td>
@@ -516,14 +477,14 @@ function DevicesContent() {
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
                           <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm">
                             {dev.criticalCount ? (
-                              <span className="bg-red-100 text-red-800 px-1.5 sm:px-2 py-0.5 rounded border border-red-300 font-black">
+                              <span className="bg-[#FDE8E8] text-[#B8251B] px-1.5 sm:px-2 py-0.5 rounded border border-[#F8B4B4] font-black">
                                 Critical: {dev.criticalCount}
                               </span>
                             ) : null}
-                            <span className="bg-orange-100 text-orange-800 px-1.5 sm:px-2 py-0.5 rounded border border-orange-300 font-black">
+                            <span className="bg-[#FFEDD5] text-[#C2410C] px-1.5 sm:px-2 py-0.5 rounded border border-[#FDBA74] font-black">
                               High: {dev.highCount || 0}
                             </span>
-                            <span className="bg-amber-100 text-amber-900 px-1.5 sm:px-2 py-0.5 rounded border border-amber-300 font-black">
+                            <span className="bg-[#EBF5FF] text-[#1E429F] px-1.5 sm:px-2 py-0.5 rounded border border-[#BFDBFE] font-black">
                               Medium: {dev.mediumCount || 0}
                             </span>
                           </div>
@@ -541,11 +502,10 @@ function DevicesContent() {
                             </span>
                           </div>
                         </td>
-
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-bold">
                           <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs sm:text-xs xl:text-sm 2xl:text-base">{datePart}</span>
-                            {agoPart && <span className="text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-semibold">({agoPart})</span>}
+                            <span className="font-extrabold text-xs sm:text-xs xl:text-sm 2xl:text-base">{datePart}</span>
+                            {agoPart && <span className="text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-semibold">{agoPart}</span>}
                           </div>
                         </td>
                       </tr>
@@ -556,13 +516,11 @@ function DevicesContent() {
             )}
           </div>
 
-          {/* Table Footer / Pagination */}
-          <div className="p-2 sm:p-2.5 xl:p-3 2xl:p-3.5 border-t border-white/60 bg-white/60 backdrop-blur-md flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-700 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
-            <span>
-              Showing {filteredDevices.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
-              {Math.min(currentPage * pageSize, sortedDevices.length)} of {sortedDevices.length} devices
-            </span>
-
+          {/* Interactive Pagination Controls */}
+          <div className="bg-white/60 backdrop-blur-md border-t border-white/60 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-2 xl:py-2.5 2xl:py-3 flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+            <div>
+              Showing {filteredDevices.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredDevices.length)} of {filteredDevices.length} Devices
+            </div>
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -572,22 +530,24 @@ function DevicesContent() {
         </div>
       </div>
 
-      {/* Right Drawer Panel */}
+      {/* Right Container: Detail Drawer */}
       <DeviceDetailDrawer
         device={selectedDevice}
         isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedDevice(null);
+        }}
         highlightIssue={initialHighlight}
       />
 
-      {/* Adaptive Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        title="Filter Devices"
-        sections={adaptiveFilterSections}
-        initialFilters={activeFilters}
         onApply={handleApplyFilters}
+        initialFilters={activeFilters}
+        sections={adaptiveFilterSections}
+        title="Filter Devices"
       />
     </div>
   );
@@ -595,7 +555,7 @@ function DevicesContent() {
 
 export default function DevicesPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-xs font-bold text-gray-500">Loading Devices...</div>}>
+    <Suspense fallback={<div className="p-4 font-bold text-gray-700">Loading Devices...</div>}>
       <DevicesContent />
     </Suspense>
   );

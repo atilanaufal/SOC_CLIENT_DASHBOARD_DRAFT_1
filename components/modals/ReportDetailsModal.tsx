@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-<<<<<<< Updated upstream
-import { SecurityReport } from '@/lib/mock-data';
-=======
+import {
+  HiOutlineXMark,
+  HiOutlineDocumentText,
+  HiOutlineServerStack,
+  HiOutlineShieldExclamation,
+  HiOutlineInformationCircle,
+} from 'react-icons/hi2';
 import { SecurityReport } from '@/lib/types';
->>>>>>> Stashed changes
-import { HiOutlineXMark, HiOutlineDocumentText } from 'react-icons/hi2';
 
 interface ReportDetailsModalProps {
   report: SecurityReport | null;
@@ -50,35 +52,29 @@ function renderSummaryContent(text: string) {
       continue;
     }
 
-    // Base64 images or standard markdown images ![alt](url)
-    const imgMatch = line.match(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^\)]+|\https?:\/\/[^\)]+)\)/);
-    if (imgMatch) {
+    // Markdown Headers
+    if (line.startsWith('### ')) {
       elements.push(
-        <div key={key++} className="my-3 flex flex-col items-center">
-          <img src={imgMatch[2]} alt={imgMatch[1] || 'Report Image'} className="max-w-full h-auto rounded border border-gray-300 max-h-[450px] object-contain" />
-          {imgMatch[1] && <span className="text-xs text-gray-500 italic mt-1">{imgMatch[1]}</span>}
-        </div>
+        <h4 key={key++} className="text-sm font-bold text-gray-900 mt-4 mb-1 border-b border-gray-200 pb-1">
+          {line.replace('### ', '')}
+        </h4>
       );
-      continue;
-    }
-
-    if (line.startsWith('## ')) {
-      elements.push(<h2 key={key++} className="text-lg font-black text-navy-800 border-b border-gray-200 pb-1 mt-4 mb-2">{line.replace('## ', '')}</h2>);
-    } else if (line.startsWith('### ')) {
-      elements.push(<h3 key={key++} className="text-base font-bold text-gray-900 mt-3 mb-1.5">{line.replace('### ', '')}</h3>);
-    } else if (line.startsWith('# ')) {
-      elements.push(<h1 key={key++} className="text-xl font-black text-navy-900 border-b-2 border-navy-800 pb-1 mt-4 mb-2">{line.replace('# ', '')}</h1>);
-    } else if (line.startsWith('- [x] ') || line.startsWith('- [ ] ')) {
-      const isChecked = line.startsWith('- [x] ');
+    } else if (line.startsWith('## ')) {
       elements.push(
-        <div key={key++} className="flex items-center gap-2 my-1 text-xs font-semibold text-gray-800 pl-2">
-          <input type="checkbox" checked={isChecked} readOnly className="rounded border-gray-300 text-navy-800" />
-          <span>{line.replace(/- \[[ x]\] /, '')}</span>
-        </div>
+        <h3 key={key++} className="text-base font-bold text-gray-900 mt-5 mb-2 border-b border-gray-300 pb-1">
+          {line.replace('## ', '')}
+        </h3>
+      );
+    } else if (line.startsWith('# ')) {
+      elements.push(
+        <h2 key={key++} className="text-lg font-bold text-[#002B9A] mt-6 mb-2 border-b border-[#002B9A]/20 pb-1">
+          {line.replace('# ', '')}
+        </h2>
       );
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      // Bullet list items
       elements.push(
-        <li key={key++} className="text-xs font-semibold text-gray-800 ml-4 list-disc my-0.5 leading-relaxed">
+        <li key={key++} className="text-xs text-gray-700 ml-4 list-disc my-0.5">
           {line.replace(/^[-*] /, '')}
         </li>
       );
@@ -144,11 +140,11 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               <span
                 className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black ${
                   report.severity === 'Critical'
-                    ? 'bg-red-100 text-red-800 border border-red-300'
+                    ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                     : report.severity === 'High'
-                    ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                    ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
                     : report.severity === 'Medium'
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    ? 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
                     : report.severity === 'Low'
                     ? 'bg-blue-100 text-blue-800 border border-blue-300'
                     : 'bg-slate-100 text-slate-800 border border-slate-300'
@@ -170,52 +166,72 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
         {/* Content Area with Vertical Scroll */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6 text-gray-900 bg-[#edf2f7]">
-          {/* Full Summary Section */}
-          <div className="bg-white/90 p-4 rounded-md border border-gray-200">
-            <h4 className="text-sm font-black uppercase text-[#002B9A] tracking-wider mb-3 flex items-center gap-2 border-b border-blue-200 pb-2">
-              <HiOutlineDocumentText className="w-4 h-4 text-[#0066B1]" />
-              <span>Full Report Summary</span>
-            </h4>
-            <div className="prose prose-sm max-w-none">
-              {renderSummaryContent(report.summary)}
+          {/* Executive Summary */}
+          <section className="bg-white/80 backdrop-blur-xl p-5 rounded-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+              <HiOutlineShieldExclamation className="w-5 h-5 text-[#002B9A]" />
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Executive Summary</h4>
             </div>
-          </div>
-
-          {/* Recommended Action Section */}
-          {report.recommendedAction && (
-            <div className="bg-white/90 p-4 rounded-md border border-gray-200">
-              <h4 className="text-sm font-black uppercase text-amber-800 tracking-wider mb-2">
-                Recommended Action
-              </h4>
-              <div className="text-xs font-semibold text-gray-900 whitespace-pre-wrap leading-relaxed">
-                {renderSummaryContent(report.recommendedAction)}
-              </div>
+            <div className="prose prose-sm max-w-none text-xs text-gray-800">
+              {renderSummaryContent(report.summary || 'No detailed executive summary available.')}
             </div>
-          )}
+          </section>
 
-          {/* Optional Affected Devices (only rendered if present in DB) */}
+          {/* Affected Devices List */}
           {report.affectedDevices && report.affectedDevices.length > 0 && (
-            <div>
-              <h4 className="font-extrabold text-xs text-gray-700 uppercase tracking-wider mb-2">Affected Devices</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <section className="bg-white/80 backdrop-blur-xl p-5 rounded-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                <HiOutlineServerStack className="w-5 h-5 text-[#002B9A]" />
+                <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Impacted Assets ({report.affectedDevices.length})
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {report.affectedDevices.map((dev, idx) => (
-                  <div key={idx} className="bg-white/90 p-2.5 rounded-md border border-gray-200 text-xs">
-                    <p className="font-black text-[#002B9A]">{dev.agent}</p>
-                    <p className="text-gray-600 font-medium">IP: {dev.ipAddress}</p>
+                  <div key={idx} className="p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200 text-xs">
+                    <p className="font-black text-[#002B9A] text-sm">{dev.agent || dev.hostname}</p>
+                    {dev.ip && <p className="text-gray-600 font-mono text-[11px] mt-0.5">IP: {dev.ip}</p>}
+                    {dev.os && <p className="text-gray-500 text-[11px] mt-0.5">OS: {dev.os}</p>}
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
+
+          {/* Technical Metadata */}
+          <section className="bg-white/80 backdrop-blur-xl p-5 rounded-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+              <HiOutlineInformationCircle className="w-5 h-5 text-[#002B9A]" />
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Audit Metadata</h4>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold text-gray-700">
+              <div>
+                <p className="text-gray-500 font-bold text-[11px] uppercase">SOC Case ID</p>
+                <p className="text-gray-900 font-black text-sm">{socIdDisplay}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 font-bold text-[11px] uppercase">Report Category</p>
+                <p className="text-gray-900 font-black text-sm">{report.type || 'Incident Report'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 font-bold text-[11px] uppercase">Origin Platform</p>
+                <p className="text-[#002B9A] font-black text-sm">DFIR-IRIS Platform</p>
+              </div>
+              <div>
+                <p className="text-gray-500 font-bold text-[11px] uppercase">Integration Status</p>
+                <p className="text-emerald-700 font-black text-sm">Synchronized</p>
+              </div>
+            </div>
+          </section>
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-slate-200/80 border-t border-gray-300 px-6 py-3 flex items-center justify-end flex-shrink-0">
+        <div className="bg-white/90 backdrop-blur-md border-t border-gray-200/60 px-6 py-3 flex justify-end flex-shrink-0">
           <button
             onClick={onClose}
-            className="bg-[#002B9A] hover:bg-[#002175] text-white font-extrabold px-5 py-2 rounded-md text-xs transition border border-[#002175]"
+            className="bg-[#002B9A] hover:bg-[#002175] text-white px-5 py-2 rounded-lg text-xs font-black transition cursor-pointer shadow-[0_4px_12px_rgba(0,43,154,0.3)]"
           >
-            Close Full Summary
+            Close Report
           </button>
         </div>
       </div>

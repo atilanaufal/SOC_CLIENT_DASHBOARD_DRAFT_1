@@ -196,11 +196,9 @@ function extractFullLogs(doc: any): string {
       affected_file: doc.affected_file || undefined,
       count: typeof doc.count === 'number' ? doc.count : 1,
       full_logs: extractFullLogs(doc),
-<<<<<<< Updated upstream
-      tenant: 'Cyber Lab Head Office'
-=======
+
       tenant: tenant.campusName,
->>>>>>> Stashed changes
+
     };
 
     return NextResponse.json({ success: true, data: incident });

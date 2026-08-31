@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
-<<<<<<< Updated upstream
-import { fetchIncidentsData } from '@/lib/redis-sync';
-=======
+
 import { getTenantIncidents } from '@/lib/data-service';
->>>>>>> Stashed changes
+
 import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
@@ -93,25 +91,7 @@ function extractFullLogs(doc: any): string {
     return JSON.stringify(doc.data, null, 2);
   }
 
-<<<<<<< Updated upstream
-  // Format authentic structured Wazuh Security Event JSON from database document
-  const rawLogObj: Record<string, any> = {
-    timestamp: doc.first_observed || doc.last_observed || new Date().toISOString(),
-    rule: {
-      id: String(doc.rule_id || '100200'),
-      level: doc.severity === 'Critical' ? 12 : doc.severity === 'High' ? 10 : doc.severity === 'Medium' ? 7 : 4,
-      description: doc.description || doc.incident_type || 'Security event detected',
-      mitre: {
-        id: doc.mitre_id ? [doc.mitre_id] : ['T1110'],
-        tactic: Array.isArray(doc.mitre_tactic) ? doc.mitre_tactic : [doc.mitre_tactic || 'Credential Access'],
-        technique: Array.isArray(doc.mitre_technique) ? doc.mitre_technique : [doc.mitre_technique || 'Brute Force'],
-      },
-    },
-    agent: {
-      id: doc.agent_id ? String(doc.agent_id) : '001',
-      name: doc.host || doc.agent || 'tguard',
-      ip: doc.agent_ip || doc.ip_source || '10.21.126.82',
-=======
+
   const mitreIds = doc.mitre_id ? [doc.mitre_id] : (doc.mitre ? [doc.mitre] : []);
   const tactics = Array.isArray(doc.mitre_tactic) ? doc.mitre_tactic : (doc.mitre_tactic ? [doc.mitre_tactic] : []);
   const techniques = Array.isArray(doc.mitre_technique) ? doc.mitre_technique : (doc.mitre_technique ? [doc.mitre_technique] : []);
@@ -132,22 +112,12 @@ function extractFullLogs(doc: any): string {
       id: doc.agent_id ? String(doc.agent_id) : (doc.agent || ''),
       name: doc.host || doc.agent || '',
       ip: doc.agent_ip || doc.sourceIp || '',
->>>>>>> Stashed changes
+
     },
     manager: {
       name: 'wazuh.manager',
     },
-<<<<<<< Updated upstream
-    location: doc.affected_file || doc.location || '/var/log/auth.log',
-    data: {
-      srcip: doc.ip_source || doc.agent_ip || '10.21.126.82',
-      dstip: doc.ip_destination || '10.21.126.1',
-      count: doc.count || 1,
-      affected_file: doc.affected_file,
-      incident_type: doc.incident_type,
-    },
-    full_log: `${doc.first_observed || new Date().toISOString()} ${doc.host || 'tguard'} ossec: Alert [${doc.rule_id || '100200'}] (${doc.severity || 'Medium'}): ${doc.description || doc.incident_type || 'Security Event Detected'}`,
-=======
+
     location: doc.affected_file || doc.location || '',
     data: {
       srcip: doc.sourceIp || doc.agent_ip || '',
@@ -157,7 +127,7 @@ function extractFullLogs(doc: any): string {
       incident_type: doc.incidentName || '',
     },
     full_log: `${doc.firstObserved || new Date().toISOString()} ${doc.host || doc.agent || ''} ossec: Alert [${doc.ruleId || doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incidentName || ''}`,
->>>>>>> Stashed changes
+
   };
 
   return JSON.stringify(rawLogObj, null, 2);
@@ -174,24 +144,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    // Get Tenant Context from logged in user session
-    const tenant = getTenantContext(request);
 
-    // Fetch from Redis for 1-7 days, or MongoDB for 1 month for this specific tenant!
-    const { data: rawDocs, source } = await fetchIncidentsData(timeRange, tenant.databaseName, tenant.redisPrefix);
-
-    // Apply memory filters for incidentType, agent, search
-    let docs = rawDocs;
-
-    if (incidentType && incidentType !== 'All') {
-      const typeRegex = new RegExp(incidentType, 'i');
-      docs = docs.filter((d: any) => {
-        const incType = Array.isArray(d.incident_type) ? d.incident_type.join(', ') : String(d.incident_type || '');
-        const desc = String(d.description || '');
-        return typeRegex.test(incType) || typeRegex.test(desc);
-      });
-=======
     // Authenticated Tenant Context
     const tenant = await getTenantContext(request);
     if (!tenant) {
@@ -199,7 +152,7 @@ export async function GET(request: Request) {
         { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
         { status: 401 }
       );
->>>>>>> Stashed changes
+
     }
 
     // Query incidents directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
@@ -250,34 +203,7 @@ export async function GET(request: Request) {
       const uniqueId = String(doc.id || doc._id || `inc_${index + 1}_${rawFirst}`);
 
       return {
-<<<<<<< Updated upstream
-        id: idStr,
-        _id: idStr,
-        incidentName: incType,
-        severity: parseSeverity(doc.severity),
-        agent: agentName,
-        agentsList: [agentName],
-        host: hostName,
-        firstObserved: formatDate(doc.first_observed),
-        raw_first_observed: doc.first_observed,
-        lastObserved: formatDate(doc.last_observed || doc.first_observed),
-        description: doc.description || incType || 'Incident detected by Wazuh agent.',
-        mitre: doc.mitre_id ? `${doc.mitre_id}` : (Array.isArray(doc.mitre_technique) ? doc.mitre_technique.join(', ') : (doc.mitre_technique || 'N/A')),
-        mitre_id: doc.mitre_id,
-        mitre_tactic: doc.mitre_tactic,
-        mitre_technique: doc.mitre_technique,
-        ruleId: doc.rule_id ? String(doc.rule_id) : undefined,
-        rule_id: doc.rule_id ? String(doc.rule_id) : undefined,
-        sourceIp: doc.ip_source || doc.agent_ip || 'N/A',
-        agent_ip: doc.agent_ip || doc.ip_source || 'N/A',
-        ip_source: doc.ip_source || doc.agent_ip || 'N/A',
-        destIp: doc.ip_destination || 'N/A',
-        ip_destination: doc.ip_destination || 'N/A',
-        affected_file: doc.affected_file || undefined,
-        count: typeof doc.count === 'number' && doc.count > 0 ? doc.count : 1,
-        full_logs: extractFullLogs(doc),
-        tenant: tenant.campusName
-=======
+
         id: uniqueId,
         _id: uniqueId,
         incidentName: doc.incidentName || doc.incident_type || doc.description || 'Security Event',
@@ -308,7 +234,7 @@ export async function GET(request: Request) {
         count: Number(doc.count) || 1,
         timeObserved: formatDate(rawLast),
         full_logs: fullLogString,
->>>>>>> Stashed changes
+
       };
     });
 
@@ -332,14 +258,10 @@ export async function GET(request: Request) {
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
-<<<<<<< Updated upstream
-      dataSource: source, // 'redis' (1-7d) or 'mongodb' (1 month)
-      total: incidents.length,
-      data: incidents
-=======
+
       data: mapped,
       total: mapped.length,
->>>>>>> Stashed changes
+
     });
   } catch (error: any) {
     console.error('Error fetching incidents:', error);

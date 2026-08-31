@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, syncMasterUserToBetterAuth } from '@/lib/auth';
-<<<<<<< Updated upstream
-=======
+
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
->>>>>>> Stashed changes
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,12 +17,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-<<<<<<< Updated upstream
-    // 1. Sync & verify user credentials with master database & Better Auth
-    const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
-    if (!syncRes.success || !syncRes.user) {
-      return NextResponse.json(
-=======
+
     // Rate Limiting: Max 5 failed attempts per 15 minutes per IP & Identifier
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       req.headers.get('x-real-ip') ||
@@ -46,18 +40,17 @@ export async function POST(req: NextRequest) {
     const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
     if (!syncRes.success || !syncRes.user) {
       return NextResponse.json(
->>>>>>> Stashed changes
+
         { success: false, error: syncRes.error || 'Login gagal. Periksa username dan password Anda.' },
         { status: 401 }
       );
     }
 
-<<<<<<< Updated upstream
-=======
+
     // Reset rate limit on successful verification
     await resetRateLimit(rateLimitKey);
 
->>>>>>> Stashed changes
+
     const masterUser = syncRes.user;
 
     // 2. Perform Better Auth sign-in
@@ -94,17 +87,12 @@ export async function POST(req: NextRequest) {
         username: masterUser.username,
         email: masterUser.email,
         role: masterUser.role,
-<<<<<<< Updated upstream
-        tenant_code: masterUser.tenant_code || 'UI',
-        campus_name: masterUser.campus_name || 'Universitas Indonesia',
-        database_name: masterUser.database_name || 'universitas_indonesia',
-        redis_prefix: masterUser.redis_prefix || 'universitas_indonesia',
-=======
+
         tenant_code: masterUser.tenant_code || '',
         campus_name: masterUser.campus_name || '',
         database_name: masterUser.database_name || '',
         redis_prefix: masterUser.redis_prefix || masterUser.database_name || '',
->>>>>>> Stashed changes
+
       },
     });
 
@@ -120,18 +108,8 @@ export async function POST(req: NextRequest) {
         response.headers.set('set-cookie', singleSetCookie);
       }
     }
-<<<<<<< Updated upstream
 
-    // Set fallback auth_session cookie
-    response.cookies.set('auth_session', JSON.stringify(masterUser), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-=======
->>>>>>> Stashed changes
+
 
     return response;
   } catch (err: any) {

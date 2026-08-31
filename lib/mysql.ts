@@ -2,21 +2,14 @@ import mysql from 'mysql2/promise';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
-<<<<<<< Updated upstream
-function getMysqlHost() {
-  return process.env.MYSQL_HOST || '10.21.126.82';
-}
 
-function getMysqlFallbackHost() {
-  return process.env.MYSQL_FALLBACK_HOST || '192.168.1.20';
-=======
 function getMysqlHost(): string {
   return process.env.MYSQL_HOST || '127.0.0.1';
 }
 
 function getMysqlFallbackHost(): string {
   return process.env.MYSQL_FALLBACK_HOST || '';
->>>>>>> Stashed changes
+
 }
 
 const MYSQL_PORT = Number(process.env.MYSQL_PORT) || 3306;
@@ -45,13 +38,12 @@ export function hashPasswordSHA512Raw(password: string): string {
   return crypto.createHash('sha512').update(password, 'utf-8').digest('hex');
 }
 
-<<<<<<< Updated upstream
-=======
+
 export async function hashPasswordBcrypt(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }
 
->>>>>>> Stashed changes
+
 export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
   const primaryHost = getMysqlHost();
   const fallbackHost = getMysqlFallbackHost();
@@ -139,31 +131,7 @@ export async function verifyUserCredentials(
     }
 
     const user = rows[0];
-<<<<<<< Updated upstream
-    const storedHash = user.password_hash;
 
-    // Supported hash algorithms: SHA-256 (standard), SHA-256 salted, SHA-512 salted, SHA-512 raw, plaintext fallback
-    const computedSha256 = hashPasswordSHA256(passwordInput);
-    const computedSha256SaltPrimary = hashPasswordSHA256Salted(passwordInput, MYSQL_SALT);
-    const computedSha256SaltDoc = hashPasswordSHA256Salted(passwordInput, 'tguard_secure_salt_2026');
-    const computedSha512Primary = hashPasswordSHA512(passwordInput, MYSQL_SALT);
-    const computedSha512Doc = hashPasswordSHA512(passwordInput, 'tguard_secure_salt_2026');
-    const computedSha512Raw = hashPasswordSHA512Raw(passwordInput);
-
-    const isMatch = (
-      storedHash === computedSha256 ||
-      storedHash === computedSha256SaltPrimary ||
-      storedHash === computedSha256SaltDoc ||
-      storedHash === computedSha512Primary ||
-      storedHash === computedSha512Doc ||
-      storedHash === computedSha512Raw ||
-      storedHash === passwordInput
-    );
-
-    if (isMatch) {
-      const usernameLower = (user.username || '').toLowerCase();
-      const detectedRole = usernameLower.includes('admin') ? 'admin' : 'tenant';
-=======
     const storedHash = user.password_hash || '';
 
     let isMatch = false;
@@ -199,7 +167,7 @@ export async function verifyUserCredentials(
     if (isMatch) {
       const usernameLower = (user.username || '').toLowerCase();
       const detectedRole = usernameLower.includes('admin') ? 'admin' : (user.role || 'tenant');
->>>>>>> Stashed changes
+
 
       return {
         success: true,
@@ -209,17 +177,12 @@ export async function verifyUserCredentials(
           username: user.username,
           email: user.email,
           role: detectedRole,
-<<<<<<< Updated upstream
-          tenant_code: user.tenant_code || 'UI',
-          campus_name: user.campus_name || 'Universitas Indonesia',
-          database_name: user.database_name || 'universitas_indonesia',
-          redis_prefix: user.redis_prefix || 'universitas_indonesia',
-=======
+
           tenant_code: user.tenant_code || '',
           campus_name: user.campus_name || '',
           database_name: user.database_name || '',
           redis_prefix: user.redis_prefix || user.database_name || '',
->>>>>>> Stashed changes
+
         },
       };
     } else {

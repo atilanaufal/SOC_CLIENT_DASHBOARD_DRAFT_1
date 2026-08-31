@@ -6,7 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const tenant = getTenantContext(request);
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
     const incidents = await syncIncidentsToRedis(tenant.databaseName, tenant.redisPrefix);
     const vulnerabilities = await syncVulnerabilitiesToRedis(tenant.databaseName, tenant.redisPrefix);
 

@@ -44,6 +44,7 @@ export interface Incident {
   mitre_technique?: string | string[];
   ruleId?: string;
   rule_id?: string;
+  rule_level?: number;
   university?: string;
   tenant?: string;
   impact?: string[];
@@ -57,6 +58,7 @@ export interface Incident {
   count?: number;
   timeObserved?: string;
   full_logs?: string;
+  full_log?: any;
 }
 
 export interface Vulnerability {
@@ -73,7 +75,9 @@ export interface Vulnerability {
   status: 'Solved' | 'Not Patched' | 'Patched' | 'Active' | string;
   currentVersion?: string;
   version?: string;
+  package_version?: string;
   description?: string;
+  rationale?: string;
   impact?: string;
   category?: string;
   hostname?: string;
@@ -97,7 +101,7 @@ export interface SecurityReport {
   lastUpdated?: string;
   synced_at?: string;
   summary: string;
-  affectedDevices?: { hostname: string; agent: string; ipAddress: string }[];
+  affectedDevices?: { hostname?: string; agent?: string; ipAddress?: string; ip?: string; os?: string }[];
   ioc?: { mitre: string; sourceIp: string; targetUser: string };
   findings?: string[];
   recommendedAction: string;

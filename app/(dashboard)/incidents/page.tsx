@@ -10,7 +10,6 @@ import {
   HiOutlineArrowDown,
   HiOutlineArrowTrendingUp,
   HiOutlineArrowTrendingDown,
-  HiOutlineShieldExclamation,
   HiOutlineAdjustmentsHorizontal,
   HiChevronUp,
   HiChevronDown
@@ -25,47 +24,11 @@ import { Pagination } from '@/components/ui/Pagination';
 type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved';
 type SortDirection = 'asc' | 'desc';
 
-function isWithinTimeFilter(
-  dateStr: string,
-  filter: string,
-  customRange?: { startDate: string; endDate: string } | null
-): boolean {
-  if (!dateStr || dateStr === 'N/A') return true;
-  try {
-    const itemDate = new Date(dateStr);
-    if (isNaN(itemDate.getTime())) return true;
-
-    if (filter === 'Custom' || filter.toLowerCase().startsWith('custom')) {
-      if (customRange?.startDate && customRange?.endDate) {
-        const start = new Date(`${customRange.startDate}T00:00:00.000`);
-        const end = new Date(`${customRange.endDate}T23:59:59.999`);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          return itemDate >= start && itemDate <= end;
-        }
-      }
-    }
-
-    const now = Date.now();
-    const diffMs = now - itemDate.getTime();
-
-    if (filter === 'Today') {
-      return diffMs <= 24 * 60 * 60 * 1000 || itemDate.toDateString() === new Date().toDateString();
-    } else if (filter === 'This Week') {
-      return diffMs <= 7 * 24 * 60 * 60 * 1000;
-    } else if (filter === 'This Month') {
-      return diffMs <= 30 * 24 * 60 * 60 * 1000;
-    }
-  } catch {
-    return true;
-  }
-  return true;
-}
-
 function IncidentsContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || searchParams.get('agent') || '';
 
-  const { timeFilter, customRange, metrics } = useTimeFilter();
+  const { timeFilter, customRange } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,7 +63,7 @@ function IncidentsContent() {
       setStatsData(stats);
     } catch (err: any) {
       console.error('Failed to load incidents:', err);
-      setError(err.message || 'Failed to load incidents from server');
+      setError(err.message || 'Failed to load incidents');
     } finally {
       setIsLoading(false);
     }
@@ -109,21 +72,6 @@ function IncidentsContent() {
   useEffect(() => {
     loadData();
   }, [timeFilter, customRange]);
-
-  useEffect(() => {
-    if (initialSearch && incidents.length > 0) {
-      setSearchTerm(initialSearch);
-      const matched = incidents.find(
-        (i) =>
-          i.incidentName.toLowerCase().includes(initialSearch.toLowerCase()) ||
-          i.agent.toLowerCase().includes(initialSearch.toLowerCase())
-      );
-      if (matched) {
-        setSelectedIncident(matched);
-        setIsDrawerOpen(true);
-      }
-    }
-  }, [initialSearch, incidents]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -138,43 +86,56 @@ function IncidentsContent() {
     }
   };
 
-  const displayableIncidents = useMemo(() => {
-    return incidents.filter((inc) => {
-      const agentStr = String(inc.agent || inc.host || '').toLowerCase();
-      return agentStr !== '000' && agentStr !== 'health-checker' && !agentStr.includes('000');
-    });
-  }, [incidents]);
-
   const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(displayableIncidents.map((i) => i.severity))).filter(Boolean);
-    const types = Array.from(new Set(displayableIncidents.map((i) => i.incidentName))).filter(Boolean);
-    const agents = Array.from(new Set(displayableIncidents.map((i) => i.agent))).filter(Boolean);
+    const severities = Array.from(new Set(incidents.map((i) => i.severity))).filter(Boolean);
+    const types = Array.from(
+      new Set(
+        incidents.map((i) => {
+          if (typeof i.incident_type === 'string') return i.incident_type;
+          if (Array.isArray(i.incident_type) && i.incident_type.length > 0) return i.incident_type[0];
+          return i.incidentName;
+        })
+      )
+    ).filter(Boolean) as string[];
+    const agents = Array.from(new Set(incidents.map((i) => i.agent))).filter(Boolean);
 
     return [
       { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-      { key: 'incidentType', label: 'Incident Type', type: 'select', options: types },
-      { key: 'agent', label: 'Agent', type: 'select', options: agents },
+      { key: 'type', label: 'Incident Type', type: 'select', options: types },
+      { key: 'agent', label: 'Affected Agent', type: 'select', options: agents },
     ];
-  }, [displayableIncidents]);
+  }, [incidents]);
+
+  const displayableIncidents = useMemo(() => {
+    return incidents.filter((inc) => {
+      const sev = String(inc.severity || '').toLowerCase();
+      return sev !== 'low' && sev !== 'informational' && sev !== 'info';
+    });
+  }, [incidents]);
 
   const filteredIncidents = useMemo(() => {
     return displayableIncidents.filter((inc) => {
       const matchesSearch =
         inc.incidentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inc.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.agentsList?.some((ag) => ag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        inc.host.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inc.sourceIp && inc.sourceIp.toLowerCase().includes(searchTerm.toLowerCase()));
+        ((inc as any).ip && (inc as any).ip.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesSeverity =
         !activeFilters.severity || activeFilters.severity === 'All'
           ? true
           : String(inc.severity || '').toLowerCase() === activeFilters.severity.toLowerCase();
 
+      const itemType =
+        typeof inc.incident_type === 'string'
+          ? inc.incident_type
+          : Array.isArray(inc.incident_type) && inc.incident_type.length > 0
+          ? inc.incident_type[0]
+          : inc.incidentName;
+
       const matchesType =
-        !activeFilters.incidentType || activeFilters.incidentType === 'All'
+        !activeFilters.type || activeFilters.type === 'All'
           ? true
-          : inc.incidentName === activeFilters.incidentType;
+          : itemType === activeFilters.type;
 
       const matchesAgent =
         !activeFilters.agent || activeFilters.agent === 'All'
@@ -214,43 +175,21 @@ function IncidentsContent() {
     });
   }, [filteredIncidents, sortKey, sortDirection]);
 
-  // Compute real counts & deltas for KPI directly synced with Dashboard server metrics
-  const kpiCounts = useMemo(() => {
-    if (statsData?.incidents) {
-      const inc = statsData.incidents;
-      return {
-        critical: typeof inc.critical === 'number' ? inc.critical : 0,
-        criticalPrev: typeof inc.criticalPrev === 'number' ? inc.criticalPrev : 0,
-        criticalDelta: typeof inc.criticalDelta === 'number' ? inc.criticalDelta : 0,
-        high: typeof inc.high === 'number' ? inc.high : 0,
-        highPrev: typeof inc.highPrev === 'number' ? inc.highPrev : 0,
-        highDelta: typeof inc.highDelta === 'number' ? inc.highDelta : 0,
-        medium: typeof inc.medium === 'number' ? inc.medium : 0,
-        mediumPrev: typeof inc.mediumPrev === 'number' ? inc.mediumPrev : 0,
-        mediumDelta: typeof inc.mediumDelta === 'number' ? inc.mediumDelta : 0,
-      };
-    }
+  // Live KPI metrics from statsData (MongoDB calculated)
+  const incStats = statsData?.incidents || {};
+  const kpiCounts = {
+    critical: typeof incStats.critical === 'number' ? incStats.critical : 0,
+    criticalPrev: typeof incStats.criticalPrev === 'number' ? incStats.criticalPrev : 0,
+    criticalDelta: typeof incStats.criticalDelta === 'number' ? incStats.criticalDelta : 0,
 
-    let c = 0, h = 0, m = 0;
-    displayableIncidents.forEach((i: any) => {
-      const sev = String(i.severity || '').toLowerCase();
-      if (sev === 'critical') c++;
-      else if (sev === 'high') h++;
-      else if (sev === 'medium') m++;
-    });
+    high: typeof incStats.high === 'number' ? incStats.high : 0,
+    highPrev: typeof incStats.highPrev === 'number' ? incStats.highPrev : 0,
+    highDelta: typeof incStats.highDelta === 'number' ? incStats.highDelta : 0,
 
-    return {
-      critical: c,
-      criticalPrev: 0,
-      criticalDelta: 0,
-      high: h,
-      highPrev: 0,
-      highDelta: 0,
-      medium: m,
-      mediumPrev: 0,
-      mediumDelta: 0,
-    };
-  }, [statsData, displayableIncidents]);
+    medium: typeof incStats.medium === 'number' ? incStats.medium : 0,
+    mediumPrev: typeof incStats.mediumPrev === 'number' ? incStats.mediumPrev : 0,
+    mediumDelta: typeof incStats.mediumDelta === 'number' ? incStats.mediumDelta : 0,
+  };
 
   const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
@@ -277,23 +216,25 @@ function IncidentsContent() {
     ) : (
       <HiChevronDown className="w-4 h-4 inline-block ml-1 text-blue-300" />
     );
-  };  const renderDeltaBadge = (delta: number) => {
+  };
+
+  const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2 sm:px-2.5 2xl:px-3 py-0.5 rounded-md font-black text-xs sm:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
           <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
         </span>
       );
     }
     if (delta < 0) {
       return (
-        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 2xl:px-3 py-0.5 rounded-md font-black text-xs sm:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
           <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
         </span>
       );
     }
     return (
-      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5">
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2 sm:px-2.5 2xl:px-3 py-0.5 rounded-md font-black text-xs sm:text-sm 2xl:text-base flex items-center gap-0.5">
         <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
       </span>
     );
@@ -303,117 +244,81 @@ function IncidentsContent() {
     if (trend > 0) {
       return (
         <div className="flex items-center gap-1 font-black text-red-600">
-          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-red-600 stroke-[3]" />
+          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 2xl:w-6 2xl:h-6 text-red-600 stroke-[3]" />
         </div>
       );
     }
     if (trend < 0) {
       return (
         <div className="flex items-center gap-1 font-black text-emerald-600">
-          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-emerald-600 stroke-[3]" />
+          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 2xl:w-6 2xl:h-6 text-emerald-600 stroke-[3]" />
         </div>
       );
     }
     return (
       <div className="flex items-center gap-1 font-black text-gray-400">
-        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-gray-400 stroke-[3]" />
+        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 2xl:w-6 2xl:h-6 text-gray-400 stroke-[3]" />
       </div>
     );
   };
 
   return (
-<<<<<<< Updated upstream
-    <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
-      {/* Left Container: KPI Card + Search Bar + Table */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
-        {/* Top Clean KPI Summary Card */}
-        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 p-3 sm:p-4 md:p-4.5 xl:p-5 2xl:p-6 flex-shrink-0 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
-          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6 xl:gap-8 2xl:gap-10 divide-y sm:divide-y-0 sm:divide-x divide-gray-200/60">
-            {/* Critical Column */}
-            <div className="sm:pr-3 md:pr-4 xl:pr-6 2xl:pr-8">
-              <div className="flex items-center justify-between mb-1 sm:mb-1.5">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="bg-[#FF1E1E] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 xl:py-1 2xl:py-1.5 rounded-md shadow-[0_2px_6px_rgba(255,30,30,0.3)]">
-                    Critical
-                  </span>
-                  {renderDeltaBadge(kpiCounts.criticalDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.critical, kpiCounts.criticalPrev)}
-              </div>
-              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.critical}</p>
-=======
     <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
       {/* Left Container: KPI Card + Search Bar + Table */}
       <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
-        {/* Top KPI Summary Cards (Identical to Dashboard layout) */}
+        {/* Top KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Critical Card */}
-          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
-            <span className="bg-[#FF1E1E] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
-              Critical: {kpiCounts.critical}
-            </span>
-            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+          <div className="p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm md:text-sm xl:text-base font-black text-gray-900 tracking-tight">
+                Critical
+              </p>
+              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-[#B8251B] mt-0.5 sm:mt-1 tracking-tight">
+                {kpiCounts.critical}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
               {renderTrendComparison(kpiCounts.criticalDelta)}
               <span>{kpiCounts.criticalPrev}</span>
               <span className="text-gray-400 font-bold">-</span>
               {renderDeltaBadge(kpiCounts.criticalDelta)}
->>>>>>> Stashed changes
             </div>
           </div>
 
-<<<<<<< Updated upstream
-            {/* High Column */}
-            <div className="sm:px-3 md:px-4 xl:px-6 2xl:px-8 pt-2 sm:pt-0">
-              <div className="flex items-center justify-between mb-1 sm:mb-1.5">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 xl:py-1 2xl:py-1.5 rounded-md shadow-[0_2px_6px_rgba(255,107,0,0.3)]">
-                    High
-                  </span>
-                  {renderDeltaBadge(kpiCounts.highDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.high, kpiCounts.highPrev)}
-              </div>
-              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.high}</p>
-=======
           {/* High Card */}
-          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
-            <span className="bg-[#FF6B00] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
-              High: {kpiCounts.high}
-            </span>
-            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+          <div className="p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm md:text-sm xl:text-base font-black text-gray-900 tracking-tight">
+                High
+              </p>
+              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-[#EA580C] mt-0.5 sm:mt-1 tracking-tight">
+                {kpiCounts.high}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
               {renderTrendComparison(kpiCounts.highDelta)}
               <span>{kpiCounts.highPrev}</span>
               <span className="text-gray-400 font-bold">-</span>
               {renderDeltaBadge(kpiCounts.highDelta)}
->>>>>>> Stashed changes
             </div>
           </div>
 
-<<<<<<< Updated upstream
-            {/* Medium Column */}
-            <div className="sm:pl-3 md:pl-4 xl:pl-6 2xl:pl-8 pt-2 sm:pt-0">
-              <div className="flex items-center justify-between mb-1 sm:mb-1.5">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 xl:py-1 2xl:py-1.5 rounded-md shadow-[0_2px_6px_rgba(217,119,6,0.3)]">
-                    Medium
-                  </span>
-                  {renderDeltaBadge(kpiCounts.mediumDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.medium, kpiCounts.mediumPrev)}
-              </div>
-              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.medium}</p>
-=======
           {/* Medium Card */}
-          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
-            <span className="bg-[#D97706] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
-              Medium: {kpiCounts.medium}
-            </span>
-            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+          <div className="p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm md:text-sm xl:text-base font-black text-gray-900 tracking-tight">
+                Medium
+              </p>
+              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-[#5B9BD5] mt-0.5 sm:mt-1 tracking-tight">
+                {kpiCounts.medium}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
               {renderTrendComparison(kpiCounts.mediumDelta)}
               <span>{kpiCounts.mediumPrev}</span>
               <span className="text-gray-400 font-bold">-</span>
               {renderDeltaBadge(kpiCounts.mediumDelta)}
->>>>>>> Stashed changes
             </div>
           </div>
         </div>
@@ -454,32 +359,28 @@ function IncidentsContent() {
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse min-w-[700px]">
-              <thead>
-                <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-<<<<<<< Updated upstream
-                  <th onClick={() => handleSort('incidentName')} className="w-[45%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-=======
-                  <th onClick={() => handleSort('incidentName')} className="w-[45%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition ">
->>>>>>> Stashed changes
-                    <div className="flex items-center">
+              <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                <tr className="bg-[#002B9A] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                  <th onClick={() => handleSort('incidentName')} className="bg-[#002B9A] w-[45%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Incident</span>
                       {renderSortIndicator('incidentName')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('severity')} className="w-[15%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+                  <th onClick={() => handleSort('severity')} className="bg-[#002B9A] w-[15%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Severity</span>
                       {renderSortIndicator('severity')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('agent')} className="w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+                  <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>Agent</span>
                       {renderSortIndicator('agent')}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('firstObserved')} className="w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                    <div className="flex items-center">
+                  <th onClick={() => handleSort('firstObserved')} className="bg-[#002B9A] w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                    <div className="flex items-center text-white">
                       <span>First Observed</span>
                       {renderSortIndicator('firstObserved')}
                     </div>
@@ -520,16 +421,6 @@ function IncidentsContent() {
                         onClick={() => handleToggleDetail(inc)}
                         className={`cursor-pointer transition ${
                           isSelected
-<<<<<<< Updated upstream
-                            ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]'
-                            : 'hover:bg-blue-50/40'
-                        }`}
-                      >
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
-                          <div className="flex items-center gap-2">
-                            <HiOutlineShieldExclamation className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
-                            <span className="truncate">{inc.incidentName}</span>
-=======
                             ? 'bg-blue-100/80'
                             : 'hover:bg-blue-50/40'
                         }`}
@@ -537,19 +428,17 @@ function IncidentsContent() {
                         <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
                           {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
                           <div className="flex items-center gap-2">
-                            
                             <span className="break-words whitespace-normal">{inc.incidentName}</span>
->>>>>>> Stashed changes
                           </div>
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
                           <span
                             className={`inline-block px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm font-extrabold ${
                               inc.severity === 'Critical'
-                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                                 : inc.severity === 'High'
-                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                                : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
                             }`}
                           >
                             {inc.severity}
