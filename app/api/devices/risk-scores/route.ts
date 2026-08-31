@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getIncidentsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
+<<<<<<< Updated upstream
 import { fetchIncidentsData } from '@/lib/redis-sync';
+=======
+import { getTenantIncidents } from '@/lib/data-service';
+>>>>>>> Stashed changes
 import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +13,7 @@ export const dynamic = 'force-dynamic';
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
   if (!range || range === 'All') return true;
 
-  const rawDate = doc.last_observed || doc.first_observed || doc.detected_at || doc.date || doc.created_at || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null);
+  const rawDate = doc.lastObserved || doc.firstObserved || doc.last_observed || doc.first_observed || doc.detected_at || doc.date || doc.created_at;
   if (!rawDate) return true;
 
   const d = new Date(rawDate);
@@ -77,11 +80,38 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+<<<<<<< Updated upstream
     const tenant = getTenantContext(request);
 
     const resInc = await fetchIncidentsData(timeRange, tenant.databaseName, tenant.redisPrefix);
     const rawIncidents = resInc.data || [];
     const incidents = rawIncidents.filter((inc) => matchesTimeRange(inc, timeRange, startDate, endDate));
+=======
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+
+    const rawIncidents = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
+    
+    // Filter out agent 000 / health-checker
+    const validIncidents = rawIncidents.filter((inc) => {
+      const idStr = String(inc.agent_id || inc.agent || inc.host || '').trim();
+      const hostStr = String(inc.host || '').trim().toLowerCase();
+      const agentStr = String(inc.agent || '').trim().toLowerCase();
+
+      const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
+      const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
+      const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
+
+      return !isAgent000 && !isHealthChecker && !isCampusWeb;
+    });
+
+    const incidents = validIncidents.filter((inc) => matchesTimeRange(inc, timeRange, startDate, endDate));
+>>>>>>> Stashed changes
 
     const tempMap = new Map<
       string,
@@ -89,19 +119,21 @@ export async function GET(request: Request) {
     >();
 
     incidents.forEach((inc) => {
-      const agentIdKey = String(inc.agent_id || inc.host || inc.agent || '').trim().toLowerCase();
-      const hostKey = String(inc.host || '').trim().toLowerCase();
-      const nameKey = String(inc.agent || '').trim().toLowerCase();
+      const agentIdKey = String(inc.agent_id || inc.agent || inc.host || '').trim().toLowerCase();
+      const hostKey = String(inc.host || inc.agent || '').trim().toLowerCase();
+      const nameKey = String(inc.agent || inc.host || '').trim().toLowerCase();
+      const ipKey = String(inc.agent_ip || inc.sourceIp || inc.ip_source || '').trim().toLowerCase();
 
       const sev = parseSeverity(inc.severity).toLowerCase();
-      const count = 1; // 1 document = 1 incident count!
+      const count = 1;
 
+      const rawIncType = inc.incident_type || inc.incidentName;
       const issueText =
-        (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) ||
+        (Array.isArray(rawIncType) ? rawIncType.join(', ') : String(rawIncType || '')) ||
         inc.description ||
-        (inc.rule_id ? `Rule ${inc.rule_id}` : 'Security Alert');
+        (inc.ruleId || inc.rule_id ? `Rule ${inc.ruleId || inc.rule_id}` : 'Security Alert');
 
-      const keysToUpdate = Array.from(new Set([agentIdKey, hostKey, nameKey])).filter(Boolean);
+      const keysToUpdate = Array.from(new Set([agentIdKey, hostKey, nameKey, ipKey])).filter(Boolean);
 
       keysToUpdate.forEach((key) => {
         if (!tempMap.has(key)) {
@@ -120,7 +152,6 @@ export async function GET(request: Request) {
     });
 
     tempMap.forEach((stats, key) => {
-      // Rumus Agent Score: min(100, (Critical * 10) + (High * 6) + (Medium * 3))
       const rawScore = stats.critical * 10 + stats.high * 6 + stats.medium * 3;
       const score = Math.min(100, rawScore);
       const cat = getRiskCategory(score);
@@ -143,11 +174,25 @@ export async function GET(request: Request) {
       scoresMap,
     });
   } catch (error: any) {
+<<<<<<< Updated upstream
     console.warn('[Risk Scores API] MongoDB fetch error, falling back to Redis:', error.message);
     return NextResponse.json({
       success: true,
       mongoDbAvailable: false,
       scoresMap: {},
     });
+=======
+    console.warn('[Risk Scores API] Error fetching risk scores:', error.message);
+    return NextResponse.json(
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat skor risiko.'
+          : error.message || 'Failed to fetch device risk scores',
+        scoresMap: {},
+      },
+      { status: 500 }
+    );
+>>>>>>> Stashed changes
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getVulnerabilitiesCollection } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const collection = await getVulnerabilitiesCollection();
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+
+    const collection = await getVulnerabilitiesCollection(tenant.databaseName);
 
     let doc = null;
     if (ObjectId.isValid(id)) {
@@ -60,14 +69,20 @@ export async function GET(
       description: doc.description || 'No detailed rationale provided for this vulnerability.',
       category: doc.category || 'Software',
       classification: doc.category || 'Software',
-      ip: doc.ip || 'N/A'
+      ip: doc.ip || 'N/A',
+      tenant: tenant.campusName,
     };
 
     return NextResponse.json({ success: true, data: vuln });
   } catch (error: any) {
     console.error('Error in GET /api/vulnerabilities/[id]:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch vulnerability detail' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat detail kerentanan.'
+          : error.message || 'Failed to fetch vulnerability detail',
+      },
       { status: 500 }
     );
   }

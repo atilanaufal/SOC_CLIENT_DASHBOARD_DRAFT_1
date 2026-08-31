@@ -1,6 +1,10 @@
 'use client';
 
+<<<<<<< Updated upstream
 import React, { useState, useEffect, useRef } from 'react';
+=======
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+>>>>>>> Stashed changes
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,7 +17,7 @@ import {
   HiOutlineArrowTrendingUp,
   HiOutlineArrowTrendingDown
 } from 'react-icons/hi2';
-import { Incident } from '@/lib/mock-data';
+import { Incident } from '@/lib/types';
 import { fetchDashboardStats } from '@/lib/api-client';
 import { MoreAgentsModal } from '@/components/modals/MoreAgentsModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
@@ -142,22 +146,32 @@ export default function DashboardPage() {
   ];
 
   // Top Incidents (Real DB)
-  const topIncidentsSource: any[] = statsData?.topIncidents || [];
-  const rawFiltered = topIncidentsSource.filter((inc) => String(inc.severity || '').toLowerCase() === severityFilter.toLowerCase());
-  const maxItems = severityFilter === 'Critical' ? 5 : severityFilter === 'High' ? 3 : 2;
-  const filteredIncidents = rawFiltered.slice(0, maxItems);
+  const topIncidentsSource: any[] = useMemo(() => statsData?.topIncidents || [], [statsData]);
+  const filteredIncidents = useMemo(() => {
+    const targetSev = (severityFilter || '').trim().toLowerCase();
+    return topIncidentsSource
+      .filter((inc) => String(inc.severity || '').trim().toLowerCase() === targetSev)
+      .slice(0, 5);
+  }, [topIncidentsSource, severityFilter]);
 
-  // Recommended Actions (Real DB) - Sorted by highest severity, then most recent date
+  // Recommended Actions (Real DB) - Strictly only reports with genuine recommended actions
   const SEVERITY_RANK_MAP: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
   const rawRecs: any[] = statsData?.recommendedActions || [];
-  const recommendedActionsSource = [...rawRecs].sort((a, b) => {
-    const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
-    const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
-    if (rankB !== rankA) return rankB - rankA;
-    const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
-    const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
-    return timeB - timeA;
-  });
+  const recommendedActionsSource = useMemo(() => {
+    return [...rawRecs]
+      .filter((act) => {
+        const text = String(act.action || '').trim();
+        return text !== '' && text.toLowerCase() !== 'no recommended action specified.' && text.toLowerCase() !== 'n/a' && text.toLowerCase() !== '-';
+      })
+      .sort((a, b) => {
+        const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
+        const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
+        if (rankB !== rankA) return rankB - rankA;
+        const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
+        const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
+        return timeB - timeA;
+      });
+  }, [rawRecs]);
 
   const renderSeverityBadge = (sev: string) => {
     const s = String(sev || '').toLowerCase();
@@ -171,21 +185,36 @@ export default function DashboardPage() {
   const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
+<<<<<<< Updated upstream
         <span className="bg-red-50/80 text-red-600 border border-red-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
           <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> +{delta}
+=======
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
+>>>>>>> Stashed changes
         </span>
       );
     }
     if (delta < 0) {
       return (
+<<<<<<< Updated upstream
         <span className="bg-emerald-50/80 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
           <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> {delta}
+=======
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
+>>>>>>> Stashed changes
         </span>
       );
     }
     return (
+<<<<<<< Updated upstream
       <span className="bg-gray-100/80 text-gray-700 border border-gray-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5">
         <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> 0
+=======
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5">
+        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
+>>>>>>> Stashed changes
       </span>
     );
   };
@@ -193,21 +222,36 @@ export default function DashboardPage() {
   const renderTrendComparison = (trend: number) => {
     if (trend > 0) {
       return (
+<<<<<<< Updated upstream
         <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-red-600">
           <HiOutlineArrowTrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-red-600 stroke-[2.5]" />
+=======
+        <div className="flex items-center gap-1 font-black text-red-600">
+          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-red-600 stroke-[3]" />
+>>>>>>> Stashed changes
         </div>
       );
     }
     if (trend < 0) {
       return (
+<<<<<<< Updated upstream
         <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-emerald-600">
           <HiOutlineArrowTrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-emerald-600 stroke-[2.5]" />
+=======
+        <div className="flex items-center gap-1 font-black text-emerald-600">
+          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-emerald-600 stroke-[3]" />
+>>>>>>> Stashed changes
         </div>
       );
     }
     return (
+<<<<<<< Updated upstream
       <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-gray-400">
         <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-gray-400 stroke-[3]" />
+=======
+      <div className="flex items-center gap-1 font-black text-gray-400">
+        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-gray-400 stroke-[3]" />
+>>>>>>> Stashed changes
       </div>
     );
   };
@@ -255,6 +299,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Breakdown Cards */}
+<<<<<<< Updated upstream
             <div className="flex flex-col gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 border-t border-gray-200/50 pt-2 sm:pt-2.5 2xl:pt-3">
               {/* Critical Row */}
               <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
@@ -262,6 +307,15 @@ export default function DashboardPage() {
                   Critical: {criticalCount}
                 </span>
                 <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
+=======
+            <div className="flex flex-col gap-2 sm:gap-2.5 xl:gap-3 2xl:gap-3.5 border-t border-gray-200/50 pt-2 sm:pt-2.5 2xl:pt-3">
+              {/* Critical Row */}
+              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#FF1E1E] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
+                  Critical: {criticalCount}
+                </span>
+                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+>>>>>>> Stashed changes
                   {renderTrendComparison(criticalDelta)}
                   <span>{criticalPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -270,11 +324,19 @@ export default function DashboardPage() {
               </div>
 
               {/* High Row */}
+<<<<<<< Updated upstream
               <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
                 <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
                   High: {highCount}
                 </span>
                 <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
+=======
+              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#FF6B00] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
+                  High: {highCount}
+                </span>
+                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+>>>>>>> Stashed changes
                   {renderTrendComparison(highDelta)}
                   <span>{highPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -283,11 +345,19 @@ export default function DashboardPage() {
               </div>
 
               {/* Medium Row */}
+<<<<<<< Updated upstream
               <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
                 <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
                   Medium: {mediumCount}
                 </span>
                 <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
+=======
+              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <span className="bg-[#D97706] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
+                  Medium: {mediumCount}
+                </span>
+                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+>>>>>>> Stashed changes
                   {renderTrendComparison(mediumDelta)}
                   <span>{mediumPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -354,7 +424,11 @@ export default function DashboardPage() {
             ) : filteredIncidents.length === 0 ? (
               <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">No {severityFilter} incidents found.</div>
             ) : (
+<<<<<<< Updated upstream
               filteredIncidents.slice(0, 3).map((inc) => (
+=======
+              filteredIncidents.slice(0, 5).map((inc) => (
+>>>>>>> Stashed changes
                 <div
                   key={inc.id}
                   className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-2.5 sm:px-3 md:px-3.5 xl:px-4 2xl:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-blue-50/50 transition flex-shrink-0"
@@ -421,7 +495,7 @@ export default function DashboardPage() {
                       }}
                       className="bg-black/90 backdrop-blur-sm hover:bg-black text-white font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-1 xl:py-1.5 2xl:py-2 rounded-md transition shadow-[0_2px_6px_rgba(0,0,0,0.15)] cursor-pointer"
                     >
-                      More Agents
+                      Agent
                     </button>
                     <button
                       onClick={() => router.push(`/incidents?search=${encodeURIComponent(inc.incidentName)}`)}

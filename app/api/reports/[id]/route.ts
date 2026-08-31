@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getReportsCollection } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const collection = await getReportsCollection();
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+
+    const collection = await getReportsCollection(tenant.databaseName);
 
     let doc = null;
     if (ObjectId.isValid(id)) {
@@ -60,14 +69,20 @@ export async function GET(
       summary: doc.summary || 'No summary description provided.',
       recommendedAction: doc.recommended_action || 'No recommended action specified.',
       recommended_action: doc.recommended_action || 'No recommended action specified.',
-      type: 'Security Alert Incident'
+      type: 'Security Alert Incident',
+      tenant: tenant.campusName,
     };
 
     return NextResponse.json({ success: true, data: report });
   } catch (error: any) {
     console.error('Error in GET /api/reports/[id]:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch report detail' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat detail laporan.'
+          : error.message || 'Failed to fetch report detail',
+      },
       { status: 500 }
     );
   }

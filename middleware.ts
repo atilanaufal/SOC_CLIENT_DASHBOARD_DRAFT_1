@@ -4,11 +4,18 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+<<<<<<< Updated upstream
   // Optimistic & high-performance session cookie check for Edge / Middleware runtime
   const sessionToken =
     request.cookies.get('better-auth.session_token')?.value ||
     request.cookies.get('__Secure-better-auth.session_token')?.value ||
     request.cookies.get('auth_session')?.value;
+=======
+  // Optimized Edge session cookie check
+  const sessionToken =
+    request.cookies.get('better-auth.session_token')?.value ||
+    request.cookies.get('__Secure-better-auth.session_token')?.value;
+>>>>>>> Stashed changes
 
   const isAuthenticated = Boolean(sessionToken);
 
@@ -68,7 +75,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+<<<<<<< Updated upstream
      * - public files (e.g. ITSEC.png, tguard.png)
+=======
+     * - public files (e.g. infoguard.png, tguard.png, svg, jpg)
+>>>>>>> Stashed changes
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

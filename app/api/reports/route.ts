@@ -77,7 +77,17 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+<<<<<<< Updated upstream
     const tenant = getTenantContext(request);
+=======
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+>>>>>>> Stashed changes
 
     const collection = await getReportsCollection(tenant.databaseName);
 
@@ -137,7 +147,12 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('Error in GET /api/reports:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch reports' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat laporan DFIR.'
+          : error.message || 'Failed to fetch reports',
+      },
       { status: 500 }
     );
   }

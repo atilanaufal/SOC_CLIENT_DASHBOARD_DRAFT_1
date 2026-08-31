@@ -71,7 +71,6 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
   const fillLength = fillRatio * circumference;
 
   const diff = score - lastMonthScore;
-  const percentage = lastMonthScore > 0 ? Math.round((diff / lastMonthScore) * 100) : 0;
   const isUp = diff > 0;
   const isDown = diff < 0;
 
@@ -136,6 +135,7 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
           </span>
           {isUp ? (
             <span className="bg-red-50/80 backdrop-blur-sm text-red-600 border border-red-200 font-black px-2 sm:px-2.5 md:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 md:py-1 xl:py-1 2xl:py-1.5 rounded-md text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+<<<<<<< Updated upstream
               <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-3.5 md:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 stroke-[3]" /> +{diff} ({percentage}%)
             </span>
           ) : isDown ? (
@@ -145,6 +145,17 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
           ) : (
             <span className="bg-gray-100/80 backdrop-blur-sm text-gray-700 border border-gray-200 font-black px-2 sm:px-2.5 md:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 md:py-1 xl:py-1 2xl:py-1.5 rounded-md text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base flex items-center gap-1">
               <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-3.5 md:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 stroke-[3]" /> 0 (0%)
+=======
+              <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-3.5 md:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 stroke-[3]" /> +{diff}
+            </span>
+          ) : isDown ? (
+            <span className="bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border border-emerald-200 font-black px-2 sm:px-2.5 md:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 md:py-1 xl:py-1 2xl:py-1.5 rounded-md text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+              <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-3.5 md:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 stroke-[3]" /> {diff}
+            </span>
+          ) : (
+            <span className="bg-gray-100/80 backdrop-blur-sm text-gray-700 border border-gray-200 font-black px-2 sm:px-2.5 md:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 md:py-1 xl:py-1 2xl:py-1.5 rounded-md text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base flex items-center gap-1">
+              <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-3.5 md:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 stroke-[3]" /> 0
+>>>>>>> Stashed changes
             </span>
           )}
         </div>

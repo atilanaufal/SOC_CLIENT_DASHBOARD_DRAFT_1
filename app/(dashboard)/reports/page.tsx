@@ -10,7 +10,7 @@ import {
   HiChevronUp,
   HiChevronDown
 } from 'react-icons/hi2';
-import { SecurityReport } from '@/lib/mock-data';
+import { SecurityReport } from '@/lib/types';
 import { fetchReports } from '@/lib/api-client';
 import { ReportDetailDrawer } from '@/components/drawers/ReportDetailDrawer';
 import { ReportDetailsModal } from '@/components/modals/ReportDetailsModal';
@@ -179,9 +179,15 @@ function ReportsContent() {
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
       {/* Left Container: KPI Card + Search Bar + Table */}
       <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
+=======
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Left Container: KPI Card + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
+>>>>>>> Stashed changes
         {/* KPI */}
         <div className="max-w-md bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 2xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3 sm:gap-3.5 2xl:gap-4 flex-shrink-0">
           <div className="w-10 h-10 sm:w-12 sm:h-12 2xl:w-14 2xl:h-14 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center font-black text-xs border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)]">
@@ -230,7 +236,7 @@ function ReportsContent() {
         {/* Data Table Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                   <th onClick={() => handleSort('reportName')} className="py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
@@ -274,7 +280,9 @@ function ReportsContent() {
                   </tr>
                 ) : (
                   paginatedReports.map((rep) => {
-                    const isSelected = isDrawerOpen && selectedReport?.id === rep.id;
+                    const repId = rep.id || rep.reportName;
+                    const selectedId = selectedReport?.id || selectedReport?.reportName;
+                    const isSelected = Boolean(isDrawerOpen && selectedId && repId && selectedId === repId);
                     const parts = (rep.dateGenerated || '').split(' ');
                     const datePart = parts.slice(0, 3).join(' ');
                     const timePart = parts.slice(3).join(' ');
@@ -284,12 +292,22 @@ function ReportsContent() {
                         key={rep.id}
                         onClick={() => handleToggleDetail(rep)}
                         className={`cursor-pointer transition ${
+<<<<<<< Updated upstream
                           isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
                         }`}
                       >
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
                           <div className="flex items-center gap-2">
                             <HiOutlineDocumentText className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
+=======
+                          isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
+                          {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                          <div className="flex items-center gap-2">
+                            
+>>>>>>> Stashed changes
                             <span>{rep.reportName}</span>
                           </div>
                         </td>

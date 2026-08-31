@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+<<<<<<< Updated upstream
 import { SecurityReport } from '@/lib/mock-data';
+=======
+import { SecurityReport } from '@/lib/types';
+>>>>>>> Stashed changes
 import { HiOutlineXMark, HiOutlineDocumentText } from 'react-icons/hi2';
 
 interface ReportDetailsModalProps {

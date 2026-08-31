@@ -15,8 +15,8 @@ import {
   HiChevronUp,
   HiChevronDown
 } from 'react-icons/hi2';
-import { Incident } from '@/lib/mock-data';
-import { fetchIncidents } from '@/lib/api-client';
+import { Incident } from '@/lib/types';
+import { fetchIncidents, fetchDashboardStats } from '@/lib/api-client';
 import { IncidentDetailDrawer } from '@/components/drawers/IncidentDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
@@ -43,7 +43,6 @@ function isWithinTimeFilter(
           return itemDate >= start && itemDate <= end;
         }
       }
-      return true;
     }
 
     const now = Date.now();
@@ -68,6 +67,7 @@ function IncidentsContent() {
 
   const { timeFilter, customRange, metrics } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [statsData, setStatsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,12 +88,16 @@ function IncidentsContent() {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchIncidents({
-        timeRange: timeFilter,
-        startDate: customRange?.startDate,
-        endDate: customRange?.endDate,
-      });
+      const [data, stats] = await Promise.all([
+        fetchIncidents({
+          timeRange: timeFilter,
+          startDate: customRange?.startDate,
+          endDate: customRange?.endDate,
+        }),
+        fetchDashboardStats(timeFilter, customRange),
+      ]);
       setIncidents(data);
+      setStatsData(stats);
     } catch (err: any) {
       console.error('Failed to load incidents:', err);
       setError(err.message || 'Failed to load incidents from server');
@@ -148,7 +152,7 @@ function IncidentsContent() {
 
     return [
       { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-      { key: 'incidentType', label: 'Incident Type', type: 'buttons', options: types },
+      { key: 'incidentType', label: 'Incident Type', type: 'select', options: types },
       { key: 'agent', label: 'Agent', type: 'select', options: agents },
     ];
   }, [displayableIncidents]);
@@ -210,69 +214,43 @@ function IncidentsContent() {
     });
   }, [filteredIncidents, sortKey, sortDirection]);
 
-  // Compute real counts & deltas for KPI from real MongoDB incidents data (1 document = 1 incident)
+  // Compute real counts & deltas for KPI directly synced with Dashboard server metrics
   const kpiCounts = useMemo(() => {
-    let c = 0, h = 0, m = 0;
-    let cPrev = 0, hPrev = 0, mPrev = 0;
-
-    const now = new Date();
-    const lowerFilter = (timeFilter || 'today').toLowerCase();
-
-    let startOfCurrent: Date;
-    let startOfPrevious: Date;
-    let endOfPrevious: Date;
-
-    if (lowerFilter === 'today') {
-      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      endOfPrevious = startOfCurrent;
-    } else if (lowerFilter === 'this week' || lowerFilter === '7d') {
-      startOfCurrent = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      startOfPrevious = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-      endOfPrevious = startOfCurrent;
-    } else if (lowerFilter === 'this month' || lowerFilter === '30d') {
-      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
-      startOfPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      endOfPrevious = startOfCurrent;
-    } else {
-      startOfCurrent = new Date(0);
-      startOfPrevious = new Date(0);
-      endOfPrevious = new Date(0);
+    if (statsData?.incidents) {
+      const inc = statsData.incidents;
+      return {
+        critical: typeof inc.critical === 'number' ? inc.critical : 0,
+        criticalPrev: typeof inc.criticalPrev === 'number' ? inc.criticalPrev : 0,
+        criticalDelta: typeof inc.criticalDelta === 'number' ? inc.criticalDelta : 0,
+        high: typeof inc.high === 'number' ? inc.high : 0,
+        highPrev: typeof inc.highPrev === 'number' ? inc.highPrev : 0,
+        highDelta: typeof inc.highDelta === 'number' ? inc.highDelta : 0,
+        medium: typeof inc.medium === 'number' ? inc.medium : 0,
+        mediumPrev: typeof inc.mediumPrev === 'number' ? inc.mediumPrev : 0,
+        mediumDelta: typeof inc.mediumDelta === 'number' ? inc.mediumDelta : 0,
+      };
     }
 
+    let c = 0, h = 0, m = 0;
     displayableIncidents.forEach((i: any) => {
       const sev = String(i.severity || '').toLowerCase();
-      const rawDate = i.last_observed || i.first_observed || i.raw_first_observed || i.date;
-      const d = rawDate ? new Date(rawDate) : null;
-
-      const isCurrent = !d || isNaN(d.getTime()) || (lowerFilter === 'all' ? true : (d >= startOfCurrent));
-      const isPrevious = lowerFilter !== 'all' && d && !isNaN(d.getTime()) && (d >= startOfPrevious && d < endOfPrevious);
-
-      if (isCurrent) {
-        if (sev === 'critical') c++;
-        else if (sev === 'high') h++;
-        else if (sev === 'medium') m++;
-      }
-
-      if (isPrevious) {
-        if (sev === 'critical') cPrev++;
-        else if (sev === 'high') hPrev++;
-        else if (sev === 'medium') mPrev++;
-      }
+      if (sev === 'critical') c++;
+      else if (sev === 'high') h++;
+      else if (sev === 'medium') m++;
     });
 
     return {
       critical: c,
-      criticalPrev: cPrev,
-      criticalDelta: c - cPrev,
+      criticalPrev: 0,
+      criticalDelta: 0,
       high: h,
-      highPrev: hPrev,
-      highDelta: h - hPrev,
+      highPrev: 0,
+      highDelta: 0,
       medium: m,
-      mediumPrev: mPrev,
-      mediumDelta: m - mPrev,
+      mediumPrev: 0,
+      mediumDelta: 0,
     };
-  }, [displayableIncidents, timeFilter]);
+  }, [statsData, displayableIncidents]);
 
   const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
@@ -299,57 +277,52 @@ function IncidentsContent() {
     ) : (
       <HiChevronDown className="w-4 h-4 inline-block ml-1 text-blue-300" />
     );
-  };
-
-  const renderDeltaBadge = (delta: number) => {
+  };  const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-        <span className="bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" /> +{delta}
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
         </span>
       );
     }
     if (delta < 0) {
       return (
-        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" /> {delta}
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
         </span>
       );
     }
     return (
-      <span className="bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-        <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" /> 0
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5">
+        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
       </span>
     );
   };
 
-  const renderTrendComparison = (current: number, previous: number) => {
-    const diff = current - previous;
-    if (diff > 0) {
+  const renderTrendComparison = (trend: number) => {
+    if (trend > 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-red-600 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-          <HiOutlineArrowTrendingUp className="w-4 h-4 text-red-600 stroke-[2.5]" />
-          <span>{previous}</span>
+        <div className="flex items-center gap-1 font-black text-red-600">
+          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-red-600 stroke-[3]" />
         </div>
       );
     }
-    if (diff < 0) {
+    if (trend < 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-emerald-600 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-          <HiOutlineArrowTrendingDown className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-          <span>{previous}</span>
+        <div className="flex items-center gap-1 font-black text-emerald-600">
+          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-emerald-600 stroke-[3]" />
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-1 text-xs font-black text-gray-500 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-        <HiOutlineMinus className="w-4 h-4 text-gray-400 stroke-[3]" />
-        <span>{previous}</span>
+      <div className="flex items-center gap-1 font-black text-gray-400">
+        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-gray-400 stroke-[3]" />
       </div>
     );
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
       {/* Left Container: KPI Card + Search Bar + Table */}
       <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
@@ -368,8 +341,27 @@ function IncidentsContent() {
                 {renderTrendComparison(kpiCounts.critical, kpiCounts.criticalPrev)}
               </div>
               <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.critical}</p>
+=======
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Left Container: KPI Card + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
+        {/* Top KPI Summary Cards (Identical to Dashboard layout) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
+          {/* Critical Card */}
+          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <span className="bg-[#FF1E1E] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
+              Critical: {kpiCounts.critical}
+            </span>
+            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+              {renderTrendComparison(kpiCounts.criticalDelta)}
+              <span>{kpiCounts.criticalPrev}</span>
+              <span className="text-gray-400 font-bold">-</span>
+              {renderDeltaBadge(kpiCounts.criticalDelta)}
+>>>>>>> Stashed changes
             </div>
+          </div>
 
+<<<<<<< Updated upstream
             {/* High Column */}
             <div className="sm:px-3 md:px-4 xl:px-6 2xl:px-8 pt-2 sm:pt-0">
               <div className="flex items-center justify-between mb-1 sm:mb-1.5">
@@ -382,8 +374,22 @@ function IncidentsContent() {
                 {renderTrendComparison(kpiCounts.high, kpiCounts.highPrev)}
               </div>
               <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.high}</p>
+=======
+          {/* High Card */}
+          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <span className="bg-[#FF6B00] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
+              High: {kpiCounts.high}
+            </span>
+            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+              {renderTrendComparison(kpiCounts.highDelta)}
+              <span>{kpiCounts.highPrev}</span>
+              <span className="text-gray-400 font-bold">-</span>
+              {renderDeltaBadge(kpiCounts.highDelta)}
+>>>>>>> Stashed changes
             </div>
+          </div>
 
+<<<<<<< Updated upstream
             {/* Medium Column */}
             <div className="sm:pl-3 md:pl-4 xl:pl-6 2xl:pl-8 pt-2 sm:pt-0">
               <div className="flex items-center justify-between mb-1 sm:mb-1.5">
@@ -396,6 +402,18 @@ function IncidentsContent() {
                 {renderTrendComparison(kpiCounts.medium, kpiCounts.mediumPrev)}
               </div>
               <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 tracking-tight">{kpiCounts.medium}</p>
+=======
+          {/* Medium Card */}
+          <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-xl bg-white/70 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <span className="bg-[#D97706] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
+              Medium: {kpiCounts.medium}
+            </span>
+            <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
+              {renderTrendComparison(kpiCounts.mediumDelta)}
+              <span>{kpiCounts.mediumPrev}</span>
+              <span className="text-gray-400 font-bold">-</span>
+              {renderDeltaBadge(kpiCounts.mediumDelta)}
+>>>>>>> Stashed changes
             </div>
           </div>
         </div>
@@ -435,10 +453,14 @@ function IncidentsContent() {
         {/* Data Table Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse table-fixed">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+<<<<<<< Updated upstream
                   <th onClick={() => handleSort('incidentName')} className="w-[45%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+=======
+                  <th onClick={() => handleSort('incidentName')} className="w-[45%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition ">
+>>>>>>> Stashed changes
                     <div className="flex items-center">
                       <span>Incident</span>
                       {renderSortIndicator('incidentName')}
@@ -485,7 +507,9 @@ function IncidentsContent() {
                   </tr>
                 ) : (
                   paginatedIncidents.map((inc) => {
-                    const isSelected = isDrawerOpen && selectedIncident?.id === inc.id;
+                    const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
+                    const selectedId = selectedIncident?.id || selectedIncident?._id;
+                    const isSelected = Boolean(isDrawerOpen && selectedId && incId && selectedId === incId);
                     const parts = (inc.firstObserved || '').split(' ');
                     const datePart = parts.slice(0, 3).join(' ');
                     const timePart = parts.slice(3).join(' ');
@@ -496,6 +520,7 @@ function IncidentsContent() {
                         onClick={() => handleToggleDetail(inc)}
                         className={`cursor-pointer transition ${
                           isSelected
+<<<<<<< Updated upstream
                             ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]'
                             : 'hover:bg-blue-50/40'
                         }`}
@@ -504,6 +529,17 @@ function IncidentsContent() {
                           <div className="flex items-center gap-2">
                             <HiOutlineShieldExclamation className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
                             <span className="truncate">{inc.incidentName}</span>
+=======
+                            ? 'bg-blue-100/80'
+                            : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
+                          {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                          <div className="flex items-center gap-2">
+                            
+                            <span className="break-words whitespace-normal">{inc.incidentName}</span>
+>>>>>>> Stashed changes
                           </div>
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">

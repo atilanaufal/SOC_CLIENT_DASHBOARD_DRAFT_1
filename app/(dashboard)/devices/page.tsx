@@ -12,7 +12,7 @@ import {
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
-import { Device } from '@/lib/mock-data';
+import { Device } from '@/lib/types';
 import { fetchDevices, fetchDeviceRiskScores } from '@/lib/api-client';
 import { DeviceDetailDrawer } from '@/components/drawers/DeviceDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
@@ -270,9 +270,15 @@ function DevicesContent() {
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
       {/* Left Container: KPI Cards + Search Bar + Table */}
       <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
+=======
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Left Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
+>>>>>>> Stashed changes
         {/* Critical Error Banner */}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-900 px-3 py-2 rounded-md text-xs font-bold flex items-center justify-between flex-shrink-0">
@@ -406,7 +412,7 @@ function DevicesContent() {
                 No devices found.
               </div>
             ) : (
-              <table className="w-full text-left border-collapse table-fixed">
+              <table className="w-full text-left border-collapse min-w-[850px]">
                 <thead>
                   <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                     <th onClick={() => handleSort('agent')} className="w-[18%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
@@ -444,7 +450,9 @@ function DevicesContent() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold">
                   {paginatedDevices.map((dev) => {
-                    const isSelected = isDrawerOpen && selectedDevice?.id === dev.id;
+                    const devId = dev.id || dev.agent;
+                    const selectedId = selectedDevice?.id || selectedDevice?.agent;
+                    const isSelected = Boolean(isDrawerOpen && selectedId && devId && selectedId === devId);
                     
                     const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
                     const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
@@ -458,6 +466,7 @@ function DevicesContent() {
                         key={dev.id}
                         onClick={() => handleToggleDetail(dev)}
                         className={`cursor-pointer transition ${
+<<<<<<< Updated upstream
                           isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
                         }`}
                       >
@@ -468,6 +477,19 @@ function DevicesContent() {
                           </div>
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 truncate" title={dev.os}>
+=======
+                          isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
+                          {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                          <div className="flex items-center gap-2 truncate">
+                            
+                            <span className="truncate" title={dev.agent}>{dev.agent}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 break-words max-w-[180px] whitespace-normal" title={dev.os}>
+>>>>>>> Stashed changes
                           {dev.os}
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-black">
@@ -478,11 +500,15 @@ function DevicesContent() {
                                 : 'bg-red-100 text-red-800 border border-red-300'
                             }`}
                           >
+<<<<<<< Updated upstream
                             <span
                               className={`w-1.5 h-1.5 rounded-full ${
                                 dev.status === 'Online' ? 'bg-emerald-500' : 'bg-red-500'
                               }`}
                             />
+=======
+                            
+>>>>>>> Stashed changes
                             {dev.status}
                           </span>
                         </td>

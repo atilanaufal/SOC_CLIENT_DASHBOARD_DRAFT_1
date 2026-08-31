@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { SecurityReport } from '@/lib/mock-data';
+import { SecurityReport } from '@/lib/types';
 import { HiOutlineXMark, HiOutlineDocumentText, HiOutlineArrowTopRightOnSquare } from 'react-icons/hi2';
 
 interface ReportDetailDrawerProps {
@@ -50,10 +50,17 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
       {/* Detail Panel Container */}
       <div
         onClick={(e) => e.stopPropagation()}
+<<<<<<< Updated upstream
         className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b-2 border-[#002B9A] px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+=======
+        className="fixed inset-y-0 right-0 z-50 lg:z-30 lg:inset-auto lg:top-[84px] lg:bottom-3.5 lg:right-6 w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200/60 px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+>>>>>>> Stashed changes
           <h3 className="text-lg 2xl:text-xl font-black text-gray-900 tracking-tight">Report Details</h3>
           <button
             onClick={onClose}

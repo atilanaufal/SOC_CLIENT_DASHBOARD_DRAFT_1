@@ -63,7 +63,17 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+<<<<<<< Updated upstream
     const tenant = getTenantContext(request);
+=======
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+>>>>>>> Stashed changes
 
     // Prioritas 1: Redis (<tenant.redisPrefix>:devices:summary) -> < 1ms
     // Prioritas 2 (Fallback): MongoDB (<tenant.databaseName>.device_summary) -> 5-10ms
@@ -95,7 +105,7 @@ export async function GET(request: Request) {
         else if (sev === 'high') totalHigh += count;
         else if (sev === 'medium') totalMedium += count;
       });
-    } catch (err: any) {
+    } catch {
       mongoDbAvailable = false;
     }
 
@@ -132,7 +142,12 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('[API /api/devices/summary] Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch devices summary' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat ringkasan perangkat.'
+          : error.message || 'Failed to fetch devices summary',
+      },
       { status: 500 }
     );
   }

@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+<<<<<<< Updated upstream
 import { Incident } from '@/lib/mock-data';
+=======
+import { Incident } from '@/lib/types';
+>>>>>>> Stashed changes
 import {
   HiOutlineXMark,
   HiOutlineDocumentText,
@@ -47,6 +51,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
     const fallbackObj = {
       timestamp: incident.firstObserved || new Date().toISOString(),
       rule: {
+<<<<<<< Updated upstream
         id: incident.rule_id || incident.ruleId || '100200',
         severity: incident.severity || 'Medium',
         description: incident.description || incident.incidentName,
@@ -60,19 +65,45 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
         id: incident.agent || '001',
         name: incident.host || incident.agent || 'tguard',
         ip: incident.agent_ip || incident.sourceIp || '10.21.126.82',
+=======
+        id: incident.rule_id || incident.ruleId || 'N/A',
+        severity: incident.severity || 'Medium',
+        description: incident.description || incident.incidentName,
+        mitre: {
+          id: incident.mitre_id || incident.mitre || 'N/A',
+          tactic: incident.mitre_tactic || 'N/A',
+          technique: incident.mitre_technique || 'N/A',
+        },
+      },
+      agent: {
+        id: incident.agent || 'N/A',
+        name: incident.host || incident.agent || 'Agent',
+        ip: incident.agent_ip || incident.sourceIp || 'N/A',
+>>>>>>> Stashed changes
       },
       manager: {
         name: 'wazuh.manager',
       },
+<<<<<<< Updated upstream
       location: incident.affected_file || '/var/log/auth.log',
       data: {
         srcip: incident.sourceIp || incident.agent_ip || '10.21.126.82',
         dstip: incident.destIp || incident.ip_destination || '10.21.126.1',
+=======
+      location: incident.affected_file || 'N/A',
+      data: {
+        srcip: incident.sourceIp || incident.agent_ip || 'N/A',
+        dstip: incident.destIp || incident.ip_destination || 'N/A',
+>>>>>>> Stashed changes
         count: incident.count || 1,
         incident_type: incident.incidentName,
         affected_file: incident.affected_file || null,
       },
+<<<<<<< Updated upstream
       raw_log: `${incident.firstObserved || new Date().toISOString()} ${incident.host || 'tguard'} ossec: Alert [${incident.rule_id || incident.ruleId || '100200'}] (${incident.severity || 'Medium'}): ${incident.description || incident.incidentName}`,
+=======
+      raw_log: `${incident.firstObserved || new Date().toISOString()} ${incident.host || 'Agent'} ossec: Alert [${incident.rule_id || incident.ruleId || 'N/A'}] (${incident.severity || 'Medium'}): ${incident.description || incident.incidentName}`,
+>>>>>>> Stashed changes
     };
     return JSON.stringify(fallbackObj, null, 2);
   }, [incident]);
@@ -148,10 +179,17 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
       {/* Detail Panel Container */}
       <div
         onClick={(e) => e.stopPropagation()}
+<<<<<<< Updated upstream
         className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b-2 border-[#002B9A] px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+=======
+        className="fixed inset-y-0 right-0 z-50 lg:z-30 lg:inset-auto lg:top-[84px] lg:bottom-3.5 lg:right-6 w-[85vw] max-w-sm lg:w-[380px] 2xl:w-[440px] bg-white/80 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-l-xl lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200/60 px-4 2xl:px-5 py-3 2xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+>>>>>>> Stashed changes
           <h3 className="text-lg 2xl:text-xl font-black text-gray-900 tracking-tight">Incident Details</h3>
           <button
             onClick={onClose}

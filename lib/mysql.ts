@@ -1,17 +1,27 @@
 import mysql from 'mysql2/promise';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
+<<<<<<< Updated upstream
 function getMysqlHost() {
   return process.env.MYSQL_HOST || '10.21.126.82';
 }
 
 function getMysqlFallbackHost() {
   return process.env.MYSQL_FALLBACK_HOST || '192.168.1.20';
+=======
+function getMysqlHost(): string {
+  return process.env.MYSQL_HOST || '127.0.0.1';
+}
+
+function getMysqlFallbackHost(): string {
+  return process.env.MYSQL_FALLBACK_HOST || '';
+>>>>>>> Stashed changes
 }
 
 const MYSQL_PORT = Number(process.env.MYSQL_PORT) || 3306;
 const MYSQL_USER = process.env.MYSQL_USER || 'auth_user';
-const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'admin12345';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'auth_db';
 const MYSQL_SALT = process.env.MYSQL_SALT || 'sec_auth_salt_2026';
 
@@ -35,6 +45,13 @@ export function hashPasswordSHA512Raw(password: string): string {
   return crypto.createHash('sha512').update(password, 'utf-8').digest('hex');
 }
 
+<<<<<<< Updated upstream
+=======
+export async function hashPasswordBcrypt(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
+}
+
+>>>>>>> Stashed changes
 export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
   const primaryHost = getMysqlHost();
   const fallbackHost = getMysqlFallbackHost();
@@ -48,16 +65,16 @@ export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
       password: MYSQL_PASSWORD,
       database: MYSQL_DATABASE,
       waitForConnections: true,
-      connectionLimit: 5,
-      connectTimeout: 2000,
+      connectionLimit: 10,
+      connectTimeout: 3000,
     });
     const conn = await primaryPool.getConnection();
     activePool = primaryPool;
     activeHost = primaryHost;
     return conn;
   } catch (primaryErr: any) {
-    // Fallback attempt
-    if (fallbackHost !== primaryHost) {
+    // Fallback attempt if configured
+    if (fallbackHost && fallbackHost !== primaryHost) {
       try {
         const fallbackPool = mysql.createPool({
           host: fallbackHost,
@@ -66,15 +83,15 @@ export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
           password: MYSQL_PASSWORD,
           database: MYSQL_DATABASE,
           waitForConnections: true,
-          connectionLimit: 5,
-          connectTimeout: 2000,
+          connectionLimit: 10,
+          connectTimeout: 3000,
         });
         const conn = await fallbackPool.getConnection();
         activePool = fallbackPool;
         activeHost = fallbackHost;
         return conn;
       } catch (fallbackErr: any) {
-        throw new Error(`Koneksi MySQL gagal ke Host ${primaryHost}:${MYSQL_PORT} (${primaryErr.message})`);
+        throw new Error(`MySQL connection failed to primary and fallback hosts: ${primaryErr.message}`);
       }
     }
     throw primaryErr;
@@ -99,7 +116,6 @@ export async function verifyUserCredentials(
 ): Promise<{ success: boolean; user?: UserRecord; error?: string }> {
   let conn: mysql.PoolConnection | null = null;
   try {
-    // Strictly connect to MySQL database on target VM
     conn = await getMysqlConnection();
     const [rows]: any = await conn.execute(
       `SELECT 
@@ -119,10 +135,11 @@ export async function verifyUserCredentials(
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      return { success: false, error: 'Username atau email tidak ditemukan di database MySQL.' };
+      return { success: false, error: 'Username atau email tidak terdaftar.' };
     }
 
     const user = rows[0];
+<<<<<<< Updated upstream
     const storedHash = user.password_hash;
 
     // Supported hash algorithms: SHA-256 (standard), SHA-256 salted, SHA-512 salted, SHA-512 raw, plaintext fallback
@@ -146,6 +163,43 @@ export async function verifyUserCredentials(
     if (isMatch) {
       const usernameLower = (user.username || '').toLowerCase();
       const detectedRole = usernameLower.includes('admin') ? 'admin' : 'tenant';
+=======
+    const storedHash = user.password_hash || '';
+
+    let isMatch = false;
+
+    // 1. Bcrypt verification ($2a$, $2b$, $2y$)
+    if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$') || storedHash.startsWith('$2y$')) {
+      try {
+        isMatch = await bcrypt.compare(passwordInput, storedHash);
+      } catch {
+        isMatch = false;
+      }
+    }
+
+    // 2. Cryptographic hash fallbacks (Salted SHA-256 / SHA-512)
+    if (!isMatch) {
+      const computedSha256SaltPrimary = hashPasswordSHA256Salted(passwordInput, MYSQL_SALT);
+      const computedSha256SaltDoc = hashPasswordSHA256Salted(passwordInput, 'tguard_secure_salt_2026');
+      const computedSha512Primary = hashPasswordSHA512(passwordInput, MYSQL_SALT);
+      const computedSha512Doc = hashPasswordSHA512(passwordInput, 'tguard_secure_salt_2026');
+      const computedSha256 = hashPasswordSHA256(passwordInput);
+      const computedSha512Raw = hashPasswordSHA512Raw(passwordInput);
+
+      isMatch = (
+        storedHash === computedSha256 ||
+        storedHash === computedSha256SaltPrimary ||
+        storedHash === computedSha256SaltDoc ||
+        storedHash === computedSha512Primary ||
+        storedHash === computedSha512Doc ||
+        storedHash === computedSha512Raw
+      );
+    }
+
+    if (isMatch) {
+      const usernameLower = (user.username || '').toLowerCase();
+      const detectedRole = usernameLower.includes('admin') ? 'admin' : (user.role || 'tenant');
+>>>>>>> Stashed changes
 
       return {
         success: true,
@@ -155,24 +209,37 @@ export async function verifyUserCredentials(
           username: user.username,
           email: user.email,
           role: detectedRole,
+<<<<<<< Updated upstream
           tenant_code: user.tenant_code || 'UI',
           campus_name: user.campus_name || 'Universitas Indonesia',
           database_name: user.database_name || 'universitas_indonesia',
           redis_prefix: user.redis_prefix || 'universitas_indonesia',
+=======
+          tenant_code: user.tenant_code || '',
+          campus_name: user.campus_name || '',
+          database_name: user.database_name || '',
+          redis_prefix: user.redis_prefix || user.database_name || '',
+>>>>>>> Stashed changes
         },
       };
     } else {
-      return { success: false, error: 'Password yang Anda masukkan salah.' };
+      return { success: false, error: 'Password yang Anda masukkan tidak sesuai.' };
     }
   } catch (err: any) {
     console.error('MySQL Database Connection Error:', err.message);
+    const sanitizedMessage = process.env.NODE_ENV === 'production'
+      ? 'Gagal terhubung ke layanan database autentikasi. Silakan hubungi administrator.'
+      : `Gagal terhubung ke Database MySQL (${activeHost}:${MYSQL_PORT}): ${err.message}`;
+
     return {
       success: false,
-      error: `Gagal terhubung ke Database MySQL VM (${activeHost}:${MYSQL_PORT}). Pastikan server MySQL di VM berjalan dan dapat diakses. Detail: ${err.message}`,
+      error: sanitizedMessage,
     };
   } finally {
     if (conn) {
-      try { conn.release(); } catch {}
+      try {
+        conn.release();
+      } catch {}
     }
   }
 }

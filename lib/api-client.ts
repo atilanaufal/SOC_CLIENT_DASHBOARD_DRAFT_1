@@ -1,4 +1,4 @@
-import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/mock-data';
+import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
 
 export async function fetchIncidents(filters?: {
   search?: string;

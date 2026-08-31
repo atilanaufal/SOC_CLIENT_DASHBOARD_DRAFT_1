@@ -11,7 +11,7 @@ import {
   HiChevronUp,
   HiChevronDown
 } from 'react-icons/hi2';
-import { Vulnerability } from '@/lib/mock-data';
+import { Vulnerability } from '@/lib/types';
 import { fetchVulnerabilities } from '@/lib/api-client';
 import { VulnerabilityDetailDrawer } from '@/components/drawers/VulnerabilityDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
@@ -116,13 +116,19 @@ export default function VulnerabilitiesPage() {
   const adaptiveFilterSections: FilterSection[] = useMemo(() => {
     const severities = Array.from(new Set(vulnerabilities.map((v) => v.severity))).filter(Boolean);
     const statuses = Array.from(new Set(vulnerabilities.map((v) => v.status))).filter(Boolean);
-    const classifications = Array.from(new Set(vulnerabilities.map((v) => v.classification || v.category).filter(Boolean))) as string[];
+    const vulnNames = Array.from(
+      new Set(vulnerabilities.map((v) => (v.vulnerability || v.name || v.package || '').trim()).filter(Boolean))
+    ).sort() as string[];
     const agents = Array.from(new Set(vulnerabilities.map((v) => v.agent))).filter(Boolean);
 
     return [
       { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
       { key: 'status', label: 'Status', type: 'buttons', options: statuses.length ? statuses : ['Not Patched', 'Solved'] },
+<<<<<<< Updated upstream
       { key: 'classification', label: 'Category', type: 'buttons', options: classifications },
+=======
+      { key: 'vulnerability', label: 'Vulnerability Name', type: 'select', options: vulnNames },
+>>>>>>> Stashed changes
       { key: 'agent', label: 'Agent', type: 'select', options: agents },
     ];
   }, [vulnerabilities]);
@@ -145,10 +151,10 @@ export default function VulnerabilitiesPage() {
           ? true
           : String(vuln.status || '').toLowerCase() === activeFilters.status.toLowerCase();
 
-      const matchesClass =
-        !activeFilters.classification || activeFilters.classification === 'All'
+      const matchesVuln =
+        !activeFilters.vulnerability || activeFilters.vulnerability === 'All'
           ? true
-          : (vuln.classification || vuln.category) === activeFilters.classification;
+          : (vuln.vulnerability || vuln.name || vuln.package || '').trim().toLowerCase() === activeFilters.vulnerability.trim().toLowerCase();
 
       const matchesAgent =
         !activeFilters.agent || activeFilters.agent === 'All'
@@ -157,7 +163,7 @@ export default function VulnerabilitiesPage() {
 
       const matchesTime = isWithinTimeFilter(vuln.detected_at || vuln.detectionDate, timeFilter, customRange);
 
-      return matchesSearch && matchesSeverity && matchesStatus && matchesClass && matchesAgent && matchesTime;
+      return matchesSearch && matchesSeverity && matchesStatus && matchesVuln && matchesAgent && matchesTime;
     });
   }, [vulnerabilities, searchTerm, activeFilters, timeFilter, customRange]);
 
@@ -190,10 +196,14 @@ export default function VulnerabilitiesPage() {
     });
   }, [filteredVulns, sortKey, sortDirection]);
 
-  // Compute real metrics & dynamic Vuln Distribution by category
+  // Compute real metrics & dynamic Vuln Distribution by Vulnerability Name
   const { stats, vulnDistSegments } = useMemo(() => {
     let c = 0, h = 0, m = 0, solved = 0;
+<<<<<<< Updated upstream
     const catMap = new Map<string, number>();
+=======
+    const vulnMap = new Map<string, number>();
+>>>>>>> Stashed changes
 
     filteredVulns.forEach((v) => {
       const sev = String(v.severity || '').toLowerCase();
@@ -204,17 +214,31 @@ export default function VulnerabilitiesPage() {
       const st = String(v.status || '').trim().toLowerCase();
       if (st === 'solved' || st === 'patched' || st === 'pass') solved++;
 
-      const cat = v.category || v.classification || 'Packages';
-      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+      const vulnName = (v.vulnerability || v.name || v.package || 'Unknown').trim();
+      vulnMap.set(vulnName, (vulnMap.get(vulnName) || 0) + 1);
     });
 
-    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
+    const sortedEntries = Array.from(vulnMap.entries()).sort((a, b) => b[1] - a[1]);
+
+    // Take top 6 items, group remainder as Other if necessary
+    let topEntries = sortedEntries;
+    if (sortedEntries.length > 6) {
+      const top5 = sortedEntries.slice(0, 5);
+      const otherCount = sortedEntries.slice(5).reduce((sum, [, val]) => sum + val, 0);
+      topEntries = [...top5, ['Other', otherCount]];
+    }
+
+    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#EC4899', '#6366F1'];
     let idx = 0;
-    const segments = Array.from(catMap.entries()).map(([label, value]) => ({
-      label,
-      value,
-      color: colors[idx++ % colors.length]
-    }));
+    const segments = topEntries.map(([rawLabel, value]) => {
+      const displayLabel = rawLabel.length > 13 ? `${rawLabel.slice(0, 11)}...` : rawLabel;
+      return {
+        label: displayLabel,
+        fullLabel: rawLabel,
+        value,
+        color: colors[idx++ % colors.length]
+      };
+    });
 
     return {
       stats: {
@@ -225,7 +249,7 @@ export default function VulnerabilitiesPage() {
         solved,
         patched: solved,
       },
-      vulnDistSegments: segments.length ? segments : [{ label: 'Software', value: 1, color: '#3B82F6' }]
+      vulnDistSegments: segments
     };
   }, [filteredVulns]);
 
@@ -263,9 +287,15 @@ export default function VulnerabilitiesPage() {
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
       {/* Left Container: KPI Cards + Search Bar + Table */}
       <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
+=======
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Left Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
+>>>>>>> Stashed changes
         {/* Top KPI Cards (3 columns) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
@@ -295,7 +325,11 @@ export default function VulnerabilitiesPage() {
             </div>
           </div>
 
+<<<<<<< Updated upstream
           {/* Vuln Distribution Widget (Functional by Category) */}
+=======
+          {/* Vuln Distribution Widget (Functional by Vulnerability Name) */}
+>>>>>>> Stashed changes
           <div className="md:col-span-4 bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-2.5 sm:gap-3">
             <BestDonutChart
               segments={vulnDistSegments}
@@ -303,6 +337,7 @@ export default function VulnerabilitiesPage() {
               size={100}
               strokeWidth={12}
             />
+<<<<<<< Updated upstream
             <div className="flex-1 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base">
               <h4 className="font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base uppercase tracking-wider text-gray-500 mb-1 sm:mb-1.5 border-b border-gray-200/50 pb-0.5">
                 Vuln Distribution
@@ -315,6 +350,26 @@ export default function VulnerabilitiesPage() {
                   </span>
                 ))}
               </div>
+=======
+            <div className="flex-1 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base min-w-0">
+              <h4 className="font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base uppercase tracking-wider text-gray-500 mb-1 sm:mb-1.5 border-b border-gray-200/50 pb-0.5">
+                Vuln Distribution
+              </h4>
+              {vulnDistSegments.length === 0 ? (
+                <div className="text-[11px] sm:text-xs text-gray-400 font-semibold italic py-2">
+                  No vulnerabilities detected
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 sm:gap-y-1 font-bold text-gray-700 text-[10px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base max-h-16 sm:max-h-18 xl:max-h-20 2xl:max-h-24 overflow-y-auto pr-1">
+                  {vulnDistSegments.map((seg, idx) => (
+                    <span key={idx} className="flex items-center gap-1 truncate" title={`${(seg as any).fullLabel || seg.label}: ${seg.value} issues`}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
+                      <span className="truncate">{seg.label} ({seg.value})</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+>>>>>>> Stashed changes
             </div>
           </div>
 
@@ -367,10 +422,14 @@ export default function VulnerabilitiesPage() {
         {/* Data Table Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse table-fixed">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+<<<<<<< Updated upstream
                   <th onClick={() => handleSort('name')} className="w-[30%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+=======
+                  <th onClick={() => handleSort('name')} className="w-[30%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition ">
+>>>>>>> Stashed changes
                     <div className="flex items-center">
                       <span>Vulnerability</span>
                       {renderSortIndicator('name')}
@@ -429,7 +488,9 @@ export default function VulnerabilitiesPage() {
                   </tr>
                 ) : (
                   paginatedVulns.map((vuln) => {
-                    const isSelected = isDrawerOpen && selectedVuln?.id === vuln.id;
+                    const vulnId = vuln.id || vuln.cveId || vuln.name;
+                    const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
+                    const isSelected = Boolean(isDrawerOpen && selectedId && vulnId && selectedId === vulnId);
                     const parts = (vuln.detectionDate || '').split(' ');
                     const datePart = parts.slice(0, 3).join(' ');
                     const timePart = parts.slice(3).join(' ');
@@ -439,6 +500,7 @@ export default function VulnerabilitiesPage() {
                         key={vuln.id}
                         onClick={() => handleToggleDetail(vuln)}
                         className={`cursor-pointer transition ${
+<<<<<<< Updated upstream
                           isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
                         }`}
                       >
@@ -446,6 +508,16 @@ export default function VulnerabilitiesPage() {
                           <div className="flex items-center gap-2">
                             <HiOutlineShieldExclamation className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
                             <span className="truncate">{vuln.name}</span>
+=======
+                          isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
+                        }`}
+                      >
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-extrabold">
+                          {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                          <div className="flex items-center gap-2">
+                            
+                            <span className="break-words whitespace-normal">{vuln.name}</span>
+>>>>>>> Stashed changes
                           </div>
                         </td>
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
@@ -461,12 +533,19 @@ export default function VulnerabilitiesPage() {
                         </td>
 
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
+<<<<<<< Updated upstream
                           <span className={`inline-flex items-center gap-1 px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm font-extrabold ${
+=======
+                          <span className={`inline-block px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm font-extrabold ${
+>>>>>>> Stashed changes
                             vuln.status === 'Solved' || vuln.status === 'Patched'
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                               : 'bg-red-100 text-red-800 border border-red-300'
                           }`}>
+<<<<<<< Updated upstream
                             {vuln.status === 'Solved' || vuln.status === 'Patched' ? <HiOutlineCheckCircle className="w-3.5 h-3.5 2xl:w-4 2xl:h-4" /> : <HiOutlineXCircle className="w-3.5 h-3.5 2xl:w-4 2xl:h-4" />}
+=======
+>>>>>>> Stashed changes
                             {vuln.status}
                           </span>
                         </td>

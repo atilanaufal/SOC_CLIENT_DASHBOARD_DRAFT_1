@@ -14,7 +14,17 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Agent ID required' }, { status: 400 });
     }
 
+<<<<<<< Updated upstream
     const tenant = getTenantContext(request);
+=======
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+>>>>>>> Stashed changes
 
     // Prioritas 1: Redis (<tenant.redisPrefix>:device:<id>:hardware) -> < 1ms
     // Prioritas 2 (Fallback): MongoDB (<tenant.databaseName>.devices WHERE id = id) -> 5-10ms

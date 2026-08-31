@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
+<<<<<<< Updated upstream
 import { fetchVulnerabilitiesData } from '@/lib/redis-sync';
+=======
+import { getTenantVulnerabilities } from '@/lib/data-service';
+>>>>>>> Stashed changes
 import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +25,7 @@ function formatDate(val: any): string {
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
   if (!range || range === 'All') return true;
 
-  const rawDate = doc.detected_at || doc.last_seen || doc.first_seen || doc.date || doc.created_at || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null);
+  const rawDate = doc.detected_at || doc.detectionDate || doc.last_seen || doc.first_seen || doc.date || doc.created_at;
   if (!rawDate) return true;
 
   const d = new Date(rawDate);
@@ -75,17 +79,31 @@ export async function GET(request: Request) {
     const severity = searchParams.get('severity') || '';
     const status = searchParams.get('status') || '';
     const category = searchParams.get('category') || '';
+    const vulnerabilityParam = searchParams.get('vulnerability') || '';
     const agent = searchParams.get('agent') || '';
     const timeRange = searchParams.get('timeRange') || searchParams.get('timeFilter') || '';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
+<<<<<<< Updated upstream
     // Get Tenant Context from logged in user session
     const tenant = getTenantContext(request);
 
     // Fetch from Redis / MongoDB strictly for this tenant
     const { data: rawDocs, source } = await fetchVulnerabilitiesData(timeRange, tenant.databaseName, tenant.redisPrefix);
+=======
+    // Authenticated Tenant Context
+    const tenant = await getTenantContext(request);
+    if (!tenant) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+    }
+>>>>>>> Stashed changes
 
+    // Query vulnerabilities directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
+    const rawDocs = await getTenantVulnerabilities(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
     let docs = rawDocs;
 
     if (severity && severity !== 'All') {
@@ -107,64 +125,98 @@ export async function GET(request: Request) {
       docs = docs.filter((d: any) => catRegex.test(String(d.category || '')));
     }
 
-    if (agent && agent !== 'All') {
-      const agentRegex = new RegExp(agent, 'i');
-      docs = docs.filter((d: any) => agentRegex.test(String(d.agent || '')) || agentRegex.test(String(d.ip || '')));
+    if (vulnerabilityParam && vulnerabilityParam !== 'All') {
+      const vRegex = new RegExp(`^${vulnerabilityParam}$`, 'i');
+      docs = docs.filter((d: any) => vRegex.test(String(d.vulnerability || d.name || d.cve || '')));
     }
 
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
+    if (agent && agent !== 'All') {
+      const agentRegex = new RegExp(agent, 'i');
       docs = docs.filter((d: any) => {
-        return searchRegex.test(String(d.cve || '')) ||
-          searchRegex.test(String(d.vulnerability || '')) ||
-          searchRegex.test(String(d.agent || '')) ||
-          searchRegex.test(String(d.ip || '')) ||
-          searchRegex.test(String(d.description || '')) ||
-          searchRegex.test(String(d.category || ''));
+        const h = String(d.host || d.agent || '');
+        return agentRegex.test(h);
       });
     }
 
-    const timeFilteredDocs = docs.filter((doc: any) => matchesTimeRange(doc, timeRange, startDate, endDate));
+    if (timeRange && timeRange !== 'All') {
+      docs = docs.filter((d: any) => matchesTimeRange(d, timeRange, startDate, endDate));
+    }
 
+<<<<<<< Updated upstream
     const vulnerabilities = timeFilteredDocs.map((doc: any) => {
       const idStr = doc._id ? doc._id.toString() : String(doc.id || Math.random());
       const rawStatus = String(doc.status || '').trim().toLowerCase();
       const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
+=======
+    const mapped = docs.map((doc: any, index: number) => {
+      let sev = String(doc.severity || 'Medium');
+      sev = sev.charAt(0).toUpperCase() + sev.slice(1).toLowerCase();
+
+      const isSolved =
+        String(doc.status).toLowerCase() === 'solved' ||
+        String(doc.status).toLowerCase() === 'pass' ||
+        String(doc.status).toLowerCase() === 'patched';
+>>>>>>> Stashed changes
 
       return {
-        id: idStr,
-        _id: idStr,
-        name: doc.vulnerability || doc.cve || 'Vulnerability',
-        vulnerability: doc.vulnerability || doc.cve || 'Vulnerability',
-        severity: doc.severity || 'Medium',
+        id: String(doc.id || doc._id || `vuln-${index + 1}`),
+        _id: String(doc.id || doc._id || `vuln-${index + 1}`),
+        name: doc.vulnerability || doc.name || doc.cve || 'Vulnerability',
+        vulnerability: doc.vulnerability || doc.name || doc.cve || 'Vulnerability',
+        severity: sev,
         agent: (doc.agent || doc.host || 'Unknown Agent').replace(/-agent$/i, '').trim(),
-        cveId: doc.cve || 'N/A',
-        cve: doc.cve || 'N/A',
-        detectionDate: formatDate(doc.detected_at || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null)),
+        cveId: doc.cve || doc.cveId || 'N/A',
+        cve: doc.cve || doc.cveId || 'N/A',
+        detectionDate: formatDate(doc.detected_at || doc.detectionDate),
         detected_at: doc.detected_at ? String(doc.detected_at) : undefined,
-        status: statusFormatted,
-        currentVersion: doc.version || 'N/A',
-        version: doc.version || 'N/A',
+        status: isSolved ? 'Solved' : 'Not Patched',
+        currentVersion: doc.version || doc.currentVersion || 'N/A',
+        version: doc.version || doc.currentVersion || 'N/A',
         description: doc.description || 'No detailed rationale provided for this vulnerability.',
+        impact: doc.impact || '',
         category: doc.category || 'Software',
         classification: doc.category || 'Software',
+<<<<<<< Updated upstream
         ip: doc.ip || 'N/A',
         tenant: tenant.campusName
+=======
+        package: doc.package || '',
+        ip: doc.ip || doc.agent_ip || 'N/A',
+        tenant: tenant.campusName,
+>>>>>>> Stashed changes
       };
     });
+
+    let result = mapped;
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.cveId.toLowerCase().includes(q) ||
+          item.agent.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q)
+      );
+    }
 
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
+<<<<<<< Updated upstream
       dataSource: source, // 'redis' (1-7d) or 'mongodb' (1 month)
       total: vulnerabilities.length,
       data: vulnerabilities
+=======
+      data: result,
+      total: result.length,
+>>>>>>> Stashed changes
     });
   } catch (error: any) {
-    console.error('Error in GET /api/vulnerabilities:', error);
+    console.error('Error fetching vulnerabilities:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch vulnerabilities' },
+      { error: 'Internal Server Error', details: error.message },
       { status: 500 }
     );
   }
