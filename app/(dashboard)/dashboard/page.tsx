@@ -1,43 +1,41 @@
 'use client';
 
-<<<<<<< Updated upstream
-import React, { useState, useEffect, useRef } from 'react';
-=======
 import React, { useState, useEffect, useRef, useMemo } from 'react';
->>>>>>> Stashed changes
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   HiOutlineChevronDown,
-  HiOutlineArrowUpRight,
-  HiOutlineExclamationCircle,
   HiOutlineArrowUp,
   HiOutlineArrowDown,
   HiOutlineMinus,
   HiOutlineArrowTrendingUp,
-  HiOutlineArrowTrendingDown
+  HiOutlineArrowTrendingDown,
+  HiOutlineArrowUpRight,
 } from 'react-icons/hi2';
-import { Incident } from '@/lib/types';
-import { fetchDashboardStats } from '@/lib/api-client';
-import { MoreAgentsModal } from '@/components/modals/MoreAgentsModal';
-import { useTimeFilter } from '@/lib/time-filter-context';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { RiskScoreWidget } from '@/components/widgets/RiskScoreWidget';
+import { MoreAgentsModal } from '@/components/modals/MoreAgentsModal';
+import { useTimeFilter } from '@/lib/time-filter-context';
+import { fetchDashboardStats } from '@/lib/api-client';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { timeFilter, customRange } = useTimeFilter();
+
   const [statsData, setStatsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [isMoreAgentsOpen, setIsMoreAgentsOpen] = useState(false);
-  const [selectedMoreAgentsIncident, setSelectedMoreAgentsIncident] = useState<Incident | null>(null);
-  const [severityFilter, setSeverityFilter] = useState('Critical');
+  // Top Incident Severity Filter Dropdown state
+  const [severityFilter, setSeverityFilter] = useState<'Critical' | 'High' | 'Medium'>('Critical');
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
   const [severityCoords, setSeverityCoords] = useState<{ top: number; right: number } | null>(null);
-  const [mounted, setMounted] = useState(false);
   const severityButtonRef = useRef<HTMLButtonElement>(null);
   const severityDropdownRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // More Agents Modal State
+  const [isMoreAgentsOpen, setIsMoreAgentsOpen] = useState(false);
+  const [selectedMoreAgentsIncident, setSelectedMoreAgentsIncident] = useState<any | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -65,6 +63,7 @@ export default function DashboardPage() {
     }
   }, [isSeverityDropdownOpen]);
 
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -80,13 +79,16 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fetch live metrics strictly based on active Time Filter and Custom Range
   useEffect(() => {
     async function loadStats() {
       try {
         setIsLoading(true);
         const data = await fetchDashboardStats(timeFilter, customRange);
         setStatsData(data);
-        if (data?.topIncidents?.length > 0) {
+
+        // Auto fallback if no critical incidents exist
+        if (data?.topIncidents?.length) {
           const hasCritical = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'critical');
           const hasHigh = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'high');
           const hasMedium = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'medium');
@@ -140,9 +142,9 @@ export default function DashboardPage() {
   const mediumDelta = typeof incStats.mediumDelta === 'number' ? incStats.mediumDelta : 0;
 
   const donutSegments = [
-    { label: 'Medium', value: mediumCount, color: '#D97706' },
-    { label: 'High', value: highCount, color: '#FF6B00' },
-    { label: 'Critical', value: criticalCount, color: '#FF1E1E' },
+    { label: 'Medium', value: mediumCount, color: '#5B9BD5' },
+    { label: 'High', value: highCount, color: '#EA580C' },
+    { label: 'Critical', value: criticalCount, color: '#B8251B' },
   ];
 
   // Top Incidents (Real DB)
@@ -175,46 +177,31 @@ export default function DashboardPage() {
 
   const renderSeverityBadge = (sev: string) => {
     const s = String(sev || '').toLowerCase();
-    if (s === 'critical') return <span className="bg-[#FF1E1E] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(255,30,30,0.3)]">Critical</span>;
-    if (s === 'high') return <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(255,107,0,0.3)]">High</span>;
-    if (s === 'medium') return <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(217,119,6,0.3)]">Medium</span>;
-    if (s === 'low') return <span className="bg-[#0066B1] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Low</span>;
-    return <span className="bg-slate-600 text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Info</span>;
+    if (s === 'critical') return <span className="bg-[#B8251B] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(184,37,27,0.3)]">Critical</span>;
+    if (s === 'high') return <span className="bg-[#EA580C] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(234,88,12,0.3)]">High</span>;
+    if (s === 'medium') return <span className="bg-[#5B9BD5] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(91,155,213,0.3)]">Medium</span>;
+    if (s === 'low') return <span className="bg-[#0066B1] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Low</span>;
+    return <span className="bg-slate-600 text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Info</span>;
   };
 
   const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-<<<<<<< Updated upstream
-        <span className="bg-red-50/80 text-red-600 border border-red-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-          <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> +{delta}
-=======
-        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
           <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
->>>>>>> Stashed changes
         </span>
       );
     }
     if (delta < 0) {
       return (
-<<<<<<< Updated upstream
-        <span className="bg-emerald-50/80 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-          <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> {delta}
-=======
-        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
           <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
->>>>>>> Stashed changes
         </span>
       );
     }
     return (
-<<<<<<< Updated upstream
-      <span className="bg-gray-100/80 text-gray-700 border border-gray-200 px-2 sm:px-2.5 xl:px-3 2xl:px-3.5 py-0.5 rounded-md font-black text-[11px] sm:text-xs xl:text-xs 2xl:text-sm flex items-center gap-0.5">
-        <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" /> 0
-=======
-      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-sm xl:text-sm 2xl:text-base flex items-center gap-0.5">
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 whitespace-nowrap">
         <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
->>>>>>> Stashed changes
       </span>
     );
   };
@@ -222,64 +209,51 @@ export default function DashboardPage() {
   const renderTrendComparison = (trend: number) => {
     if (trend > 0) {
       return (
-<<<<<<< Updated upstream
-        <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-red-600">
-          <HiOutlineArrowTrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-red-600 stroke-[2.5]" />
-=======
         <div className="flex items-center gap-1 font-black text-red-600">
-          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-red-600 stroke-[3]" />
->>>>>>> Stashed changes
+          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-red-600 stroke-[3]" />
         </div>
       );
     }
     if (trend < 0) {
       return (
-<<<<<<< Updated upstream
-        <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-emerald-600">
-          <HiOutlineArrowTrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-emerald-600 stroke-[2.5]" />
-=======
         <div className="flex items-center gap-1 font-black text-emerald-600">
-          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-emerald-600 stroke-[3]" />
->>>>>>> Stashed changes
+          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-emerald-600 stroke-[3]" />
         </div>
       );
     }
     return (
-<<<<<<< Updated upstream
-      <div className="flex items-center gap-1 text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-black text-gray-400">
-        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-gray-400 stroke-[3]" />
-=======
       <div className="flex items-center gap-1 font-black text-gray-400">
-        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5.5 xl:h-5.5 2xl:w-6 2xl:h-6 text-gray-400 stroke-[3]" />
->>>>>>> Stashed changes
+        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-gray-400 stroke-[3]" />
       </div>
     );
   };
 
   return (
-    <div className="w-full flex flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-4.5 2xl:gap-6">
+    <div className="w-full flex flex-col gap-3.5 sm:gap-4 md:gap-4.5 xl:gap-5 2xl:gap-6">
       {/* Top Row: Total Severity | Risk Score | Top Incident */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-3.5 md:gap-4 xl:gap-4.5 2xl:gap-6 items-stretch w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 sm:gap-4 md:gap-4.5 xl:gap-5 2xl:gap-6 items-stretch w-full">
         {/* 1. Total Severity */}
         <div className="md:col-span-1 lg:col-span-4 xl:col-span-4 2xl:col-span-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 flex flex-col justify-between overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
-          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
             Total Severity
           </div>
 
-          <div className="p-3 sm:p-3.5 md:p-4 xl:p-4.5 2xl:p-5 flex-1 flex flex-col justify-start gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5">
-            <div className="flex items-center justify-around py-1">
+          <div className="p-3.5 sm:p-4 xl:p-4.5 2xl:p-5 flex-1 flex flex-col justify-between gap-3 sm:gap-3">
+            {/* Donut Chart & Previous Period Summary */}
+            <div className="flex flex-row items-center justify-around gap-2 py-1">
               <BestDonutChart
                 segments={donutSegments}
                 centerLabel={totalSeverity.toString()}
-                size={145}
-                strokeWidth={14}
+                size={135}
+                strokeWidth={13}
+                customFontSizeClass="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black"
               />
-              <div className="text-center bg-white/65 backdrop-blur-md px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 py-2 sm:py-2.5 xl:py-3 2xl:py-4 rounded-lg border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(0,0,0,0.02)] flex flex-col items-center gap-1 min-w-[110px] sm:min-w-[120px] xl:min-w-[135px] 2xl:min-w-[150px]">
-                <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
-                <div className="flex items-center justify-center gap-1.5 text-gray-900 font-black text-xl sm:text-2xl md:text-2xl xl:text-3xl 2xl:text-4xl my-0.5">
+              <div className="text-center bg-white/75 backdrop-blur-md px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(0,0,0,0.02)] flex flex-col items-center gap-1 min-w-[105px] sm:min-w-[120px] xl:min-w-[135px]">
+                <p className="text-xs sm:text-xs xl:text-sm font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
+                <div className="flex items-center justify-center gap-1 text-gray-900 font-black text-2xl sm:text-2xl xl:text-3xl my-0.5">
                   <span>{lastPeriodCount}</span>
                 </div>
-                <div className={`px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-0.5 xl:py-1 2xl:py-1.5 rounded-md font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base border flex items-center gap-1 ${
+                <div className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-xs xl:text-sm border flex items-center gap-1 ${
                   totalDelta > 0
                     ? 'bg-red-50/80 backdrop-blur-sm text-red-600 border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]'
                     : totalDelta < 0
@@ -287,11 +261,11 @@ export default function DashboardPage() {
                     : 'bg-gray-100/80 backdrop-blur-sm text-gray-700 border-gray-200'
                 }`}>
                   {totalDelta > 0 ? (
-                    <HiOutlineArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
+                    <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" />
                   ) : totalDelta < 0 ? (
-                    <HiOutlineArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
+                    <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" />
                   ) : (
-                    <HiOutlineMinus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
+                    <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" />
                   )}
                   <span>{totalDelta > 0 ? `+${totalDelta}` : totalDelta}</span>
                 </div>
@@ -299,23 +273,18 @@ export default function DashboardPage() {
             </div>
 
             {/* Breakdown Cards */}
-<<<<<<< Updated upstream
-            <div className="flex flex-col gap-1.5 sm:gap-2 xl:gap-2.5 2xl:gap-3 border-t border-gray-200/50 pt-2 sm:pt-2.5 2xl:pt-3">
-              {/* Critical Row */}
-              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#FF1E1E] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
-                  Critical: {criticalCount}
-                </span>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
-=======
-            <div className="flex flex-col gap-2 sm:gap-2.5 xl:gap-3 2xl:gap-3.5 border-t border-gray-200/50 pt-2 sm:pt-2.5 2xl:pt-3">
-              {/* Critical Row */}
-              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#FF1E1E] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,30,30,0.3)]">
-                  Critical: {criticalCount}
-                </span>
-                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
->>>>>>> Stashed changes
+            <div className="flex flex-col gap-2 sm:gap-2.5 border-t border-gray-200/60 pt-2.5 sm:pt-3">
+              {/* Critical Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#B8251B] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(184,37,27,0.25)]">
+                    Critical
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {criticalCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(criticalDelta)}
                   <span>{criticalPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -323,20 +292,17 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* High Row */}
-<<<<<<< Updated upstream
-              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#FF6B00] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
-                  High: {highCount}
-                </span>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
-=======
-              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#FF6B00] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(255,107,0,0.3)]">
-                  High: {highCount}
-                </span>
-                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
->>>>>>> Stashed changes
+              {/* High Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#EA580C] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(234,88,12,0.25)]">
+                    High
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {highCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(highDelta)}
                   <span>{highPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -344,20 +310,17 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Medium Row */}
-<<<<<<< Updated upstream
-              <div className="p-1.5 sm:p-2 md:p-2 xl:p-2.5 2xl:p-3 px-3 sm:px-3.5 md:px-3.5 xl:px-4 2xl:px-5 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#D97706] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 px-3 sm:px-3.5 xl:px-4 2xl:px-5 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
-                  Medium: {mediumCount}
-                </span>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base md:text-base xl:text-lg 2xl:text-xl font-black text-gray-900">
-=======
-              <div className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-3.5 sm:px-4 md:px-4 xl:px-5 2xl:px-6 rounded-lg bg-white/60 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
-                <span className="bg-[#D97706] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black py-1.5 sm:py-2 xl:py-2.5 2xl:py-3 px-3.5 sm:px-4 xl:px-5 2xl:px-6 rounded-md shadow-[0_2px_8px_rgba(217,119,6,0.3)]">
-                  Medium: {mediumCount}
-                </span>
-                <div className="flex items-center gap-2 sm:gap-2.5 text-base sm:text-lg md:text-lg xl:text-xl 2xl:text-2xl font-black text-gray-900">
->>>>>>> Stashed changes
+              {/* Medium Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#5B9BD5] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(91,155,213,0.25)]">
+                    Medium
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {mediumCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(mediumDelta)}
                   <span>{mediumPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -379,32 +342,32 @@ export default function DashboardPage() {
 
         {/* 3. Top Incident */}
         <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col justify-between relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
-          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
             <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top Incident</span>
             <div className="relative z-30">
               <button
                 ref={severityButtonRef}
                 onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-                className="bg-white/90 backdrop-blur-md text-gray-900 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-md flex items-center gap-1 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer"
+                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[32px]"
               >
                 <span>{severityFilter}</span>
-                <HiOutlineChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <HiOutlineChevronDown className="w-3.5 h-3.5" />
               </button>
 
               {isSeverityDropdownOpen && mounted && severityCoords && createPortal(
                 <div
                   ref={severityDropdownRef}
                   style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
-                  className="w-32 2xl:w-36 bg-white/80 backdrop-blur-2xl rounded-md border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm 2xl:text-base font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5"
+                  className="w-36 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
                 >
                   {['Critical', 'High', 'Medium'].map((sev) => (
                     <button
                       key={sev}
                       onClick={() => {
-                        setSeverityFilter(sev);
+                        setSeverityFilter(sev as 'Critical' | 'High' | 'Medium');
                         setIsSeverityDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 rounded-md font-bold transition cursor-pointer ${
+                      className={`w-full text-left px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                         severityFilter === sev ? 'bg-blue-50/90 text-[#002B9A] font-black' : 'text-gray-700 hover:bg-blue-50/80'
                       }`}
                     >
@@ -417,89 +380,119 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Item Container - Clean natural spacing with justify-start */}
+          {/* Item Container - Responsive layout on mobile and desktop */}
           <div className="divide-y divide-gray-100/80 flex-1 flex flex-col justify-start px-1 overflow-hidden rounded-b-xl relative z-10">
             {isLoading ? (
-              <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">Loading top incidents...</div>
+              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading top incidents...</div>
             ) : filteredIncidents.length === 0 ? (
-              <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">No {severityFilter} incidents found.</div>
+              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No {severityFilter} incidents found.</div>
             ) : (
-<<<<<<< Updated upstream
-              filteredIncidents.slice(0, 3).map((inc) => (
-=======
               filteredIncidents.slice(0, 5).map((inc) => (
->>>>>>> Stashed changes
                 <div
                   key={inc.id}
-                  className="p-2 sm:p-2.5 md:p-2.5 xl:p-3 2xl:p-3.5 px-2.5 sm:px-3 md:px-3.5 xl:px-4 2xl:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-blue-50/50 transition flex-shrink-0"
+                  className="p-3 sm:p-2.5 md:p-3 xl:p-3.5 px-3 sm:px-4 hover:bg-blue-50/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0"
                 >
-                  <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <div className="mt-0.5 flex-shrink-0">
-                      <HiOutlineExclamationCircle
-                        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 ${
+                  {/* Incident Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2 sm:hidden">
+                      <span
+                        className={`text-xs font-black px-2 py-0.5 rounded-md ${
                           inc.severity === 'Critical'
-                            ? 'text-red-600'
+                            ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                             : inc.severity === 'High'
-                            ? 'text-orange-600'
-                            : 'text-amber-600'
+                            ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                            : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
                         }`}
-                      />
-                    </div>
-                    <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-extrabold text-gray-900 leading-tight truncate">
-                        <span
-                          className={
-                            inc.severity === 'Critical'
-                              ? 'text-red-600 font-black'
-                              : inc.severity === 'High'
-                              ? 'text-orange-600 font-black'
-                              : 'text-amber-600 font-black'
-                          }
+                      >
+                        {inc.severity}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedMoreAgentsIncident(inc);
+                            setIsMoreAgentsOpen(true);
+                          }}
+                          className="bg-black/90 hover:bg-black text-white font-bold text-xs px-2.5 py-1 rounded-md transition shadow-sm cursor-pointer"
                         >
-                          {inc.severity}:
-                        </span>{' '}
-                        {inc.incidentName}
-                      </p>
-
-                      <div className="flex items-center gap-1 text-[10px] sm:text-[11px] md:text-[11px] xl:text-xs 2xl:text-sm text-gray-600 truncate">
-                        <span className="font-bold text-gray-500">Agent:</span>
-                        {(inc.agentsList || [inc.agent]).slice(0, 3).map((ag: string, idx: number) => (
-                          <React.Fragment key={idx}>
-                            <button
-                              onClick={() => handleAgentClick(ag, inc.incidentName)}
-                              className="text-[#0066B1] hover:text-[#002B9A] hover:underline font-extrabold transition"
-                            >
-                              {ag}
-                            </button>
-                            {idx < (inc.agentsList?.length || 1) - 1 && <span className="text-gray-400">-</span>}
-                          </React.Fragment>
-                        ))}
+                          Agent
+                        </button>
+                        <button
+                          onClick={() => {
+                            const agentParam = inc.agent || inc.host || '';
+                            const incName = inc.incidentName || inc.incident_type || '';
+                            const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
+                              agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
+                            }`;
+                            router.push(targetUrl);
+                          }}
+                          className="bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-xs px-3 py-1 rounded-md transition shadow-sm cursor-pointer"
+                        >
+                          View
+                        </button>
                       </div>
+                    </div>
 
-                      <div className="flex items-center gap-2 text-[9px] sm:text-[10px] md:text-[10px] xl:text-[11px] 2xl:text-xs">
-                        <span className="bg-white/75 backdrop-blur-md px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-gray-800 font-extrabold border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)]">
-                          Count: <span className="font-black text-gray-900">{inc.count || 1} Detected</span>
-                        </span>
-                        <span className="bg-white/75 backdrop-blur-md px-1.5 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-gray-800 font-extrabold border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)]">
-                          Observed: <span className="font-black text-gray-900">{inc.lastObserved || inc.firstObserved || 'Recently'}</span>
-                        </span>
-                      </div>
+                    <p className="text-xs sm:text-sm xl:text-base font-extrabold text-gray-900 leading-snug">
+                      <span
+                        className={`hidden sm:inline font-black mr-1 ${
+                          inc.severity === 'Critical'
+                            ? 'text-[#B8251B]'
+                            : inc.severity === 'High'
+                            ? 'text-[#EA580C]'
+                            : 'text-[#5B9BD5]'
+                        }`}
+                      >
+                        {inc.severity}:
+                      </span>
+                      {inc.incidentName}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-1 text-xs text-gray-600">
+                      <span className="font-bold text-gray-500">Agent:</span>
+                      {(inc.agentsList || [inc.agent]).slice(0, 3).map((ag: string, idx: number) => (
+                        <React.Fragment key={idx}>
+                          <button
+                            onClick={() => handleAgentClick(ag, inc.incidentName)}
+                            className="text-[#0066B1] hover:text-[#002B9A] hover:underline font-extrabold transition"
+                          >
+                            {ag}
+                          </button>
+                          {idx < (inc.agentsList?.length || 1) - 1 && <span className="text-gray-400">-</span>}
+                        </React.Fragment>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="bg-white/80 backdrop-blur-md px-2 py-0.5 rounded-md text-gray-800 font-bold border border-white/80 shadow-sm">
+                        Count: <span className="font-black text-gray-900">{inc.count || 1} Detected</span>
+                      </span>
+                      <span className="bg-white/80 backdrop-blur-md px-2 py-0.5 rounded-md text-gray-800 font-bold border border-white/80 shadow-sm">
+                        Observed: <span className="font-black text-gray-900">{inc.lastObserved || inc.firstObserved || 'Recently'}</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto flex-shrink-0">
+                  {/* Desktop Action Buttons */}
+                  <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => {
                         setSelectedMoreAgentsIncident(inc);
                         setIsMoreAgentsOpen(true);
                       }}
-                      className="bg-black/90 backdrop-blur-sm hover:bg-black text-white font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-1 xl:py-1.5 2xl:py-2 rounded-md transition shadow-[0_2px_6px_rgba(0,0,0,0.15)] cursor-pointer"
+                      className="bg-black/90 backdrop-blur-sm hover:bg-black text-white font-bold text-xs sm:text-xs xl:text-sm px-3 py-1.5 rounded-lg transition shadow-[0_2px_6px_rgba(0,0,0,0.15)] cursor-pointer"
                     >
                       Agent
                     </button>
                     <button
-                      onClick={() => router.push(`/incidents?search=${encodeURIComponent(inc.incidentName)}`)}
-                      className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-black text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-3 sm:px-3.5 xl:px-4 2xl:px-5 py-1 xl:py-1.5 2xl:py-2 rounded-md transition shadow-[0_2px_6px_rgba(0,43,154,0.25)] cursor-pointer"
+                      onClick={() => {
+                        const agentParam = inc.agent || inc.host || '';
+                        const incName = inc.incidentName || inc.incident_type || '';
+                        const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
+                          agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
+                        }`;
+                        router.push(targetUrl);
+                      }}
+                      className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-xs xl:text-sm px-3.5 py-1.5 rounded-lg transition shadow-[0_2px_6px_rgba(0,43,154,0.25)] cursor-pointer"
                     >
                       View
                     </button>
@@ -513,37 +506,41 @@ export default function DashboardPage() {
 
       {/* Bottom Row: Recommended Action - Latest */}
       <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex-shrink-0">
-        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-3.5 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-          Recommended Action - Latest
+        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          Recommended Action
         </div>
 
         <div className="divide-y divide-gray-200/50">
           {isLoading ? (
-            <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">Loading recommended actions...</div>
+            <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading recommended actions...</div>
           ) : recommendedActionsSource.length === 0 ? (
-            <div className="p-4 text-center text-xs sm:text-xs md:text-sm xl:text-sm 2xl:text-base font-bold text-gray-500">No recommended actions found.</div>
+            <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No recommended actions found.</div>
           ) : (
             recommendedActionsSource.slice(0, 3).map((act, idx) => (
-              <div key={idx} className="p-2 sm:p-2.5 md:p-3 xl:p-3.5 2xl:p-4 px-3 sm:px-4 md:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  {renderSeverityBadge(act.severity)}
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-900 truncate">
+              <div key={idx} className="p-3 sm:p-3.5 md:p-4 px-3.5 sm:px-4 md:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
+                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                  <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                    {renderSeverityBadge(act.severity)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm md:text-base font-extrabold text-gray-900 leading-snug">
                       {act.action}
                     </p>
-                    <div className="flex items-center gap-2 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base text-gray-500 font-semibold mt-0.5">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mt-1">
                       <span>{act.date}</span>
                       {act.time && <span>{act.time}</span>}
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRecommendedActionView(act.id || act.reportId)}
-                  className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md transition flex items-center gap-1 sm:gap-1.5 flex-shrink-0 shadow-[0_2px_8px_rgba(0,43,154,0.2)] cursor-pointer"
-                >
-                  <span>View Report</span>
-                  <HiOutlineArrowUpRight className="w-3.5 h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5" />
-                </button>
+                <div className="flex justify-end sm:justify-auto">
+                  <button
+                    onClick={() => handleRecommendedActionView(act.id || act.reportId)}
+                    className="w-full sm:w-auto bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2 rounded-lg transition flex items-center justify-center gap-1.5 flex-shrink-0 shadow-[0_2px_8px_rgba(0,43,154,0.2)] cursor-pointer"
+                  >
+                    <span>View Report</span>
+                    <HiOutlineArrowUpRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))
           )}

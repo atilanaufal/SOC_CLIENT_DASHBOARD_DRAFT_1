@@ -110,7 +110,7 @@ const TIME_METRICS_DATA: Record<string, TimeFilterMetrics> = {
 function formatCustomLabel(range: CustomDateRange | null): string {
   if (!range || !range.startDate || !range.endDate) return 'Custom';
   try {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const startParts = range.startDate.split('-');
     const endParts = range.endDate.split('-');
 
