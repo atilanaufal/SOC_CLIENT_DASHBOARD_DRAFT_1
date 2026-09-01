@@ -2,11 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-<<<<<<< Updated upstream
-import { Device } from '@/lib/mock-data';
-=======
+
 import { Device } from '@/lib/types';
->>>>>>> Stashed changes
+
 import { useRouter } from 'next/navigation';
 
 interface DeviceDetailModalProps {

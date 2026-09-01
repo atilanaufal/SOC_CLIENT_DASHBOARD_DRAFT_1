@@ -22,11 +22,11 @@ interface CustomDateModalProps {
 }
 
 const MONTHS_LIST = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const DAYS_HEADER = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const DAYS_HEADER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const CustomDateModal: React.FC<CustomDateModalProps> = ({
   isOpen,
@@ -83,12 +83,12 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
 
   const handleApply = () => {
     if (!startDate || !endDate) {
-      setErrorMessage('Pilih tanggal mulai dan tanggal selesai.');
+      setErrorMessage('Please select a start date and an end date.');
       return;
     }
 
     if (new Date(startDate) > new Date(endDate)) {
-      setErrorMessage('Tanggal mulai tidak boleh lebih besar dari tanggal selesai.');
+      setErrorMessage('Start date cannot be after end date.');
       return;
     }
 
@@ -206,89 +206,89 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white/85 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-md w-full overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
+        className="bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-lg xl:max-w-xl 2xl:max-w-2xl w-full overflow-hidden p-5 sm:p-6 2xl:p-7 space-y-4.5 sm:space-y-5 2xl:space-y-6 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
-          <div className="flex items-center gap-2 text-[#002B9A] font-extrabold text-base">
-            <HiOutlineCalendar className="w-5 h-5 text-[#0066B1]" />
-            <span>Pilih Rentang Tanggal</span>
+        <div className="flex items-center justify-between pb-3 2xl:pb-4 border-b border-gray-200/60">
+          <div className="flex items-center gap-2 text-[#002B9A] font-bold text-base sm:text-lg 2xl:text-xl">
+            <HiOutlineCalendar className="w-5 h-5 sm:w-6 sm:h-6 2xl:w-7 2xl:h-7 text-[#0066B1]" />
+            <span>Select Date Range</span>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-900 p-1 rounded-lg transition"
+            className="text-gray-400 hover:text-gray-900 p-1.5 rounded-lg transition cursor-pointer"
             aria-label="Close modal"
           >
-            <HiOutlineXMark className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
         {/* Quick Presets */}
         <div>
-          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-            Pilihan Cepat:
+          <label className="block text-[11px] sm:text-xs 2xl:text-sm font-bold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2">
+            Quick Presets:
           </label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 2xl:gap-2.5">
             <button
               type="button"
               onClick={() => applyPreset('today')}
-              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
+              className="px-3 sm:px-4 2xl:px-5 py-1.5 sm:py-2 text-xs sm:text-sm 2xl:text-base font-semibold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-xl transition border border-gray-200 cursor-pointer shadow-sm"
             >
-              Hari Ini
+              Today
             </button>
             <button
               type="button"
               onClick={() => applyPreset('7days')}
-              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
+              className="px-3 sm:px-4 2xl:px-5 py-1.5 sm:py-2 text-xs sm:text-sm 2xl:text-base font-semibold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-xl transition border border-gray-200 cursor-pointer shadow-sm"
             >
-              7 Hari Terakhir
+              Last 7 Days
             </button>
             <button
               type="button"
               onClick={() => applyPreset('30days')}
-              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
+              className="px-3 sm:px-4 2xl:px-5 py-1.5 sm:py-2 text-xs sm:text-sm 2xl:text-base font-semibold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-xl transition border border-gray-200 cursor-pointer shadow-sm"
             >
-              30 Hari Terakhir
+              Last 30 Days
             </button>
             <button
               type="button"
               onClick={() => applyPreset('thisMonth')}
-              className="px-2.5 py-1 text-xs font-bold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-md transition border border-gray-200"
+              className="px-3 sm:px-4 2xl:px-5 py-1.5 sm:py-2 text-xs sm:text-sm 2xl:text-base font-semibold bg-white/80 text-gray-700 hover:bg-[#002B9A] hover:text-white rounded-xl transition border border-gray-200 cursor-pointer shadow-sm"
             >
-              Bulan Ini
+              This Month
             </button>
           </div>
         </div>
 
         {/* Embedded Interactive Calendar */}
-        <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-lg p-3">
+        <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-4 sm:p-5 2xl:p-6">
           {/* Calendar Month/Year Controls */}
-          <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center justify-between mb-3.5 2xl:mb-4 px-1">
             <button
               type="button"
               onClick={prevMonth}
-              className="p-1 rounded-md text-gray-600 hover:bg-gray-200 transition"
-              title="Bulan Sebelumnya"
+              className="p-2 rounded-xl text-gray-600 hover:bg-gray-200 transition cursor-pointer"
+              title="Previous Month"
             >
-              <HiOutlineChevronLeft className="w-4 h-4" />
+              <HiOutlineChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 2xl:w-6 2xl:h-6" />
             </button>
 
-            <span className="text-sm font-extrabold text-[#002B9A]">
+            <span className="text-sm sm:text-base 2xl:text-lg font-bold text-[#002B9A]">
               {MONTHS_LIST[viewMonth]} {viewYear}
             </span>
 
             <button
               type="button"
               onClick={nextMonth}
-              className="p-1 rounded-md text-gray-600 hover:bg-gray-200 transition"
-              title="Bulan Berikutnya"
+              className="p-2 rounded-xl text-gray-600 hover:bg-gray-200 transition cursor-pointer"
+              title="Next Month"
             >
-              <HiOutlineChevronRight className="w-4 h-4" />
+              <HiOutlineChevronRight className="w-4 h-4 sm:w-5 sm:h-5 2xl:w-6 2xl:h-6" />
             </button>
           </div>
 
           {/* Days Header */}
-          <div className="grid grid-cols-7 text-center text-[11px] font-bold text-gray-500 mb-1">
+          <div className="grid grid-cols-7 text-center text-[11px] sm:text-xs 2xl:text-sm font-bold text-gray-500 mb-2">
             {DAYS_HEADER.map((day) => (
               <div key={day} className="py-1">
                 {day}
@@ -297,7 +297,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
           </div>
 
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 2xl:gap-2 text-center">
             {daysGrid.map((item, idx) => {
               const isStart = item.dateStr === startDate;
               const isEnd = item.dateStr === endDate;
@@ -314,7 +314,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
               }
 
               if (isStart || isEnd) {
-                btnClass = 'bg-[#002B9A] text-white font-bold hover:bg-[#002175]';
+                btnClass = 'bg-[#002B9A] text-white font-bold hover:bg-[#002175] shadow-sm';
               } else if (isInRange) {
                 btnClass = 'bg-blue-100 text-[#002B9A] font-semibold';
               }
@@ -324,7 +324,7 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
                   key={idx}
                   type="button"
                   onClick={() => handleDateClick(item.dateStr)}
-                  className={`h-8 w-full rounded-md text-xs font-semibold flex items-center justify-center transition ${btnClass}`}
+                  className={`h-9 sm:h-10 2xl:h-12 w-full rounded-xl text-xs sm:text-sm 2xl:text-base font-semibold flex items-center justify-center transition cursor-pointer ${btnClass}`}
                 >
                   {item.day}
                 </button>
@@ -334,9 +334,9 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
         </div>
 
         {/* Range Selected Indicator */}
-        <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 text-xs flex items-center justify-between text-gray-900">
-          <span className="font-medium text-gray-600">Rentang Terpilih:</span>
-          <span className="font-extrabold text-[#002B9A]">
+        <div className="bg-blue-50/80 p-3 sm:p-3.5 2xl:p-4 rounded-xl border border-blue-100 text-xs sm:text-sm 2xl:text-base flex items-center justify-between text-gray-900">
+          <span className="font-medium text-gray-600">Selected Range:</span>
+          <span className="font-bold text-[#002B9A]">
             {startDate === endDate
               ? formatDisplayDate(startDate)
               : `${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}`}
@@ -345,26 +345,26 @@ export const CustomDateModal: React.FC<CustomDateModalProps> = ({
 
         {/* Validation Warning */}
         {errorMessage && (
-          <p className="text-xs font-bold text-red-600 bg-red-50 p-2 rounded-md border border-red-200">
+          <p className="text-xs sm:text-sm 2xl:text-base font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">
             {errorMessage}
           </p>
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-2.5 2xl:gap-3 pt-2 2xl:pt-3 border-t border-gray-200">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-md transition border border-gray-200"
+            className="px-4 sm:px-5 2xl:px-6 py-2 sm:py-2.5 2xl:py-3 text-xs sm:text-sm 2xl:text-base font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition border border-gray-200 cursor-pointer shadow-sm"
           >
-            Batal
+            Cancel
           </button>
           <button
             type="button"
             onClick={handleApply}
-            className="px-4 py-1.5 text-xs font-extrabold bg-[#002B9A] text-white hover:bg-[#002175] rounded-md transition border border-[#002175]"
+            className="px-5 sm:px-6 2xl:px-7 py-2 sm:py-2.5 2xl:py-3 text-xs sm:text-sm 2xl:text-base font-bold bg-[#002B9A] text-white hover:bg-[#002175] rounded-xl transition border border-[#002175] shadow-[0_2px_8px_rgba(0,43,154,0.3)] cursor-pointer"
           >
-            Terapkan Filter
+            Apply Filter
           </button>
         </div>
       </div>

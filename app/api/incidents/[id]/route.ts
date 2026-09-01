@@ -11,7 +11,7 @@ function formatDate(val: any): string {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   } catch {
     return String(val);
@@ -196,11 +196,9 @@ function extractFullLogs(doc: any): string {
       affected_file: doc.affected_file || undefined,
       count: typeof doc.count === 'number' ? doc.count : 1,
       full_logs: extractFullLogs(doc),
-<<<<<<< Updated upstream
-      tenant: 'Cyber Lab Head Office'
-=======
+
       tenant: tenant.campusName,
->>>>>>> Stashed changes
+
     };
 
     return NextResponse.json({ success: true, data: incident });

@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const tenantCtx = getTenantContext(request);
-    const tenantDbName = tenantCtx.databaseName || 'universitas_indonesia';
-    const tenantPrefix = tenantCtx.redisPrefix || 'universitas_indonesia';
+    const tenantCtx = await getTenantContext(request);
+    const tenantDbName = tenantCtx?.databaseName || 'universitas_indonesia';
+    const tenantPrefix = tenantCtx?.redisPrefix || 'universitas_indonesia';
 
     // 1. MongoDB Status & Document Counts for current tenant
     const mongoStart = performance.now();
@@ -213,7 +213,7 @@ export async function GET(request: NextRequest) {
     };
 
     // D. Wazuh Server API vs Database Devices (Queried dynamically from real device stores)
-    const { data: realTenantDevices } = await getTenantDevices(tenantCtx);
+    const { data: realTenantDevices } = tenantCtx ? await getTenantDevices(tenantCtx) : { data: [] };
     let apiAgents: any[] = [];
     try {
       apiAgents = await fetchWazuhAgents();
@@ -251,11 +251,11 @@ export async function GET(request: NextRequest) {
       success: true,
       timestamp: new Date().toISOString(),
       activeTenant: {
-        username: tenantCtx.username,
-        campusName: tenantCtx.campusName,
+        username: tenantCtx?.username || '',
+        campusName: tenantCtx?.campusName || '',
         databaseName: tenantDbName,
         redisPrefix: tenantPrefix,
-        role: tenantCtx.role || 'tenant',
+        role: tenantCtx?.role || 'tenant',
       },
       databases: {
         mongoDB: {
@@ -338,7 +338,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const tenantCtx = getTenantContext(request);
+    const tenantCtx = await getTenantContext(request);
     const body = await request.json().catch(() => ({}));
     const action = body.action || 'sync';
 
@@ -354,15 +354,15 @@ export async function POST(request: NextRequest) {
           { database: 'DFIR-IRIS PostgreSQL', host: '172.21.0.5:5432', readLatencyMs: 2.80, writeLatencyMs: 18.50, throughputOpsSec: 980, status: 'Normal' },
         ],
         syncPipelineBenchmark: [
-          { pipeline: 'Wazuh Indexer ➔ MongoDB', source: 'Indexer Hits', target: `${tenantCtx.databaseName}.incident`, resyncTimeSec: 1.20, throughputDocsSec: 1394, statusText: '100% SYNCED' },
-          { pipeline: 'MongoDB ➔ Redis Cache', source: 'MongoDB Historic (7D)', target: `${tenantCtx.redisPrefix}:*`, resyncTimeSec: 0.31, throughputDocsSec: 4641, statusText: '100% SYNCED' },
-          { pipeline: 'DFIR-IRIS ➔ MongoDB Reports', source: 'PostgreSQL Cases', target: `${tenantCtx.databaseName}.reports`, resyncTimeSec: 0.12, throughputDocsSec: 66.7, statusText: '100% SYNCED' },
+          { pipeline: 'Wazuh Indexer ➔ MongoDB', source: 'Indexer Hits', target: `${tenantCtx?.databaseName || 'universitas_indonesia'}.incident`, resyncTimeSec: 1.20, throughputDocsSec: 1394, statusText: '100% SYNCED' },
+          { pipeline: 'MongoDB ➔ Redis Cache', source: 'MongoDB Historic (7D)', target: `${tenantCtx?.redisPrefix || 'universitas_indonesia'}:*`, resyncTimeSec: 0.31, throughputDocsSec: 4641, statusText: '100% SYNCED' },
+          { pipeline: 'DFIR-IRIS ➔ MongoDB Reports', source: 'PostgreSQL Cases', target: `${tenantCtx?.databaseName || 'universitas_indonesia'}.reports`, resyncTimeSec: 0.12, throughputDocsSec: 66.7, statusText: '100% SYNCED' },
         ],
       });
     }
 
     if (action === 'sync') {
-      const targetTenant = body.tenant || tenantCtx.databaseName || 'universitas_indonesia';
+      const targetTenant = body.tenant || tenantCtx?.databaseName || 'universitas_indonesia';
       const targetPipeline = body.pipeline || 'all';
       const targetTimeRange = body.timeRange || '7days';
       const startDate = body.startDate;

@@ -1051,3 +1051,620 @@
 2026-08-31 11:30:55 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
 2026-08-31 11:30:56 +07:00: (node:92304) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
 2026-08-31 11:30:56 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:02:04 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:02:04 +07:00: npm notice run next start
+2026-08-31 12:02:04 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:02:05 +07:00: (node:110817) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:02:05 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:11:21 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:21 +07:00: npm notice run next start
+2026-08-31 12:11:22 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:22 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:22 +07:00: npm notice run next start
+2026-08-31 12:11:22 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:22 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:22 +07:00: npm notice run next start
+2026-08-31 12:11:23 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:23 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:23 +07:00: npm notice run next start
+2026-08-31 12:11:24 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:24 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:24 +07:00: npm notice run next start
+2026-08-31 12:11:25 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:25 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:25 +07:00: npm notice run next start
+2026-08-31 12:11:25 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:25 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:25 +07:00: npm notice run next start
+2026-08-31 12:11:26 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:26 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:26 +07:00: npm notice run next start
+2026-08-31 12:11:27 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:27 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:27 +07:00: npm notice run next start
+2026-08-31 12:11:28 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:28 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:28 +07:00: npm notice run next start
+2026-08-31 12:11:29 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:29 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:29 +07:00: npm notice run next start
+2026-08-31 12:11:29 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:29 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:29 +07:00: npm notice run next start
+2026-08-31 12:11:30 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:30 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:30 +07:00: npm notice run next start
+2026-08-31 12:11:31 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:31 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:31 +07:00: npm notice run next start
+2026-08-31 12:11:32 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:32 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:32 +07:00: npm notice run next start
+2026-08-31 12:11:32 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:11:32 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:11:32 +07:00: npm notice run next start
+2026-08-31 12:11:33 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:23 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:23 +07:00: npm notice run next start
+2026-08-31 12:16:24 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:24 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:24 +07:00: npm notice run next start
+2026-08-31 12:16:25 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:25 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:25 +07:00: npm notice run next start
+2026-08-31 12:16:25 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:26 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:26 +07:00: npm notice run next start
+2026-08-31 12:16:26 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:26 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:26 +07:00: npm notice run next start
+2026-08-31 12:16:27 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:27 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:27 +07:00: npm notice run next start
+2026-08-31 12:16:28 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:28 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:28 +07:00: npm notice run next start
+2026-08-31 12:16:29 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:29 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:29 +07:00: npm notice run next start
+2026-08-31 12:16:29 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:30 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:30 +07:00: npm notice run next start
+2026-08-31 12:16:30 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:30 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:30 +07:00: npm notice run next start
+2026-08-31 12:16:31 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:31 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:31 +07:00: npm notice run next start
+2026-08-31 12:16:32 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:32 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:32 +07:00: npm notice run next start
+2026-08-31 12:16:32 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:33 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:33 +07:00: npm notice run next start
+2026-08-31 12:16:33 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:33 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:33 +07:00: npm notice run next start
+2026-08-31 12:16:34 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:34 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:34 +07:00: npm notice run next start
+2026-08-31 12:16:35 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:16:35 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:16:35 +07:00: npm notice run next start
+2026-08-31 12:16:35 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:29:26 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:29:26 +07:00: npm notice run next start
+2026-08-31 12:29:27 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:29:27 +07:00: (node:125016) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:29:27 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:32:57 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:32:57 +07:00: npm notice run next start
+2026-08-31 12:32:58 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:32:58 +07:00: (node:126868) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:32:58 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:37:26 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:37:26 +07:00: npm notice run next start
+2026-08-31 12:37:26 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:37:27 +07:00: (node:128569) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:37:27 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:37:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:37:52 +07:00: npm notice run next start
+2026-08-31 12:37:52 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:37:53 +07:00: (node:128844) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:37:53 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:38:02 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:02 +07:00: npm notice run next start
+2026-08-31 12:38:02 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:02 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:02 +07:00: npm notice run next start
+2026-08-31 12:38:03 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:03 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:03 +07:00: npm notice run next start
+2026-08-31 12:38:04 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:04 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:04 +07:00: npm notice run next start
+2026-08-31 12:38:05 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:05 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:05 +07:00: npm notice run next start
+2026-08-31 12:38:06 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:06 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:06 +07:00: npm notice run next start
+2026-08-31 12:38:06 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:07 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:07 +07:00: npm notice run next start
+2026-08-31 12:38:07 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:07 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:07 +07:00: npm notice run next start
+2026-08-31 12:38:08 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:08 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:08 +07:00: npm notice run next start
+2026-08-31 12:38:09 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:09 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:09 +07:00: npm notice run next start
+2026-08-31 12:38:09 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:10 +07:00: npm notice run next start
+2026-08-31 12:38:10 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:10 +07:00: npm notice run next start
+2026-08-31 12:38:11 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:11 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:11 +07:00: npm notice run next start
+2026-08-31 12:38:12 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:12 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:12 +07:00: npm notice run next start
+2026-08-31 12:38:13 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:13 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:13 +07:00: npm notice run next start
+2026-08-31 12:38:13 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:13 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:13 +07:00: npm notice run next start
+2026-08-31 12:38:14 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:42 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:42 +07:00: npm notice run next start
+2026-08-31 12:38:43 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:43 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:43 +07:00: npm notice run next start
+2026-08-31 12:38:44 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:44 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:44 +07:00: npm notice run next start
+2026-08-31 12:38:44 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:44 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:44 +07:00: npm notice run next start
+2026-08-31 12:38:45 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:45 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:45 +07:00: npm notice run next start
+2026-08-31 12:38:46 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:46 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:46 +07:00: npm notice run next start
+2026-08-31 12:38:47 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:47 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:47 +07:00: npm notice run next start
+2026-08-31 12:38:47 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:48 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:48 +07:00: npm notice run next start
+2026-08-31 12:38:48 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:48 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:48 +07:00: npm notice run next start
+2026-08-31 12:38:49 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:49 +07:00: npm notice run next start
+2026-08-31 12:38:50 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:50 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:50 +07:00: npm notice run next start
+2026-08-31 12:38:50 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:50 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:50 +07:00: npm notice run next start
+2026-08-31 12:38:51 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:51 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:51 +07:00: npm notice run next start
+2026-08-31 12:38:52 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:52 +07:00: npm notice run next start
+2026-08-31 12:38:53 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:53 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:53 +07:00: npm notice run next start
+2026-08-31 12:38:53 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:53 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:53 +07:00: npm notice run next start
+2026-08-31 12:38:54 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:56 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:56 +07:00: npm notice run next start
+2026-08-31 12:38:56 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:56 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:56 +07:00: npm notice run next start
+2026-08-31 12:38:57 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:57 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:57 +07:00: npm notice run next start
+2026-08-31 12:38:58 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:58 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:58 +07:00: npm notice run next start
+2026-08-31 12:38:58 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:59 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:59 +07:00: npm notice run next start
+2026-08-31 12:38:59 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:38:59 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:38:59 +07:00: npm notice run next start
+2026-08-31 12:39:00 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:00 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:00 +07:00: npm notice run next start
+2026-08-31 12:39:01 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:01 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:01 +07:00: npm notice run next start
+2026-08-31 12:39:01 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:02 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:02 +07:00: npm notice run next start
+2026-08-31 12:39:02 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:02 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:02 +07:00: npm notice run next start
+2026-08-31 12:39:03 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:03 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:03 +07:00: npm notice run next start
+2026-08-31 12:39:04 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:04 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:04 +07:00: npm notice run next start
+2026-08-31 12:39:04 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:05 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:05 +07:00: npm notice run next start
+2026-08-31 12:39:05 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:05 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:05 +07:00: npm notice run next start
+2026-08-31 12:39:06 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:06 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:06 +07:00: npm notice run next start
+2026-08-31 12:39:07 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:39:07 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:39:07 +07:00: npm notice run next start
+2026-08-31 12:39:07 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:43 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:43 +07:00: npm notice run next start
+2026-08-31 12:40:44 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:44 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:44 +07:00: npm notice run next start
+2026-08-31 12:40:45 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:45 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:45 +07:00: npm notice run next start
+2026-08-31 12:40:45 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:46 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:46 +07:00: npm notice run next start
+2026-08-31 12:40:46 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:46 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:46 +07:00: npm notice run next start
+2026-08-31 12:40:47 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:47 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:47 +07:00: npm notice run next start
+2026-08-31 12:40:48 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:48 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:48 +07:00: npm notice run next start
+2026-08-31 12:40:48 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:49 +07:00: npm notice run next start
+2026-08-31 12:40:49 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:49 +07:00: npm notice run next start
+2026-08-31 12:40:50 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:50 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:50 +07:00: npm notice run next start
+2026-08-31 12:40:51 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:51 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:51 +07:00: npm notice run next start
+2026-08-31 12:40:51 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:52 +07:00: npm notice run next start
+2026-08-31 12:40:52 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:52 +07:00: npm notice run next start
+2026-08-31 12:40:53 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:53 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:53 +07:00: npm notice run next start
+2026-08-31 12:40:54 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:54 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:54 +07:00: npm notice run next start
+2026-08-31 12:40:54 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:40:54 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:40:54 +07:00: npm notice run next start
+2026-08-31 12:40:55 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:41:35 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:41:35 +07:00: npm notice run next start
+2026-08-31 12:41:35 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:41:36 +07:00: (node:135097) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:41:36 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:42:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:42:10 +07:00: npm notice run next start
+2026-08-31 12:42:10 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:42:11 +07:00: (node:135413) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:42:11 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:48:55 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:48:55 +07:00: npm notice run next start
+2026-08-31 12:48:56 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:48:56 +07:00: (node:138136) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:48:56 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 12:54:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:49 +07:00: npm notice run next start
+2026-08-31 12:54:49 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:49 +07:00: npm notice run next start
+2026-08-31 12:54:50 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:50 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:50 +07:00: npm notice run next start
+2026-08-31 12:54:51 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:51 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:51 +07:00: npm notice run next start
+2026-08-31 12:54:52 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:52 +07:00: npm notice run next start
+2026-08-31 12:54:52 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:52 +07:00: npm notice run next start
+2026-08-31 12:54:53 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:53 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:53 +07:00: npm notice run next start
+2026-08-31 12:54:54 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:54 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:54 +07:00: npm notice run next start
+2026-08-31 12:54:55 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:55 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:55 +07:00: npm notice run next start
+2026-08-31 12:54:55 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:55 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:55 +07:00: npm notice run next start
+2026-08-31 12:54:56 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:56 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:56 +07:00: npm notice run next start
+2026-08-31 12:54:57 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:57 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:57 +07:00: npm notice run next start
+2026-08-31 12:54:58 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:58 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:58 +07:00: npm notice run next start
+2026-08-31 12:54:58 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:58 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:58 +07:00: npm notice run next start
+2026-08-31 12:54:59 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:54:59 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:54:59 +07:00: npm notice run next start
+2026-08-31 12:55:00 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:55:00 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:55:00 +07:00: npm notice run next start
+2026-08-31 12:55:01 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:12 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:12 +07:00: npm notice run next start
+2026-08-31 12:56:13 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:13 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:13 +07:00: npm notice run next start
+2026-08-31 12:56:14 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:14 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:14 +07:00: npm notice run next start
+2026-08-31 12:56:14 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:15 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:15 +07:00: npm notice run next start
+2026-08-31 12:56:15 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:15 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:15 +07:00: npm notice run next start
+2026-08-31 12:56:16 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:16 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:16 +07:00: npm notice run next start
+2026-08-31 12:56:17 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:17 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:17 +07:00: npm notice run next start
+2026-08-31 12:56:17 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:18 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:18 +07:00: npm notice run next start
+2026-08-31 12:56:18 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:18 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:18 +07:00: npm notice run next start
+2026-08-31 12:56:19 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:19 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:19 +07:00: npm notice run next start
+2026-08-31 12:56:20 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:20 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:20 +07:00: npm notice run next start
+2026-08-31 12:56:20 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:21 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:21 +07:00: npm notice run next start
+2026-08-31 12:56:21 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:21 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:21 +07:00: npm notice run next start
+2026-08-31 12:56:22 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:56:22 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:56:22 +07:00: npm notice run next start
+2026-08-31 12:56:23 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 12:58:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 12:58:10 +07:00: npm notice run next start
+2026-08-31 12:58:10 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 12:58:11 +07:00: (node:144620) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 12:58:11 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:02:31 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:02:31 +07:00: npm notice run next start
+2026-08-31 13:02:32 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:02:32 +07:00: (node:146478) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:02:32 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:05:31 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:05:31 +07:00: npm notice run next start
+2026-08-31 13:05:32 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:05:32 +07:00: (node:147825) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:05:32 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:11:06 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:06 +07:00: npm notice run next start
+2026-08-31 13:11:07 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:07 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:07 +07:00: npm notice run next start
+2026-08-31 13:11:07 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:07 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:07 +07:00: npm notice run next start
+2026-08-31 13:11:08 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:08 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:08 +07:00: npm notice run next start
+2026-08-31 13:11:09 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:09 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:09 +07:00: npm notice run next start
+2026-08-31 13:11:10 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:10 +07:00: npm notice run next start
+2026-08-31 13:11:10 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:11 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:11 +07:00: npm notice run next start
+2026-08-31 13:11:11 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:11 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:11 +07:00: npm notice run next start
+2026-08-31 13:11:12 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:12 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:12 +07:00: npm notice run next start
+2026-08-31 13:11:13 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:13 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:13 +07:00: npm notice run next start
+2026-08-31 13:11:13 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:14 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:14 +07:00: npm notice run next start
+2026-08-31 13:11:14 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:14 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:14 +07:00: npm notice run next start
+2026-08-31 13:11:15 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:15 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:15 +07:00: npm notice run next start
+2026-08-31 13:11:16 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:16 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:16 +07:00: npm notice run next start
+2026-08-31 13:11:17 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:17 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:17 +07:00: npm notice run next start
+2026-08-31 13:11:17 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:11:18 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:11:18 +07:00: npm notice run next start
+2026-08-31 13:11:18 +07:00: [Error: Could not find a production build in the '.next' directory. Try building your app with 'next build' before starting the production server. https://nextjs.org/docs/messages/production-start-no-build-id]
+2026-08-31 13:13:41 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:13:41 +07:00: npm notice run next start
+2026-08-31 13:13:42 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:13:42 +07:00: (node:152693) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:13:42 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:20:52 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:20:52 +07:00: npm notice run next start
+2026-08-31 13:20:53 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:20:53 +07:00: (node:155449) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:20:53 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:24:44 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:24:44 +07:00: npm notice run next start
+2026-08-31 13:24:45 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:24:46 +07:00: (node:157624) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:24:46 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:52:00 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:52:00 +07:00: npm notice run next start
+2026-08-31 13:52:00 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:52:01 +07:00: (node:167247) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:52:01 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 13:58:49 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 13:58:49 +07:00: npm notice run next start
+2026-08-31 13:58:50 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 13:58:50 +07:00: (node:169914) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 13:58:50 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 14:01:28 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 14:01:28 +07:00: npm notice run next start
+2026-08-31 14:01:29 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 14:01:29 +07:00: (node:171604) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 14:01:29 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 14:01:59 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 14:01:59 +07:00: npm notice run next start
+2026-08-31 14:02:00 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 14:02:00 +07:00: (node:171934) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 14:02:00 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 14:06:08 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 14:06:08 +07:00: npm notice run next start
+2026-08-31 14:06:09 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 14:06:09 +07:00: (node:173705) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 14:06:09 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 14:08:46 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 14:08:46 +07:00: npm notice run next start
+2026-08-31 14:08:46 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 14:08:47 +07:00: (node:174916) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 14:08:47 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 14:13:24 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 14:13:24 +07:00: npm notice run next start
+2026-08-31 14:13:25 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 14:13:25 +07:00: (node:177119) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 14:13:25 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:14:13 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:14:13 +07:00: npm notice run next start
+2026-08-31 16:14:13 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:14:14 +07:00: (node:209357) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:14:14 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:20:35 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:20:35 +07:00: npm notice run next start
+2026-08-31 16:20:35 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:20:36 +07:00: (node:211570) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:20:36 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:28:06 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:28:06 +07:00: npm notice run next start
+2026-08-31 16:28:07 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:28:07 +07:00: (node:214336) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:28:07 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:34:36 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:34:36 +07:00: npm notice run next start
+2026-08-31 16:34:37 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:34:37 +07:00: (node:216478) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:34:37 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:41:19 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:41:19 +07:00: npm notice run next start
+2026-08-31 16:41:20 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:41:20 +07:00: (node:218720) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:41:20 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:47:04 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:47:04 +07:00: npm notice run next start
+2026-08-31 16:47:04 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:47:05 +07:00: (node:221048) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:47:05 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:52:20 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:52:20 +07:00: npm notice run next start
+2026-08-31 16:52:21 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:52:21 +07:00: (node:222696) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:52:21 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:56:48 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:56:48 +07:00: npm notice run next start
+2026-08-31 16:56:49 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:56:49 +07:00: (node:225267) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:56:49 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-31 16:59:41 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-08-31 16:59:41 +07:00: npm notice run next start
+2026-08-31 16:59:42 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-08-31 16:59:42 +07:00: (node:226317) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-08-31 16:59:42 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 07:34:55 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 07:34:55 +07:00: npm notice run next start
+2026-09-01 07:34:58 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 07:35:00 +07:00: (node:8694) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 07:35:00 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 07:37:10 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 07:37:10 +07:00: npm notice run next start
+2026-09-01 07:37:11 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 07:37:12 +07:00: (node:9499) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 07:37:12 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 07:45:56 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 07:45:56 +07:00: npm notice run next start
+2026-09-01 07:45:57 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 07:45:58 +07:00: (node:12455) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 07:45:58 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 07:58:32 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 07:58:32 +07:00: npm notice run next start
+2026-09-01 07:58:33 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 07:58:33 +07:00: (node:16081) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 07:58:33 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 08:01:47 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 08:01:47 +07:00: npm notice run next start
+2026-09-01 08:01:48 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 08:01:48 +07:00: (node:17403) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 08:01:48 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 08:10:16 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 08:10:16 +07:00: npm notice run next start
+2026-09-01 08:10:16 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 08:10:17 +07:00: (node:21022) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 08:10:17 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 08:14:02 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 08:14:02 +07:00: npm notice run next start
+2026-09-01 08:14:03 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 08:14:03 +07:00: (node:22426) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 08:14:03 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
+2026-09-01 08:21:31 +07:00: [DataService] MongoDB vulnerability query error, attempting Redis fallback: Operation interrupted because client was closed
+2026-09-01 08:21:38 +07:00: npm notice run asoc-dashboard@0.1.0 start
+2026-09-01 08:21:38 +07:00: npm notice run next start
+2026-09-01 08:21:39 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+2026-09-01 08:21:39 +07:00: (node:24922) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+2026-09-01 08:21:39 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)

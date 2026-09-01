@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
-<<<<<<< Updated upstream
-import { fetchIncidentsData } from '@/lib/redis-sync';
-=======
+
 import { getTenantIncidents } from '@/lib/data-service';
->>>>>>> Stashed changes
+
 import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
-  if (!range || range === 'All') return true;
+  if (!range || range.toLowerCase() === 'all') return true;
 
   const rawDate = doc.lastObserved || doc.firstObserved || doc.last_observed || doc.first_observed || doc.detected_at || doc.date || doc.created_at;
   if (!rawDate) return true;
@@ -48,8 +46,10 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   }
 
   if (lower === 'this week' || lower === '7d') {
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return d >= startOfWeek;
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return d >= mondayThisWeek;
   }
 
   if (lower === 'this month' || lower === '30d') {
@@ -80,13 +80,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    const tenant = getTenantContext(request);
 
-    const resInc = await fetchIncidentsData(timeRange, tenant.databaseName, tenant.redisPrefix);
-    const rawIncidents = resInc.data || [];
-    const incidents = rawIncidents.filter((inc) => matchesTimeRange(inc, timeRange, startDate, endDate));
-=======
     const tenant = await getTenantContext(request);
     if (!tenant) {
       return NextResponse.json(
@@ -111,7 +105,7 @@ export async function GET(request: Request) {
     });
 
     const incidents = validIncidents.filter((inc) => matchesTimeRange(inc, timeRange, startDate, endDate));
->>>>>>> Stashed changes
+
 
     const tempMap = new Map<
       string,
@@ -174,14 +168,7 @@ export async function GET(request: Request) {
       scoresMap,
     });
   } catch (error: any) {
-<<<<<<< Updated upstream
-    console.warn('[Risk Scores API] MongoDB fetch error, falling back to Redis:', error.message);
-    return NextResponse.json({
-      success: true,
-      mongoDbAvailable: false,
-      scoresMap: {},
-    });
-=======
+
     console.warn('[Risk Scores API] Error fetching risk scores:', error.message);
     return NextResponse.json(
       {
@@ -193,6 +180,6 @@ export async function GET(request: Request) {
       },
       { status: 500 }
     );
->>>>>>> Stashed changes
+
   }
 }

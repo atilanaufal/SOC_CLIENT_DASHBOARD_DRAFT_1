@@ -1,14 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   HiOutlineMagnifyingGlass,
-  HiOutlineArrowPath,
-  HiOutlineComputerDesktop,
-  HiOutlineServer,
   HiOutlineAdjustmentsHorizontal,
-  HiOutlineExclamationCircle,
+  HiOutlineArrowPath,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
@@ -17,17 +14,28 @@ import { fetchDevices, fetchDeviceRiskScores } from '@/lib/api-client';
 import { DeviceDetailDrawer } from '@/components/drawers/DeviceDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
-import { getRiskCategory } from '@/lib/risk-score';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { Pagination } from '@/components/ui/Pagination';
+import { formatDateTimeAndAgo, getTimestamp } from '@/lib/date-utils';
 
 type SortKey = 'agent' | 'os' | 'status' | 'score' | 'lastSeen';
 type SortDirection = 'asc' | 'desc';
 
+function getRiskCategory(score: number): { label: string; color: string; meaning: string } {
+  if (score >= 80) {
+    return { label: 'Critical', color: '#B8251B', meaning: 'Emergency mitigation required' };
+  } else if (score >= 60) {
+    return { label: 'High', color: '#EA580C', meaning: 'Urgent security attention required' };
+  } else if (score >= 40) {
+    return { label: 'Medium', color: '#5B9BD5', meaning: 'Scheduled attention and patching required' };
+  } else {
+    return { label: 'Low', color: '#16A34A', meaning: 'Condition relatively safe and monitored' };
+  }
+}
+
 function DevicesContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
-  const initialHighlight = searchParams.get('highlight') || '';
 
   const { timeFilter, customRange } = useTimeFilter();
   const [devices, setDevices] = useState<Device[]>([]);
@@ -41,30 +49,26 @@ function DevicesContent() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Sorting state
-  const [sortKey, setSortKey] = useState<SortKey>('agent');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortKey, setSortKey] = useState<SortKey>('score');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  // Interactive Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  // Real-time Database fetch
   const loadData = async () => {
-    setLoading(true);
-    setError(null);
-
     try {
-      // Step 1: Fetch Wazuh API Agents FIRST (Fast < 50ms) -> Display Table Immediately!
+      setLoading(true);
+      setError(null);
       const res = await fetchDevices();
       const loadedAgents = res.data || [];
       setDevices(loadedAgents);
-      setLoading(false); // Render UI immediately!
+      setLoading(false);
 
-      // Step 2: Background Async Fetch for MongoDB Risk Scores & Severity Breakdown (Filtered by timeFilter)
+      // Fetch Incident Risk Scores & Severity Breakdown per agent based on time filter
       fetchDeviceRiskScores(timeFilter, customRange)
         .then((riskRes) => {
-          if (!riskRes.mongoDbAvailable) {
-            return;
-          }
-
           const scoresMap = riskRes.scoresMap || {};
           setDevices((prevDevices) =>
             prevDevices.map((dev) => {
@@ -90,7 +94,7 @@ function DevicesContent() {
                   detectedIssues: stats.detectedIssues || [],
                 };
               }
-              // Reset if no incidents in current time filter
+
               return {
                 ...dev,
                 criticalCount: 0,
@@ -105,11 +109,12 @@ function DevicesContent() {
             })
           );
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[Devices] Failed to fetch device risk scores:', err);
+        });
     } catch (err: any) {
-      console.error('Failed to fetch devices:', err);
-      setError(err.message || 'Failed to fetch devices data');
-      setDevices([]);
+      console.error('Error fetching live devices from API:', err);
+      setError(err.message || 'Gagal memuat perangkat dari database.');
       setLoading(false);
     }
   };
@@ -118,82 +123,72 @@ function DevicesContent() {
     loadData();
   }, [timeFilter, customRange]);
 
-  useEffect(() => {
-    if (initialSearch && devices.length > 0) {
-      setSearchTerm(initialSearch);
-      const matchedDevice = devices.find(
-        (d) => d.agent.toLowerCase().includes(initialSearch.toLowerCase())
-      );
-      if (matchedDevice) {
-        setSelectedDevice(matchedDevice);
-        setIsDrawerOpen(true);
-      }
-    }
-  }, [initialSearch, initialHighlight, devices]);
-
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDirection('asc');
+      setSortDirection(key === 'score' || key === 'lastSeen' ? 'desc' : 'asc');
     }
+    setCurrentPage(1);
   };
 
-  const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const statuses = Array.from(new Set(devices.map((d) => d.status))).filter(Boolean);
-    const osList = Array.from(new Set(devices.map((d) => d.os))).filter(Boolean);
-    const agents = Array.from(new Set(devices.map((d) => d.agent))).filter(Boolean);
+  const dynamicFilterSections: FilterSection[] = useMemo(() => {
+    const rawStatuses = Array.from(new Set(devices.map((d) => d.status))).filter(Boolean);
+    const rawOs = Array.from(new Set(devices.map((d) => d.os))).filter(Boolean);
 
     return [
-      { key: 'status', label: 'Status', type: 'buttons', options: statuses.length ? statuses : ['Online', 'Offline'] },
-      { key: 'os', label: 'Operating System', type: 'select', options: osList },
-      { key: 'agent', label: 'Agent', type: 'select', options: agents },
+      {
+        key: 'status',
+        label: 'Status Perangkat',
+        type: 'buttons',
+        options: rawStatuses.length ? rawStatuses : ['Online', 'Offline'],
+      },
+      {
+        key: 'os',
+        label: 'Sistem Operasi (OS)',
+        type: 'select',
+        options: rawOs.length ? rawOs : ['Ubuntu', 'Windows', 'Debian'],
+      },
     ];
   }, [devices]);
 
   const filteredDevices = useMemo(() => {
-    return devices.filter((device) => {
-      const isExactAgentMatch = devices.some(
-        (d) => d.agent.toLowerCase() === searchTerm.trim().toLowerCase()
-      );
+    return devices.filter((dev) => {
+      // Match text search across agent name, OS, and IP
+      const q = searchTerm.toLowerCase().trim();
+      if (q) {
+        const matchName = dev.agent.toLowerCase().includes(q);
+        const matchOs = dev.os.toLowerCase().includes(q);
+        const matchIp = (dev.ipAddress || '').toLowerCase().includes(q);
+        const matchId = String(dev.id).toLowerCase().includes(q);
+        if (!matchName && !matchOs && !matchIp && !matchId) return false;
+      }
 
-      const matchesSearch = isExactAgentMatch
-        ? device.agent.toLowerCase() === searchTerm.trim().toLowerCase()
-        : device.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          device.os.toLowerCase().includes(searchTerm.toLowerCase());
+      // Match dynamic filters
+      if (activeFilters.status && activeFilters.status !== 'All') {
+        if (dev.status.toLowerCase() !== activeFilters.status.toLowerCase()) return false;
+      }
+      if (activeFilters.os && activeFilters.os !== 'All') {
+        if (dev.os !== activeFilters.os) return false;
+      }
 
-      const matchesStatus =
-        !activeFilters.status || activeFilters.status === 'All'
-          ? true
-          : device.status === activeFilters.status;
-
-      const matchesOS =
-        !activeFilters.os || activeFilters.os === 'All'
-          ? true
-          : device.os === activeFilters.os;
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : device.agent === activeFilters.agent;
-
-      return matchesSearch && matchesStatus && matchesOS && matchesAgent;
+      return true;
     });
   }, [devices, searchTerm, activeFilters]);
 
-  // Accumulated severity breakdown across all filtered agents
+  // Accumulated severity breakdown across all agents for Devices At Risk KPI
   const totalCritical = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.criticalCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.criticalCount || 0), 0),
+    [devices]
   );
   const totalHigh = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.highCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.highCount || 0), 0),
+    [devices]
   );
   const totalMedium = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.mediumCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.mediumCount || 0), 0),
+    [devices]
   );
 
   const sortedDevices = useMemo(() => {
@@ -204,6 +199,11 @@ function DevicesContent() {
         const rawB = (b.criticalCount || 0) * 10 + (b.highCount || 0) * 6 + (b.mediumCount || 0) * 3;
         const scoreB = typeof b.score === 'number' ? b.score : Math.min(100, rawB);
         return sortDirection === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+      }
+      if (sortKey === 'lastSeen') {
+        const timeA = getTimestamp((a as any).lastSeenDate || a.lastSeen);
+        const timeB = getTimestamp((b as any).lastSeenDate || b.lastSeen);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
       }
       const valA = (a[sortKey] || '').toString().toLowerCase();
       const valB = (b[sortKey] || '').toString().toLowerCase();
@@ -270,22 +270,16 @@ function DevicesContent() {
   };
 
   return (
-<<<<<<< Updated upstream
-    <div className="w-full flex flex-col lg:flex-row gap-3 min-w-0">
-      {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 w-full">
-=======
     <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
-      {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[392px] 2xl:mr-[456px]" : ""}`}>
->>>>>>> Stashed changes
+      {/* Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
         {/* Critical Error Banner */}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-900 px-3 py-2 rounded-md text-xs font-bold flex items-center justify-between flex-shrink-0">
             <span>❌ Error: {error}</span>
             <button
               onClick={() => loadData()}
-              className="bg-red-800 text-white px-2.5 py-1 rounded text-[11px] font-black hover:bg-red-900 transition"
+              className="bg-red-800 text-white px-2.5 py-1 rounded text-[11px] font-bold hover:bg-red-900 transition cursor-pointer"
             >
               Coba Lagi
             </button>
@@ -294,24 +288,27 @@ function DevicesContent() {
 
         {/* Top KPI Cards (3 columns) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-3 gap-2.5 sm:gap-3 md:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
+          {/* Total Devices Card */}
           <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
-            <div>
-              <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black text-gray-500 uppercase tracking-wider">Total Devices</p>
-              <p className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 mt-0.5 sm:mt-1 tracking-tight">{filteredDevices.length}</p>
-              <div className="flex items-center gap-1.5 sm:gap-2 mt-1 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black">
-                <span className="bg-emerald-100/80 backdrop-blur-sm text-emerald-800 px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md border border-emerald-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+            <div className="flex flex-col justify-between h-full gap-1.5 sm:gap-2">
+              <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-500 uppercase tracking-wider">
+                Total Devices
+              </p>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold">
+                <span className="bg-emerald-100/90 backdrop-blur-sm text-emerald-800 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-md border border-emerald-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
                   {filteredDevices.filter((d) => d.status === 'Online').length} Online
                 </span>
-                <span className="bg-red-100/80 backdrop-blur-sm text-red-800 px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md border border-red-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+                <span className="bg-red-100/90 backdrop-blur-sm text-red-800 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-md border border-red-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
                   {filteredDevices.filter((d) => d.status === 'Offline').length} Offline
                 </span>
               </div>
             </div>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 xl:w-14 xl:h-14 2xl:w-16 2xl:h-16 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)] flex-shrink-0">
-              <HiOutlineComputerDesktop className="w-5 h-5 sm:w-6 sm:h-6 xl:w-7 xl:h-7 2xl:w-8 2xl:h-8 text-blue-300" />
-            </div>
+            <p className="text-3xl sm:text-4xl md:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-gray-900 tracking-tight leading-none">
+              {filteredDevices.length}
+            </p>
           </div>
 
+          {/* Top OS Distribution */}
           <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-2.5 sm:gap-3">
             <BestDonutChart
               segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
@@ -320,8 +317,10 @@ function DevicesContent() {
               strokeWidth={10}
             />
             <div className="flex-1 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base space-y-0.5 overflow-hidden">
-              <p className="font-extrabold text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base text-gray-900 uppercase tracking-wider mb-0.5">Top OS Distribution</p>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-bold text-gray-700 text-[10px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base">
+              <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-500 uppercase tracking-wider mb-1 sm:mb-1.5 border-b border-gray-200/50 pb-0.5">
+                Top OS Distribution
+              </p>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-semibold text-gray-700 text-[10px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base">
                 {osChartSegments.slice(0, 4).map((seg) => (
                   <span key={seg.label} className="flex items-center gap-1 truncate" title={`${seg.label}: ${seg.value}`}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
@@ -333,31 +332,23 @@ function DevicesContent() {
             </div>
           </div>
 
+          {/* Devices At Risk ! */}
           <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 md:p-3.5 xl:p-4 2xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between">
-            <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black text-gray-900 uppercase tracking-wider">
+            <p className="text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-500 uppercase tracking-wider">
               Devices At Risk !
             </p>
-            <div className="grid grid-cols-3 gap-1 sm:gap-1.5 xl:gap-2 2xl:gap-2.5 mt-1 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black">
-              <div className="flex items-center gap-1 text-red-600 bg-red-50/80 backdrop-blur-sm p-1 sm:p-1.5 xl:p-2 2xl:p-2.5 rounded-lg border border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Critical</span>
-                  <span>{totalCritical}</span>
-                </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 xl:gap-2.5 mt-1 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold">
+              <div className="text-center bg-[#FDE8E8]/80 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#F8B4B4] shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] flex flex-col justify-center">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-semibold uppercase tracking-wide">Critical</span>
+                <span className="text-[#B8251B] text-sm sm:text-base xl:text-lg font-bold">{totalCritical}</span>
               </div>
-              <div className="flex items-center gap-1 text-orange-600 bg-orange-50/80 backdrop-blur-sm p-1.5 xl:p-2 rounded-lg border border-orange-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">High</span>
-                  <span>{totalHigh}</span>
-                </div>
+              <div className="text-center bg-[#FFEDD5]/80 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#FDBA74] shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] flex flex-col justify-center">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-semibold uppercase tracking-wide">High</span>
+                <span className="text-[#C2410C] text-sm sm:text-base xl:text-lg font-bold">{totalHigh}</span>
               </div>
-              <div className="flex items-center gap-1 text-amber-600 bg-amber-50/80 backdrop-blur-sm p-1.5 xl:p-2 rounded-lg border border-amber-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-                <HiOutlineExclamationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-bold uppercase">Medium</span>
-                  <span>{totalMedium}</span>
-                </div>
+              <div className="text-center bg-[#EBF5FF]/80 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#BFDBFE] shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] flex flex-col justify-center">
+                <span className="block text-[9px] sm:text-[10px] xl:text-xs text-gray-500 font-semibold uppercase tracking-wide">Medium</span>
+                <span className="text-[#1E429F] text-sm sm:text-base xl:text-lg font-bold">{totalMedium}</span>
               </div>
             </div>
           </div>
@@ -375,14 +366,14 @@ function DevicesContent() {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search Agent / OS"
-                className="w-full bg-white/75 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-lg pl-8 sm:pl-8.5 pr-2.5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]"
+                placeholder="Search Agent / OS / IP / ID"
+                className="w-full bg-white/75 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-lg pl-8 sm:pl-8.5 pr-2.5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]"
               />
             </div>
 
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-black/90 backdrop-blur-sm text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold px-2.5 sm:px-3 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md flex items-center gap-1 sm:gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] cursor-pointer"
+              className="bg-black/90 backdrop-blur-sm text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold px-2.5 sm:px-3 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md flex items-center gap-1 sm:gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] cursor-pointer"
             >
               <HiOutlineAdjustmentsHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4 2xl:w-5 2xl:h-5 text-blue-300" />
               <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
@@ -391,161 +382,132 @@ function DevicesContent() {
 
           <button
             onClick={() => loadData()}
-            disabled={loading}
-            className="bg-black/90 backdrop-blur-sm text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md flex items-center gap-1 sm:gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] disabled:opacity-50 cursor-pointer"
+            className="bg-black/90 backdrop-blur-sm text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-1 sm:py-1.5 xl:py-2 2xl:py-2.5 rounded-md flex items-center gap-1 sm:gap-1.5 hover:bg-black transition border border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.15)] cursor-pointer"
           >
-            <HiOutlineArrowPath className={`w-3 h-3 sm:w-3.5 sm:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 ${loading ? 'animate-spin' : ''}`} />
-            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+            <HiOutlineArrowPath className="w-3 h-3 sm:w-3.5 sm:h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5" />
+            <span className="font-semibold">Refresh</span>
           </button>
         </div>
 
-        {/* Data Table Container */}
+        {/* Devices Data Table Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto flex-1">
             {loading ? (
-              <div className="p-8 text-center text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-500 flex flex-col items-center justify-center gap-2">
-                <HiOutlineArrowPath className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-[#002B9A]" />
-                <span>Loading Devices...</span>
+              <div className="py-8 text-center text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold text-gray-500">
+                Memuat perangkat...
               </div>
-            ) : paginatedDevices.length === 0 ? (
-              <div className="p-8 text-center text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-500">
-                No devices found.
+            ) : filteredDevices.length === 0 ? (
+              <div className="py-8 text-center text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold text-gray-500">
+                Tidak ada perangkat yang sesuai dengan filter atau pencarian.
               </div>
             ) : (
-              <table className="w-full text-left border-collapse min-w-[850px]">
-                <thead>
-                  <tr className="bg-[#002B9A]/95 backdrop-blur-md text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-black tracking-wider sticky top-0 z-10 select-none border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                    <th onClick={() => handleSort('agent')} className="w-[18%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
-                        <span>Agent</span>
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                  <tr className="bg-[#002B9A] text-white text-[11px] sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
+                        <span>Agent Name</span>
                         {renderSortIndicator('agent')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('os')} className="w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('os')} className="bg-[#002B9A] w-[18%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Operating System</span>
                         {renderSortIndicator('os')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('status')} className="w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('status')} className="bg-[#002B9A] w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Status</span>
                         {renderSortIndicator('status')}
                       </div>
                     </th>
-                    <th className="w-[22%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">Severity Breakdown</th>
-                    <th onClick={() => handleSort('score')} className="w-[14%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
-                        <span>Score</span>
+                    <th className="bg-[#002B9A] w-[20%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">
+                      <div className="flex items-center text-white">
+                        <span>Severity Breakdown</span>
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
+                        <span>Risk Score</span>
                         {renderSortIndicator('score')}
                       </div>
                     </th>
-                    <th onClick={() => handleSort('lastSeen')} className="w-[12%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
-                      <div className="flex items-center">
+                    <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-2 sm:py-2.5 xl:py-3.5 2xl:py-4 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 cursor-pointer hover:bg-[#002175] transition">
+                      <div className="flex items-center text-white">
                         <span>Last Seen</span>
                         {renderSortIndicator('lastSeen')}
                       </div>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold">
+                <tbody className="divide-y divide-gray-200 text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-normal">
                   {paginatedDevices.map((dev) => {
-                    const devId = dev.id || dev.agent;
-                    const selectedId = selectedDevice?.id || selectedDevice?.agent;
-                    const isSelected = Boolean(isDrawerOpen && selectedId && devId && selectedId === devId);
-                    
                     const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
                     const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
                     const cat = getRiskCategory(scoreVal);
-
-                    const datePart = (dev as any).lastSeenDate || dev.lastSeen.split('(')[0]?.trim() || dev.lastSeen;
-                    const agoPart = (dev as any).lastSeenAgo || (dev.lastSeen.includes('(') ? dev.lastSeen.split('(')[1]?.replace(')', '').trim() : '');
+                    const isSelected = isDrawerOpen && selectedDevice?.id === dev.id;
+                    const { dateTime, timeAgo } = formatDateTimeAndAgo(dev.lastSeen);
 
                     return (
                       <tr
                         key={dev.id}
                         onClick={() => handleToggleDetail(dev)}
                         className={`cursor-pointer transition ${
-<<<<<<< Updated upstream
-                          isSelected ? 'bg-blue-100/70 border-l-4 border-l-[#002B9A]' : 'hover:bg-blue-50/40'
+                          isSelected
+                            ? 'bg-blue-100/80'
+                            : 'hover:bg-blue-50/40'
                         }`}
                       >
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
-                          <div className="flex items-center gap-2 truncate">
-                            <HiOutlineServer className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-5 xl:h-5 2xl:w-6 2xl:h-6 text-[#002B9A] flex-shrink-0" />
-                            <span className="truncate" title={dev.agent}>{dev.agent}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 truncate" title={dev.os}>
-=======
-                          isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
-                        }`}
-                      >
-                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#002B9A] font-black">
+                        <td className="relative py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-[#0066B1] font-semibold">
                           {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
-                          <div className="flex items-center gap-2 truncate">
-                            
-                            <span className="truncate" title={dev.agent}>{dev.agent}</span>
+                          <div className="flex items-center gap-2">
+                            <span>{dev.agent}</span>
                           </div>
                         </td>
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold text-gray-900 break-words max-w-[180px] whitespace-normal" title={dev.os}>
->>>>>>> Stashed changes
-                          {dev.os}
-                        </td>
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-black">
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-800 font-medium">{dev.os}</td>
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 xl:py-1 rounded-md text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm font-black ${
+                            className={`inline-block px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm font-bold ${
                               dev.status === 'Online'
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-red-100 text-red-800 border border-red-300'
                             }`}
                           >
-<<<<<<< Updated upstream
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                dev.status === 'Online' ? 'bg-emerald-500' : 'bg-red-500'
-                              }`}
-                            />
-=======
-                            
->>>>>>> Stashed changes
                             {dev.status}
                           </span>
                         </td>
-
                         <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
-                          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm">
+                          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-xs xl:text-sm 2xl:text-base">
                             {dev.criticalCount ? (
-                              <span className="bg-red-100 text-red-800 px-1.5 sm:px-2 py-0.5 rounded border border-red-300 font-black">
+                              <span className="bg-red-100 text-red-800 px-1.5 sm:px-2 py-0.5 rounded border border-red-300 font-bold">
                                 Critical: {dev.criticalCount}
                               </span>
                             ) : null}
-                            <span className="bg-orange-100 text-orange-800 px-1.5 sm:px-2 py-0.5 rounded border border-orange-300 font-black">
+                            <span className="bg-orange-100 text-orange-800 px-1.5 sm:px-2 py-0.5 rounded border border-orange-300 font-bold">
                               High: {dev.highCount || 0}
                             </span>
-                            <span className="bg-amber-100 text-amber-900 px-1.5 sm:px-2 py-0.5 rounded border border-amber-300 font-black">
+                            <span className="bg-blue-100 text-[#0066B1] px-1.5 sm:px-2 py-0.5 rounded border border-blue-300 font-bold">
                               Medium: {dev.mediumCount || 0}
                             </span>
                           </div>
                         </td>
-
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 font-bold">
-                          <div className="flex items-center gap-1.5 font-black">
-                            <span className="text-xs sm:text-xs xl:text-sm 2xl:text-base text-gray-900 font-black">{scoreVal}</span>
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <span className="text-xs sm:text-xs xl:text-sm 2xl:text-base text-gray-900 font-bold">{scoreVal}</span>
                             <span
                               style={{ backgroundColor: cat.color }}
-                              className="text-white text-[9px] sm:text-[10px] xl:text-xs 2xl:text-sm font-black px-1.5 sm:px-2 py-0.5 rounded"
+                              className="text-white text-[10px] sm:text-xs xl:text-xs 2xl:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded shadow-sm flex-shrink-0"
                               title={cat.meaning}
                             >
                               {cat.label}
                             </span>
                           </div>
                         </td>
-
-                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5">
+                        <td className="py-2 sm:py-2.5 xl:py-3 2xl:py-3.5 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 text-gray-900 font-medium">
                           <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs sm:text-xs xl:text-sm 2xl:text-base">{datePart}</span>
-                            {agoPart && <span className="text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-semibold">({agoPart})</span>}
+                            <span className="font-semibold text-xs sm:text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
+                            {timeAgo && <span className="text-[10px] sm:text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                           </div>
                         </td>
                       </tr>
@@ -556,13 +518,11 @@ function DevicesContent() {
             )}
           </div>
 
-          {/* Table Footer / Pagination */}
-          <div className="p-2 sm:p-2.5 xl:p-3 2xl:p-3.5 border-t border-white/60 bg-white/60 backdrop-blur-md flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-bold text-gray-700 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
-            <span>
-              Showing {filteredDevices.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
-              {Math.min(currentPage * pageSize, sortedDevices.length)} of {sortedDevices.length} devices
-            </span>
-
+          {/* Interactive Pagination Controls */}
+          <div className="bg-white/60 backdrop-blur-md border-t border-white/60 px-2.5 sm:px-3.5 xl:px-4 2xl:px-5 py-2 xl:py-2.5 2xl:py-3 flex items-center justify-between text-xs sm:text-xs md:text-xs xl:text-sm 2xl:text-base font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+            <div>
+              Showing {filteredDevices.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredDevices.length)} of {filteredDevices.length} Devices
+            </div>
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -572,20 +532,22 @@ function DevicesContent() {
         </div>
       </div>
 
-      {/* Right Drawer Panel */}
+      {/* Slide-out Drawer */}
       <DeviceDetailDrawer
-        device={selectedDevice}
         isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        highlightIssue={initialHighlight}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedDevice(null);
+        }}
+        device={selectedDevice}
       />
 
-      {/* Adaptive Filter Modal */}
+      {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        title="Filter Devices"
-        sections={adaptiveFilterSections}
+        title="Filter Perangkat"
+        sections={dynamicFilterSections}
         initialFilters={activeFilters}
         onApply={handleApplyFilters}
       />
@@ -595,7 +557,7 @@ function DevicesContent() {
 
 export default function DevicesPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-xs font-bold text-gray-500">Loading Devices...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-sm font-semibold text-gray-500">Loading devices...</div>}>
       <DevicesContent />
     </Suspense>
   );
