@@ -21,7 +21,7 @@ import { IncidentDetailDrawer } from '@/components/drawers/IncidentDetailDrawer'
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { Pagination } from '@/components/ui/Pagination';
-import { formatDateTimeAndAgo, getTimestamp } from '@/lib/date-utils';
+import { formatDateTimeAndAgo, getTimestamp, formatNumber } from '@/lib/date-utils';
 import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
 type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved';
@@ -274,14 +274,14 @@ function IncidentsContent() {
     if (delta > 0) {
       return (
         <span className="bg-red-50/90 text-red-600 border border-red-200 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-lg font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
-          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
+          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{formatNumber(delta)}
         </span>
       );
     }
     if (delta < 0) {
       return (
         <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-lg font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
-          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
+          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {formatNumber(delta)}
         </span>
       );
     }
@@ -306,13 +306,16 @@ function IncidentsContent() {
                 Critical
               </div>
               <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
-                {criticalCount}
+                {formatNumber(criticalCount)}
               </p>
             </div>
             <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
-              <div className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(criticalPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
                 {renderTrend(criticalDelta)}
-                <span>{criticalPrev}</span>
+                <span>{formatNumber(criticalPrev)}</span>
               </div>
               {renderDeltaBadge(criticalDelta)}
             </div>
@@ -325,13 +328,16 @@ function IncidentsContent() {
                 High
               </div>
               <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
-                {highCount}
+                {formatNumber(highCount)}
               </p>
             </div>
             <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
-              <div className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(highPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
                 {renderTrend(highDelta)}
-                <span>{highPrev}</span>
+                <span>{formatNumber(highPrev)}</span>
               </div>
               {renderDeltaBadge(highDelta)}
             </div>
@@ -344,13 +350,16 @@ function IncidentsContent() {
                 Medium
               </div>
               <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
-                {mediumCount}
+                {formatNumber(mediumCount)}
               </p>
             </div>
             <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
-              <div className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(mediumPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
                 {renderTrend(mediumDelta)}
-                <span>{mediumPrev}</span>
+                <span>{formatNumber(mediumPrev)}</span>
               </div>
               {renderDeltaBadge(mediumDelta)}
             </div>

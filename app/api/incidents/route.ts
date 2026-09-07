@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
 
-import { getTenantIncidents } from '@/lib/data-service';
+import { getTenantIncidents, getHistoricalComparisonStats } from '@/lib/data-service';
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTimestamp } from '@/lib/date-utils';
 
@@ -271,6 +271,21 @@ export async function GET(request: Request) {
       else low++;
     });
 
+    // Query comparison data directly from historical_statistics collection in MongoDB
+    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeRange, startDate, endDate);
+
+    const criticalPrev = histComp.criticalPrev ?? 0;
+    const highPrev = histComp.highPrev ?? 0;
+    const mediumPrev = histComp.mediumPrev ?? 0;
+    const lowPrev = histComp.lowPrev ?? 0;
+    const totalPrev = histComp.totalPrev ?? 0;
+
+    const criticalDelta = critical - criticalPrev;
+    const highDelta = high - highPrev;
+    const mediumDelta = medium - mediumPrev;
+    const lowDelta = low - lowPrev;
+    const totalDelta = mapped.length - totalPrev;
+
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
@@ -279,10 +294,21 @@ export async function GET(request: Request) {
       total: mapped.length,
       incidents: {
         critical,
+        criticalPrev,
+        criticalDelta,
         high,
+        highPrev,
+        highDelta,
         medium,
+        mediumPrev,
+        mediumDelta,
         low,
+        lowPrev,
+        lowDelta,
         total: mapped.length,
+        totalPrev,
+        totalDelta,
+        periodLabel: histComp.periodLabel || 'PREVIOUS PERIOD',
       },
     });
   } catch (error: any) {

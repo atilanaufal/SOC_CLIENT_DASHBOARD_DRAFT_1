@@ -767,6 +767,16 @@ export async function getHistoricalComparisonStats(
     let endOfPrev: string;
     let periodLabel = 'YESTERDAY';
 
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.startsWith('custom') && lower.includes(':')) {
+      const parts = timeFilter.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+
     if (lower === 'today') {
       const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       startOfPrev = formatDateKey(yesterday);
@@ -788,9 +798,9 @@ export async function getHistoricalComparisonStats(
       startOfPrev = formatDateKey(prevMonthStart);
       endOfPrev = formatDateKey(prevMonthEnd);
       periodLabel = 'LAST MONTH';
-    } else if (startDate && endDate) {
-      const s = new Date(startDate);
-      const e = new Date(endDate);
+    } else if (sStr && eStr) {
+      const s = new Date(sStr);
+      const e = new Date(eStr);
       const diffMs = Math.max(1, e.getTime() - s.getTime());
       const prevS = new Date(s.getTime() - diffMs);
       const prevE = new Date(s.getTime() - 24 * 3600 * 1000);
