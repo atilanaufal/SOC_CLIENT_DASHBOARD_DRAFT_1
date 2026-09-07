@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Sign out on Better Auth server
-    try {
-      await auth.api.signOut({
-        headers: req.headers,
-      });
-    } catch {}
-
     const response = NextResponse.json({
       success: true,
       message: 'Logout berhasil',
@@ -23,10 +15,12 @@ export async function POST(req: NextRequest) {
       'auth_session',
     ];
 
+    const isHttps = process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false;
+
     cookieNames.forEach((name) => {
       response.cookies.set(name, '', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isHttps,
         sameSite: 'lax',
         path: '/',
         maxAge: 0,

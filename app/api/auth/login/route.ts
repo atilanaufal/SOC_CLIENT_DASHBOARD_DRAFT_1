@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, syncMasterUserToBetterAuth } from '@/lib/auth';
-<<<<<<< Updated upstream
-=======
+import { syncMasterUserToBetterAuth } from '@/lib/auth';
+
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
->>>>>>> Stashed changes
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,12 +17,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-<<<<<<< Updated upstream
-    // 1. Sync & verify user credentials with master database & Better Auth
-    const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
-    if (!syncRes.success || !syncRes.user) {
-      return NextResponse.json(
-=======
+
     // Rate Limiting: Max 5 failed attempts per 15 minutes per IP & Identifier
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       req.headers.get('x-real-ip') ||
@@ -46,44 +40,18 @@ export async function POST(req: NextRequest) {
     const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
     if (!syncRes.success || !syncRes.user) {
       return NextResponse.json(
->>>>>>> Stashed changes
+
         { success: false, error: syncRes.error || 'Login gagal. Periksa username dan password Anda.' },
         { status: 401 }
       );
     }
 
-<<<<<<< Updated upstream
-=======
+
     // Reset rate limit on successful verification
     await resetRateLimit(rateLimitKey);
 
->>>>>>> Stashed changes
-    const masterUser = syncRes.user;
 
-    // 2. Perform Better Auth sign-in
-    let baResponse: Response;
-    try {
-      if (usernameInput.includes('@')) {
-        baResponse = await auth.api.signInEmail({
-          body: {
-            email: usernameInput,
-            password: passwordInput,
-          },
-          asResponse: true,
-        });
-      } else {
-        baResponse = await auth.api.signInUsername({
-          body: {
-            username: usernameInput,
-            password: passwordInput,
-          },
-          asResponse: true,
-        });
-      }
-    } catch (baErr: any) {
-      console.warn('Better Auth signIn direct call failed, falling back:', baErr.message);
-      baResponse = new Response(JSON.stringify({ error: baErr.message }), { status: 401 });
-    }
+    const masterUser = syncRes.user;
 
     const response = NextResponse.json({
       success: true,
@@ -94,44 +62,24 @@ export async function POST(req: NextRequest) {
         username: masterUser.username,
         email: masterUser.email,
         role: masterUser.role,
-<<<<<<< Updated upstream
-        tenant_code: masterUser.tenant_code || 'UI',
-        campus_name: masterUser.campus_name || 'Universitas Indonesia',
-        database_name: masterUser.database_name || 'universitas_indonesia',
-        redis_prefix: masterUser.redis_prefix || 'universitas_indonesia',
-=======
         tenant_code: masterUser.tenant_code || '',
         campus_name: masterUser.campus_name || '',
         database_name: masterUser.database_name || '',
         redis_prefix: masterUser.redis_prefix || masterUser.database_name || '',
->>>>>>> Stashed changes
       },
     });
 
-    // Forward all Set-Cookie headers from Better Auth
-    const setCookieHeaders = baResponse.headers.getSetCookie?.() || [];
-    if (setCookieHeaders.length > 0) {
-      setCookieHeaders.forEach((cookieStr) => {
-        response.headers.append('set-cookie', cookieStr);
-      });
-    } else {
-      const singleSetCookie = baResponse.headers.get('set-cookie');
-      if (singleSetCookie) {
-        response.headers.set('set-cookie', singleSetCookie);
-      }
-    }
-<<<<<<< Updated upstream
+    const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
+    const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
 
     // Set fallback auth_session cookie
     response.cookies.set('auth_session', JSON.stringify(masterUser), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
-=======
->>>>>>> Stashed changes
 
     return response;
   } catch (err: any) {

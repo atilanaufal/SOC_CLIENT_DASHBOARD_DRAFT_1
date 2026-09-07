@@ -14,19 +14,22 @@
 
 body {
   color: var(--foreground);
-  background-color: #eef3f9;
+  background-color: #f4f7fb;
   background-image: 
-    radial-gradient(circle at 8% 12%, rgba(0, 102, 177, 0.28) 0px, transparent 42%),
-    radial-gradient(circle at 92% 8%, rgba(0, 43, 154, 0.25) 0px, transparent 48%),
-    radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.18) 0px, transparent 52%),
-    radial-gradient(circle at 85% 82%, rgba(0, 102, 177, 0.24) 0px, transparent 44%),
-    radial-gradient(circle at 12% 82%, rgba(14, 165, 233, 0.22) 0px, transparent 48%),
-    radial-gradient(circle at 50% 92%, rgba(0, 43, 154, 0.18) 0px, transparent 48%),
-    linear-gradient(135deg, #e9f0f8 0%, #f4f8fd 50%, #eaf1f8 100%);
-  background-attachment: fixed;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    radial-gradient(circle at 8% 12%, rgba(0, 102, 177, 0.10) 0px, transparent 45%),
+    radial-gradient(circle at 92% 8%, rgba(0, 43, 154, 0.09) 0px, transparent 48%),
+    radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.06) 0px, transparent 52%),
+    radial-gradient(circle at 85% 82%, rgba(0, 102, 177, 0.09) 0px, transparent 45%),
+    radial-gradient(circle at 12% 82%, rgba(14, 165, 233, 0.08) 0px, transparent 48%),
+    radial-gradient(circle at 50% 92%, rgba(0, 43, 154, 0.07) 0px, transparent 48%),
+    linear-gradient(135deg, #f7faff 0%, #edf3fb 50%, #f8fafc 100%);
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
 }
 
 /* Turn Off All Shadows Across All Elements */
@@ -44,11 +47,11 @@ body {
   box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Modal Backdrop Overlay - Zero/no blur on background outside modal */
+/* Modal Backdrop Overlay */
 .modal-overlay {
   background: rgba(15, 23, 42, 0.25) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
 }
 
 /* Global Rich Frosted Glass Classes (70% Opacity for Denser Frosted Look) */

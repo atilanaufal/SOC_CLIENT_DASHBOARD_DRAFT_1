@@ -9,7 +9,7 @@ function formatDate(val: any): string {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     return `${dateStr} ${timeStr}`;
@@ -19,7 +19,7 @@ function formatDate(val: any): string {
 }
 
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
-  if (!range || range === 'All') return true;
+  if (!range || range.toLowerCase() === 'all') return true;
 
   const rawDate = doc.date_generated || doc.synced_at || doc.created_at || doc.date || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null);
   if (!rawDate) return true;
@@ -56,8 +56,10 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   }
 
   if (lower === 'this week' || lower === '7d') {
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return d >= startOfWeek;
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return d >= mondayThisWeek;
   }
 
   if (lower === 'this month' || lower === '30d') {
@@ -77,9 +79,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    const tenant = getTenantContext(request);
-=======
+
     const tenant = await getTenantContext(request);
     if (!tenant) {
       return NextResponse.json(
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
->>>>>>> Stashed changes
+
 
     const collection = await getReportsCollection(tenant.databaseName);
 

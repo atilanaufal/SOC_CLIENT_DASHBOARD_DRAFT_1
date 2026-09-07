@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import { getReportsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
-<<<<<<< Updated upstream
-import { fetchIncidentsData, fetchVulnerabilitiesData } from '@/lib/redis-sync';
-=======
-import { getTenantIncidents, getTenantVulnerabilities, getHistoricalComparisonStats } from '@/lib/data-service';
->>>>>>> Stashed changes
+
+import { getTenantIncidents, queryServerSideVulnerabilities, getHistoricalComparisonStats } from '@/lib/data-service';
+
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
 
@@ -17,7 +15,7 @@ function formatDate(val: any): string {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     return `${dateStr} ${timeStr}`;
@@ -70,8 +68,11 @@ function getTimeRangeBounds(range: string, startDateParam?: string | null, endDa
     endOfPrevious = startOfCurrent;
     periodLabel = 'YESTERDAY';
   } else if (lower === 'this week' || lower === '7d') {
-    startOfCurrent = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    startOfPrevious = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    startOfCurrent = mondayThisWeek;
+    startOfPrevious = new Date(startOfCurrent.getTime() - 7 * 24 * 60 * 60 * 1000);
     endOfPrevious = startOfCurrent;
     periodLabel = 'LAST WEEK';
   } else if (lower === 'this month' || lower === '30d') {
@@ -104,27 +105,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    // Get Tenant Context from logged-in user session
-    const tenant = getTenantContext(request);
 
-    // 1. Fetch Devices strictly from Redis (Prioritas 1) / MongoDB (Prioritas 2)
-    // Zero Direct Wazuh API Call saat halaman web dibuka!
-    const { data: summaryData } = await getTenantDeviceSummary(tenant);
-    const { data: devicesList, source: deviceSource } = await getTenantDevices(tenant);
-
-    const totalDevices = summaryData.total_devices || devicesList.length;
-    const onlineDevices = summaryData.online_devices;
-    const offlineDevices = summaryData.offline_devices;
-
-    // 2. Fetch Incidents strictly for this tenant
-    let rawIncidents: any[] = [];
-    let dataSource: string = 'mongodb';
-    try {
-      const res = await fetchIncidentsData(timeFilter, tenant.databaseName, tenant.redisPrefix);
-      rawIncidents = res.data;
-      dataSource = res.source;
-=======
     // Get Tenant Context from authenticated session
     const tenant = await getTenantContext(request);
     if (!tenant) {
@@ -148,7 +129,7 @@ export async function GET(request: Request) {
     try {
       rawIncidents = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
       dataSource = 'redis-or-mongodb';
->>>>>>> Stashed changes
+
     } catch (err: any) {
       console.warn('[API /api/dashboard/stats] Incidents fetch fallback:', err.message);
     }
@@ -259,16 +240,10 @@ export async function GET(request: Request) {
     const mediumDelta = currentStats.medium - previousStats.medium;
     const totalDelta = currentStats.total - previousStats.total;
 
-    const riskScore = currentStats.score;
-    const riskLastMonth = previousStats.score;
+    const riskScore = Number(Number(currentStats.score || 0).toFixed(1));
+    const riskLastMonth = Number(Number(previousStats.score || 0).toFixed(1));
 
-<<<<<<< Updated upstream
-    // 3. Top Incidents for this tenant
-    const topIncidentsMap = new Map<string, any>();
-    currentIncidents.forEach((inc) => {
-      const incType = Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : (inc.incident_type || '');
-      const name = incType || inc.description || `Rule ${inc.rule_id}`;
-=======
+
     // 3. Top Incidents for this tenant (list distinct recent incidents per severity, sorted by latest date)
     const seenIncidentSignatures = new Set<string>();
     const topIncidents: any[] = [];
@@ -278,51 +253,21 @@ export async function GET(request: Request) {
         ? (inc.incident_type || inc.incidentName).join(', ')
         : (inc.incident_type || inc.incidentName || inc.description || (inc.rule_id || inc.ruleId ? `Rule ${inc.rule_id || inc.ruleId}` : 'Security Alert'));
       const name = incType || inc.description || `Rule ${inc.rule_id || inc.ruleId}`;
->>>>>>> Stashed changes
+
       const agentName = inc.host || inc.agent || (inc.agent_id ? `Agent ${inc.agent_id}` : 'Agent');
       const sev = parseSeverity(inc.severity);
 
       const rawDateVal = inc.last_observed || inc.first_observed || inc.lastObserved || inc.firstObserved || inc.date;
       const dateFormatted = formatDate(rawDateVal);
       const rawTimestamp = rawDateVal ? new Date(rawDateVal).getTime() : 0;
-<<<<<<< Updated upstream
 
-      const groupKey = `${name}_${dateFormatted.split(' ')[0] || ''}_${agentName}`;
-      const incCount = typeof inc.count === 'number' && inc.count > 0 ? inc.count : 1;
-
-      if (!topIncidentsMap.has(groupKey)) {
-        topIncidentsMap.set(groupKey, {
-          id: (inc._id ? inc._id.toString() : String(inc.id || Math.random())),
-          incidentName: name,
-          severity: parseSeverity(inc.severity),
-          agent: agentName,
-          agentsList: [agentName],
-          host: agentName,
-          count: incCount,
-          firstObserved: formatDate(inc.first_observed || rawDateVal),
-          lastObserved: dateFormatted,
-          rawDate: rawTimestamp,
-          ruleId: inc.rule_id ? String(inc.rule_id) : 'N/A',
-          tenant: tenant.campusName,
-        });
-      } else {
-        const item = topIncidentsMap.get(groupKey);
-        if (!item.agentsList.includes(agentName)) {
-          item.agentsList.push(agentName);
-        }
-        item.count += incCount;
-        if (rawTimestamp > item.rawDate) {
-          item.rawDate = rawTimestamp;
-          item.lastObserved = dateFormatted;
-        }
-=======
       const incCount = typeof inc.count === 'number' && inc.count > 0 ? inc.count : 1;
 
       // Unique signature to deduplicate identical snapshots
       const sig = `${name}:::${dateFormatted}:::${agentName}:::${sev.toLowerCase()}`;
       if (seenIncidentSignatures.has(sig)) {
         return;
->>>>>>> Stashed changes
+
       }
       seenIncidentSignatures.add(sig);
 
@@ -344,57 +289,43 @@ export async function GET(request: Request) {
 
     topIncidents.sort((a, b) => b.rawDate - a.rawDate);
 
-<<<<<<< Updated upstream
-    // 4. Fetch Vulnerabilities for this tenant
-=======
-    // 4. Fetch Vulnerabilities for this tenant (1-7 days from Redis, > 7 days from MongoDB)
->>>>>>> Stashed changes
+
+    // 4. Fetch Vulnerabilities count and severity breakdown via high-speed server aggregation
     let vulnTotal = 0;
     let vulnCritical = 0;
     let vulnHigh = 0;
     let vulnMedium = 0;
     let vulnPatched = 0;
     try {
-<<<<<<< Updated upstream
-      const resVulns = await fetchVulnerabilitiesData(timeFilter, tenant.databaseName, tenant.redisPrefix);
-      const vulns = resVulns.data;
-=======
-      const vulns = await getTenantVulnerabilities(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
->>>>>>> Stashed changes
-      const filteredVulns = vulns.filter((v) => {
-        if (timeFilter.toLowerCase() === 'all') return true;
-        const d = getDocDate(v);
-        return !d || (d >= startOfCurrent && d <= endOfCurrent);
-      });
-
-      vulnTotal = filteredVulns.length;
-      filteredVulns.forEach((v) => {
-        const s = parseSeverity(v.severity).toLowerCase();
-        if (s === 'critical') vulnCritical += 1;
-        else if (s === 'high') vulnHigh += 1;
-        else if (s === 'medium') vulnMedium += 1;
-
-        const st = String(v.status || '').trim().toLowerCase();
-        if (st === 'solved' || st === 'pass' || st === 'patched') vulnPatched += 1;
-      });
-    } catch {
-      // fallback
+      const vulnRes = await queryServerSideVulnerabilities(
+        tenant.databaseName,
+        tenant.redisPrefix,
+        {
+          timeRange: timeFilter,
+          startDate,
+          endDate,
+          limit: 1,
+        }
+      );
+      vulnTotal = vulnRes.total;
+      vulnCritical = vulnRes.stats.critical;
+      vulnHigh = vulnRes.stats.high;
+      vulnMedium = vulnRes.stats.medium;
+      vulnPatched = vulnRes.stats.solved;
+    } catch (err: any) {
+      console.warn('[DashboardStats] Vulnerability stats query error:', err.message);
     }
 
-<<<<<<< Updated upstream
-    // 5. Fetch Reports for this tenant
-=======
+
     // 5. Fetch Reports for this tenant (strictly only reports that have genuine recommended actions)
->>>>>>> Stashed changes
+
     let reportsCount = 0;
     let recommendedActions: any[] = [];
     try {
       const repCol = await getReportsCollection(tenant.databaseName);
-<<<<<<< Updated upstream
-      const reps = await repCol.find({}).sort({ _id: -1 }).maxTimeMS(500).toArray();
-=======
+
       const reps = await repCol.find({}).sort({ _id: -1 }).toArray();
->>>>>>> Stashed changes
+
       const filteredReps = reps.filter((r) => {
         if (timeFilter.toLowerCase() === 'all') return true;
         const d = getDocDate(r);

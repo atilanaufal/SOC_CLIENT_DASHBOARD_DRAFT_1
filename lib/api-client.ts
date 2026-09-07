@@ -8,7 +8,7 @@ export async function fetchIncidents(filters?: {
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Incident[]> {
+}): Promise<Incident[] & { stats?: any }> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
@@ -23,7 +23,39 @@ export async function fetchIncidents(filters?: {
     throw new Error(`Failed to fetch incidents: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  const list = (json.data || []) as any;
+  list.stats = json.incidents || null;
+  return list;
+}
+
+export interface FetchVulnerabilitiesResponse {
+  data: Vulnerability[];
+  total: number;
+  filteredTotal: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    solved: number;
+  };
+  distribution: Array<{
+    label: string;
+    value: number;
+    color: string;
+    fullLabel: string;
+  }>;
+  filterOptions: {
+    agents: string[];
+    categories: string[];
+    vulnerabilities: string[];
+  };
+  offset?: number;
+  hasMore?: boolean;
 }
 
 export async function fetchVulnerabilities(filters?: {
@@ -31,27 +63,58 @@ export async function fetchVulnerabilities(filters?: {
   severity?: string;
   status?: string;
   category?: string;
+  vulnerability?: string;
   agent?: string;
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Vulnerability[]> {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  offset?: number;
+}): Promise<FetchVulnerabilitiesResponse> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
   if (filters?.status && filters.status !== 'All') params.set('status', filters.status);
   if (filters?.category && filters.category !== 'All') params.set('category', filters.category);
+  if (filters?.vulnerability && filters.vulnerability !== 'All') params.set('vulnerability', filters.vulnerability);
   if (filters?.agent && filters.agent !== 'All') params.set('agent', filters.agent);
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
+  if (typeof filters?.page === 'number') params.set('page', String(filters.page));
+  if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
+  if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (typeof filters?.offset === 'number') params.set('offset', String(filters.offset));
 
   const res = await fetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch vulnerabilities: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  return {
+    data: json.data || [],
+    total: json.total ?? (json.data || []).length,
+    filteredTotal: json.filteredTotal ?? json.total ?? (json.data || []).length,
+    page: json.page || 1,
+    limit: json.limit || 10,
+    totalPages: json.totalPages || 1,
+    stats: json.stats || {
+      total: json.total || 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      solved: 0,
+    },
+    distribution: json.distribution || [],
+    filterOptions: json.filterOptions || { agents: [], categories: [], vulnerabilities: [] },
+    offset: json.offset || 0,
+    hasMore: Boolean(json.hasMore),
+  };
 }
 
 export async function fetchReports(filters?: {
