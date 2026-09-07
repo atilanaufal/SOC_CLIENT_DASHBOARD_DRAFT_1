@@ -8,7 +8,7 @@ export async function fetchIncidents(filters?: {
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Incident[]> {
+}): Promise<Incident[] & { stats?: any }> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
@@ -23,7 +23,17 @@ export async function fetchIncidents(filters?: {
     throw new Error(`Failed to fetch incidents: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  const list = (json.data || []) as any;
+  list.stats = json.incidents || null;
+  return list;
+}
+
+export interface FetchVulnerabilitiesResponse {
+  data: Vulnerability[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 export async function fetchVulnerabilities(filters?: {
@@ -35,7 +45,9 @@ export async function fetchVulnerabilities(filters?: {
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Vulnerability[]> {
+  offset?: number;
+  limit?: number;
+}): Promise<FetchVulnerabilitiesResponse> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
@@ -45,13 +57,21 @@ export async function fetchVulnerabilities(filters?: {
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
+  if (typeof filters?.offset === 'number') params.set('offset', String(filters.offset));
+  if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
 
   const res = await fetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch vulnerabilities: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  return {
+    data: json.data || [],
+    total: json.total ?? (json.data || []).length,
+    offset: json.offset || 0,
+    limit: json.limit || 1000,
+    hasMore: Boolean(json.hasMore),
+  };
 }
 
 export async function fetchReports(filters?: {

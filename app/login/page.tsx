@@ -44,15 +44,18 @@ export default function LoginPage() {
         return;
       }
 
-      // Save username in localStorage for frontend persistence
+      // Save user session in localStorage and clear stale caches
       if (data.user) {
         localStorage.setItem('user_session', JSON.stringify(data.user));
       }
+      try {
+        sessionStorage.removeItem('auth_me_cache');
+      } catch {}
 
-      // Redirect to target destination or dashboard on successful login
+      // Hard redirect to target destination so all session cookies & server state are evaluated freshly
       const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const fromPath = params?.get('from') || '/dashboard';
-      router.push(fromPath);
+      window.location.href = fromPath;
     } catch (err: any) {
       console.error('Login submit error:', err);
       setErrorMessage('Terjadi kesalahan koneksi ke server. Silakan coba lagi.');
@@ -79,7 +82,7 @@ export default function LoginPage() {
           
           <div>
             <h1 className="text-xl font-black text-[#002B9A] tracking-tight">
-              Tenant Security Console
+              InfoGuard Security Console
             </h1>
             <p className="text-xs font-bold text-gray-600 mt-1">
               Sign in to manage and monitor your security posture

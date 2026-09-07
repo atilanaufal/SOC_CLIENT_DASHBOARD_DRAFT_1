@@ -11,7 +11,7 @@ function formatDate(val: any): string {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   } catch {
     return String(val);
@@ -116,61 +116,6 @@ export async function GET(
     } else {
       incType = doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert';
     }
-
-function extractFullLogs(doc: any): string {
-  if (typeof doc.full_logs === 'string' && doc.full_logs.trim()) {
-    return doc.full_logs;
-  }
-  if (typeof doc.full_log === 'string' && doc.full_log.trim()) {
-    return doc.full_log;
-  }
-  if (typeof doc.raw_log === 'string' && doc.raw_log.trim()) {
-    return doc.raw_log;
-  }
-  if (typeof doc.log === 'string' && doc.log.trim()) {
-    return doc.log;
-  }
-  if (doc.full_logs && typeof doc.full_logs === 'object') {
-    return JSON.stringify(doc.full_logs, null, 2);
-  }
-  if (doc.data && typeof doc.data === 'object') {
-    return JSON.stringify(doc.data, null, 2);
-  }
-
-  const rawLogObj: Record<string, any> = {
-    timestamp: doc.first_observed || doc.last_observed || new Date().toISOString(),
-    rule: {
-      id: String(doc.rule_id || '100200'),
-      level: doc.severity === 'Critical' ? 12 : doc.severity === 'High' ? 10 : doc.severity === 'Medium' ? 7 : 4,
-      description: doc.description || doc.incident_type || 'Security event detected',
-      mitre: {
-        id: doc.mitre_id ? [doc.mitre_id] : ['T1110'],
-        tactic: Array.isArray(doc.mitre_tactic) ? doc.mitre_tactic : [doc.mitre_tactic || 'Credential Access'],
-        technique: Array.isArray(doc.mitre_technique) ? doc.mitre_technique : [doc.mitre_technique || 'Brute Force'],
-      },
-    },
-    agent: {
-      id: doc.agent_id ? String(doc.agent_id) : '001',
-      name: doc.host || doc.agent || 'tguard',
-      ip: doc.agent_ip || doc.ip_source || '10.21.126.82',
-    },
-    manager: {
-      name: 'wazuh.manager',
-    },
-    location: doc.affected_file || doc.location || '/var/log/auth.log',
-    data: {
-      srcip: doc.ip_source || doc.agent_ip || '10.21.126.82',
-      dstip: doc.ip_destination || '10.21.126.1',
-      count: doc.count || 1,
-      affected_file: doc.affected_file,
-      incident_type: doc.incident_type,
-    },
-    full_log: `${doc.first_observed || new Date().toISOString()} ${doc.host || 'tguard'} ossec: Alert [${doc.rule_id || '100200'}] (${doc.severity || 'Medium'}): ${doc.description || doc.incident_type || 'Security Event Detected'}`,
-  };
-
-  return JSON.stringify(rawLogObj, null, 2);
-}
-
     const incident = {
       id: idStr,
       _id: idStr,
@@ -196,11 +141,9 @@ function extractFullLogs(doc: any): string {
       affected_file: doc.affected_file || undefined,
       count: typeof doc.count === 'number' ? doc.count : 1,
       full_logs: extractFullLogs(doc),
-<<<<<<< Updated upstream
-      tenant: 'Cyber Lab Head Office'
-=======
+
       tenant: tenant.campusName,
->>>>>>> Stashed changes
+
     };
 
     return NextResponse.json({ success: true, data: incident });

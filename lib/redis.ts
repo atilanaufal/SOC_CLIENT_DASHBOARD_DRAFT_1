@@ -1,19 +1,13 @@
 import Redis from 'ioredis';
 
 function getRedisConfig() {
-<<<<<<< Updated upstream
-  const primaryHost = process.env.REDIS_HOST || '10.21.126.82';
-  const primaryPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-  const primaryPassword = process.env.REDIS_PASSWORD || undefined;
 
-  const fallbackHost = process.env.REDIS_FALLBACK_HOST || '192.168.1.20';
-=======
   const primaryHost = process.env.REDIS_HOST || '127.0.0.1';
   const primaryPort = parseInt(process.env.REDIS_PORT || '6379', 10);
   const primaryPassword = process.env.REDIS_PASSWORD || undefined;
 
   const fallbackHost = process.env.REDIS_FALLBACK_HOST || '';
->>>>>>> Stashed changes
+
   const fallbackPort = parseInt(process.env.REDIS_FALLBACK_PORT || process.env.REDIS_PORT || '6379', 10);
   const fallbackPassword = process.env.REDIS_FALLBACK_PASSWORD || process.env.REDIS_PASSWORD || undefined;
 
@@ -26,11 +20,9 @@ function getRedisConfig() {
 let primaryClient: Redis | null = null;
 let fallbackClient: Redis | null = null;
 let activeClient: Redis | null = null;
-<<<<<<< Updated upstream
-let activeHost: string = process.env.REDIS_HOST || '10.21.126.82';
-=======
+
 let activeHost: string = process.env.REDIS_HOST || '127.0.0.1';
->>>>>>> Stashed changes
+
 let activePort: number = parseInt(process.env.REDIS_PORT || '6379', 10);
 
 let lastPrimaryFailTime = 0;
@@ -41,28 +33,15 @@ function createClientInstance(host: string, port: number, password?: string): Re
     host,
     port,
     password,
-<<<<<<< Updated upstream
-    connectTimeout: 2000,
-    commandTimeout: 2000,
+    connectTimeout: 1000,
+    commandTimeout: 1000,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
     retryStrategy(times) {
-      if (times > 2) {
-        return null; // Stop retrying quickly to allow fast failover
-      }
-      return Math.min(times * 150, 500);
+      if (times > 2) return null;
+      return 300;
     },
     lazyConnect: true,
-=======
-    connectTimeout: 3000,
-    commandTimeout: 3000,
-    maxRetriesPerRequest: 2,
-    enableOfflineQueue: true,
-    retryStrategy(times) {
-      return Math.min(times * 300, 3000);
-    },
-    lazyConnect: false,
->>>>>>> Stashed changes
   });
 
   client.on('error', (_err) => {
@@ -81,11 +60,19 @@ export function getActiveRedisHost(): { host: string; port: number } {
  */
 async function testClientConnection(client: Redis): Promise<boolean> {
   try {
-    if (client.status === 'wait' || client.status === 'close') {
-      await client.connect();
-    }
-    const pingRes = await client.ping();
-    return pingRes === 'PONG';
+    const connectPromise = async () => {
+      if (client.status === 'wait' || client.status === 'close') {
+        await client.connect();
+      }
+      const pingRes = await client.ping();
+      return pingRes === 'PONG';
+    };
+
+    const timeoutPromise = new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), 500)
+    );
+
+    return await Promise.race([connectPromise(), timeoutPromise]);
   } catch {
     return false;
   }
@@ -97,98 +84,7 @@ async function testClientConnection(client: Redis): Promise<boolean> {
 export async function getActiveRedisClient(): Promise<Redis | null> {
   const { primary, fallback } = getRedisConfig();
   const now = Date.now();
-<<<<<<< Updated upstream
 
-  // 1. Try Primary if not in cooldown
-  if (now - lastPrimaryFailTime > PRIMARY_FAIL_COOLDOWN_MS) {
-    try {
-      if (!primaryClient) {
-        primaryClient = createClientInstance(primary.host, primary.port, primary.password);
-      }
-      const ok = await testClientConnection(primaryClient);
-      if (ok) {
-        activeClient = primaryClient;
-        activeHost = primary.host;
-        activePort = primary.port;
-        lastPrimaryFailTime = 0;
-        return primaryClient;
-      } else {
-        lastPrimaryFailTime = now;
-      }
-    } catch {
-      lastPrimaryFailTime = now;
-    }
-  }
-
-  // 2. Try Fallback if primary is failing or in cooldown
-  const isFallbackDifferent = fallback.host !== primary.host || fallback.port !== primary.port;
-  if (isFallbackDifferent && fallback.host) {
-    try {
-      if (!fallbackClient) {
-        fallbackClient = createClientInstance(fallback.host, fallback.port, fallback.password);
-      }
-      const ok = await testClientConnection(fallbackClient);
-      if (ok) {
-        activeClient = fallbackClient;
-        activeHost = fallback.host;
-        activePort = fallback.port;
-        return fallbackClient;
-      }
-    } catch (err: any) {
-      console.warn(`[Redis Fallback ${fallback.host}:${fallback.port}] Connection failed:`, err.message);
-    }
-  }
-
-  // Fallback also down, or primary only
-  if (activeClient && activeClient.status === 'ready') {
-    return activeClient;
-  }
-
-  return null;
-}
-
-/**
- * Synchronous accessor for compatibility
- */
-export function getRedisClient(): Redis | null {
-  if (activeClient) {
-    return activeClient;
-  }
-  const { primary, fallback } = getRedisConfig();
-  if (Date.now() - lastPrimaryFailTime < PRIMARY_FAIL_COOLDOWN_MS && fallback.host) {
-    if (!fallbackClient) {
-      fallbackClient = createClientInstance(fallback.host, fallback.port, fallback.password);
-    }
-    return fallbackClient;
-  }
-
-  if (!primaryClient) {
-    primaryClient = createClientInstance(primary.host, primary.port, primary.password);
-  }
-  return primaryClient;
-}
-
-export async function isRedisAvailable(): Promise<boolean> {
-  const client = await getActiveRedisClient();
-  return client !== null;
-}
-
-/**
- * Retrieve JSON parsed value from Redis by key
- */
-export async function getCache<T>(key: string): Promise<T | null> {
-  try {
-    const client = await getActiveRedisClient();
-    if (!client) return null;
-
-    const data = await client.get(key);
-    if (!data) return null;
-
-    return JSON.parse(data) as T;
-  } catch (err: any) {
-    console.warn(`[Redis Cache GET Error - Key ${key}]:`, err.message);
-    return null;
-=======
 
   // 1. Try Primary if not in cooldown
   if (now - lastPrimaryFailTime > PRIMARY_FAIL_COOLDOWN_MS) {
@@ -212,7 +108,7 @@ export async function getCache<T>(key: string): Promise<T | null> {
     } catch {
       lastPrimaryFailTime = now;
     }
->>>>>>> Stashed changes
+
   }
 
   // 2. Try Fallback if primary is failing or in cooldown
@@ -246,7 +142,39 @@ export async function getCache<T>(key: string): Promise<T | null> {
 }
 
 /**
-<<<<<<< Updated upstream
+ * Synchronous accessor for compatibility
+ */
+export function getRedisClient(): Redis | null {
+  if (activeClient && (activeClient.status === 'ready' || activeClient.status === 'connect')) {
+    return activeClient;
+  }
+  return null;
+}
+
+export async function isRedisAvailable(): Promise<boolean> {
+  const client = await getActiveRedisClient();
+  return client !== null;
+}
+
+/**
+ * Retrieve JSON parsed value from Redis by key
+ */
+export async function getCache<T>(key: string): Promise<T | null> {
+  try {
+    const client = await getActiveRedisClient();
+    if (!client) return null;
+
+    const data = await client.get(key);
+    if (!data) return null;
+
+    return JSON.parse(data) as T;
+  } catch (err: any) {
+    console.warn(`[Redis Cache GET Error - Key ${key}]:`, err.message);
+    return null;
+  }
+}
+
+/**
  * Store JSON stringified value into Redis with optional TTL (default 7 days = 604800s)
  */
 export async function setCache(key: string, value: any, ttlSeconds: number = 7 * 24 * 3600): Promise<boolean> {
@@ -279,13 +207,5 @@ export async function delCache(key: string): Promise<boolean> {
     return true;
   } catch {
     return false;
-=======
- * Synchronous accessor for compatibility
- */
-export function getRedisClient(): Redis | null {
-  if (activeClient && (activeClient.status === 'ready' || activeClient.status === 'connect')) {
-    return activeClient;
->>>>>>> Stashed changes
   }
-  return null;
 }

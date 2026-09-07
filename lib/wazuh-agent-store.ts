@@ -46,7 +46,8 @@ export interface WazuhDeviceSummary {
 export async function getTenantDevices(
   tenant: TenantContext
 ): Promise<{ data: WazuhDevice[]; source: 'redis' | 'mongodb' }> {
-  const redisKey = `${tenant.redisPrefix}:devices:list`;
+  const cleanPrefix = (tenant.redisPrefix || tenant.databaseName).replace(/:+$/, '');
+  const redisKey = `${cleanPrefix}:devices:list`;
 
   // 1. PRIORITAS 1: Baca Cepat dari Redis
   try {
@@ -83,7 +84,8 @@ export async function getTenantDevices(
 export async function getTenantDeviceSummary(
   tenant: TenantContext
 ): Promise<{ data: WazuhDeviceSummary; source: 'redis' | 'mongodb' }> {
-  const redisKey = `${tenant.redisPrefix}:devices:summary`;
+  const cleanPrefix = (tenant.redisPrefix || tenant.databaseName).replace(/:+$/, '');
+  const redisKey = `${cleanPrefix}:devices:summary`;
 
   // 1. PRIORITAS 1: Baca Cepat dari Redis
   try {
@@ -158,7 +160,8 @@ export async function getTenantDeviceHardware(
   agentId: string,
   tenant: TenantContext
 ): Promise<{ data: Record<string, any>; source: 'redis' | 'mongodb' }> {
-  const redisDevKey = `${tenant.redisPrefix}:device:${agentId}`;
+  const cleanPrefix = (tenant.redisPrefix || tenant.databaseName).replace(/:+$/, '');
+  const redisDevKey = `${cleanPrefix}:device:${agentId}`;
 
   // 1. PRIORITAS 1: Baca Cepat dari Redis
   try {

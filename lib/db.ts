@@ -1,108 +1,82 @@
 import { MongoClient, Db } from 'mongodb';
 
-<<<<<<< Updated upstream
-const PRIMARY_URI = process.env.MONGODB_URI || 'mongodb://10.21.126.82:27017/wazuh';
-const FALLBACK_URI = process.env.MONGODB_FALLBACK_URI || 'mongodb://192.168.1.20:27017/wazuh';
-=======
 const PRIMARY_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
 const FALLBACK_URI = process.env.MONGODB_FALLBACK_URI || '';
->>>>>>> Stashed changes
 
-let activeClientPromise: Promise<MongoClient> | null = null;
-let activeUriUsed: string = PRIMARY_URI;
-let lastFailureTime: number = 0;
-const FAILURE_COOLDOWN_MS = 15000; // 15s cooldown to prevent repeated slow/hanging Mongo connection attempts
+interface MongoCache {
+  client: MongoClient | null;
+  promise: Promise<MongoClient> | null;
+  uriUsed: string;
+}
 
-function connectToMongo(uri: string, timeoutMs = 2500): Promise<MongoClient> {
+declare global {
+  // eslint-disable-next-line no-var
+  var _mongoCache: MongoCache | undefined;
+}
+
+const cache: MongoCache = global._mongoCache || {
+  client: null,
+  promise: null,
+  uriUsed: PRIMARY_URI,
+};
+
+if (process.env.NODE_ENV !== 'production') {
+  global._mongoCache = cache;
+}
+
+async function createClient(uri: string): Promise<MongoClient> {
   const client = new MongoClient(uri, {
-    connectTimeoutMS: timeoutMs,
-    socketTimeoutMS: 5000,
-    serverSelectionTimeoutMS: timeoutMs,
-<<<<<<< Updated upstream
-    maxPoolSize: 10,
-=======
     maxPoolSize: 20,
->>>>>>> Stashed changes
+    minPoolSize: 2,
+    connectTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 30000,
   });
-
-  const connectPromise = client.connect();
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => {
-      client.close(true).catch(() => {});
-      reject(new Error(`MongoDB connection timeout (${timeoutMs}ms)`));
-    }, timeoutMs)
-  );
-
-  return Promise.race([connectPromise, timeoutPromise]);
+  await client.connect();
+  return client;
 }
 
 export async function getMongoClient(): Promise<MongoClient> {
-  // Fast fail if MongoDB recently failed
-  if (Date.now() - lastFailureTime < FAILURE_COOLDOWN_MS) {
-    throw new Error('MongoDB cooling down after recent failure');
-  }
-
-  if (activeClientPromise) {
+  if (cache.promise) {
     try {
-      const client = await activeClientPromise;
-      const pingPromise = client.db().admin().ping();
-      const pingTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Mongo admin ping timeout (300ms)')), 300)
-      );
-      await Promise.race([pingPromise, pingTimeout]);
+      const client = await cache.promise;
       return client;
     } catch {
-      activeClientPromise = null;
+      cache.promise = null;
+      cache.client = null;
     }
   }
 
-  // Connect attempt to PRIMARY_URI
-  try {
-    const client = await connectToMongo(PRIMARY_URI, 500);
-    activeUriUsed = PRIMARY_URI;
-    activeClientPromise = Promise.resolve(client);
-    lastFailureTime = 0;
-    return client;
-  } catch (errPrimary: any) {
-    // Only attempt FALLBACK_URI if defined and different
-    if (FALLBACK_URI && FALLBACK_URI !== PRIMARY_URI) {
-      try {
-        const fallbackClient = await connectToMongo(FALLBACK_URI, 400);
-        activeUriUsed = FALLBACK_URI;
-        activeClientPromise = Promise.resolve(fallbackClient);
-        lastFailureTime = 0;
-        return fallbackClient;
-      } catch {}
+  cache.promise = (async () => {
+    try {
+      const client = await createClient(PRIMARY_URI);
+      cache.client = client;
+      cache.uriUsed = PRIMARY_URI;
+      return client;
+    } catch (primaryErr: any) {
+      if (FALLBACK_URI && FALLBACK_URI !== PRIMARY_URI) {
+        try {
+          const fallbackClient = await createClient(FALLBACK_URI);
+          cache.client = fallbackClient;
+          cache.uriUsed = FALLBACK_URI;
+          return fallbackClient;
+        } catch {}
+      }
+      cache.promise = null;
+      cache.client = null;
+      throw new Error(`MongoDB connection unavailable: ${primaryErr.message}`);
     }
+  })();
 
-    lastFailureTime = Date.now();
-    activeClientPromise = null;
-    throw new Error(`MongoDB connection unavailable: ${errPrimary.message}`);
-  }
+  return cache.promise;
 }
 
 export function getActiveMongoHost(): string {
   try {
-    const parsed = new URL(activeUriUsed);
-<<<<<<< Updated upstream
-    return parsed.host;
-  } catch {
-    const match = activeUriUsed.match(/\/\/(.*?)\//);
-    return match ? match[1] : '10.21.126.82:27017';
-  }
-}
-
-export async function getDb(databaseName?: string): Promise<Db> {
-  const client = await getMongoClient();
-  const targetDb = databaseName || 'universitas_indonesia';
-  return client.db(targetDb);
-}
-
-export async function getIncidentsCollection(databaseName?: string) {
-=======
+    const parsed = new URL(cache.uriUsed);
     return parsed.host || '127.0.0.1:27017';
   } catch {
-    const match = activeUriUsed.match(/\/\/(.*?)\//);
+    const match = cache.uriUsed.match(/\/\/(.*?)\//);
     return match ? match[1] : '127.0.0.1:27017';
   }
 }
@@ -116,31 +90,17 @@ export async function getDb(databaseName: string): Promise<Db> {
 }
 
 export async function getIncidentsCollection(databaseName: string) {
->>>>>>> Stashed changes
   const db = await getDb(databaseName);
   return db.collection('incident');
 }
 
-<<<<<<< Updated upstream
-export async function getVulnerabilitiesCollection(databaseName?: string) {
-=======
 export async function getVulnerabilitiesCollection(databaseName: string) {
->>>>>>> Stashed changes
   const db = await getDb(databaseName);
   return db.collection('vulnerability');
 }
 
-<<<<<<< Updated upstream
-export async function getReportsCollection(databaseName?: string) {
-  const db = await getDb(databaseName);
-  try {
-    const repCount = await db.collection('reports').countDocuments();
-    if (repCount > 0) return db.collection('reports');
-  } catch {}
-=======
 export async function getReportsCollection(databaseName: string) {
   const db = await getDb(databaseName);
->>>>>>> Stashed changes
   return db.collection('reports');
 }
 

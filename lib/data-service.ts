@@ -62,10 +62,10 @@ export function isQueryForRecentDays(
 function parseRawIncident(h: any, fallbackId: string): Incident {
   const incName = Array.isArray(h.incident_type)
     ? h.incident_type.join(', ')
-    : (h.incident_type || h.incidentName || h.description || 'Security Event');
+    : (h.incident_type || h.incidentName || h.description || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event'));
 
-  const firstObs = h.first_observed || h.timeObserved || h.last_observed || h.date || new Date().toISOString();
-  const lastObs = h.last_observed || h.timeObserved || h.first_observed || firstObs;
+  const firstObs = h.first_observed || h.last_observed || h.date || h.created_at || new Date().toISOString();
+  const lastObs = h.last_observed || h.first_observed || firstObs;
 
   const mitreTechnique = Array.isArray(h.mitre_technique)
     ? h.mitre_technique.join(', ')
@@ -80,13 +80,17 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     : (h.mitre_tactic || '');
 
   let fullLogsString = '';
-  if (typeof h.full_logs === 'string') {
+  if (typeof h.full_logs === 'string' && h.full_logs.trim()) {
     fullLogsString = h.full_logs;
+  } else if (typeof h.full_log === 'string' && h.full_log.trim()) {
+    fullLogsString = h.full_log;
   } else if (Array.isArray(h.full_logs)) {
     fullLogsString = h.full_logs.join('\n');
   } else if (h.full_logs && typeof h.full_logs === 'object') {
     fullLogsString = JSON.stringify(h.full_logs, null, 2);
   }
+
+  const hostName = h.host || h.agent || h.agent_name || (h.agent_id ? `Agent ${h.agent_id}` : '');
 
   // Ensure unique ID per record
   const baseId = h._id ? String(h._id) : (h.id || h.incident_id ? String(h.id || h.incident_id) : '');
@@ -98,9 +102,9 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     incidentName: incName,
     incident_type: h.incident_type || incName,
     severity: (h.severity || 'Medium') as any,
-    agent: h.host || h.agent || (h.agent_id ? `Agent ${h.agent_id}` : ''),
-    agentsList: [h.host || h.agent || 'Agent'],
-    host: h.host || h.agent || '',
+    agent: hostName,
+    agentsList: [hostName || 'Agent'],
+    host: hostName,
     agent_id: h.agent_id ? String(h.agent_id) : (h.agent ? String(h.agent) : undefined),
     firstObserved: firstObs,
     first_observed: firstObs,
@@ -130,34 +134,182 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
  */
 function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
   const cve = h.cve || h.cveId || '';
-  const vulnName = h.vulnerability || h.name || cve || 'CVE Vulnerability';
-  const detectDate = h.detected_at || h.detectionDate || h.last_seen || h.first_seen || new Date().toISOString();
+  const pkgName = h.package_name || h.package || '';
+  const vulnTitle = h.title || h.vulnerability || h.name || pkgName || cve || 'CVE Vulnerability';
+  const detectDate = h.detected_at || h.detectionDate || h.last_seen || h.first_seen || h.created_at || new Date().toISOString();
+  const agentName = h.host || h.agent || h.agent_name || (h.agent_id ? `Agent ${h.agent_id}` : '');
+  const pkgVersion = h.version || h.currentVersion || h.package_version || 'N/A';
+
+  const baseId = h._id ? String(h._id) : (h.id ? String(h.id) : (cve ? `${cve}_${agentName}_${pkgName}` : fallbackId));
 
   return {
-    id: String(h._id || h.id || cve || fallbackId),
-    name: vulnName,
-    vulnerability: vulnName,
+    id: baseId,
+    name: vulnTitle,
+    vulnerability: vulnTitle,
     severity: (h.severity || 'Medium') as any,
-    agent: h.host || h.agent || '',
-    cveId: cve,
-    cve: cve,
+    agent: agentName,
+    cveId: cve || 'N/A',
+    cve: cve || 'N/A',
     detectionDate: detectDate,
     detected_at: detectDate,
     status: (h.status || 'Active') as any,
-    currentVersion: h.version || h.currentVersion || 'N/A',
-    version: h.version || h.currentVersion || 'N/A',
-    description: h.description || '',
+    currentVersion: pkgVersion,
+    version: pkgVersion,
+    description: h.description || h.title || `Vulnerability ${cve} detected on ${pkgName || 'package'}`,
     impact: h.impact || '',
     category: h.category || 'Packages',
-    package: h.package || vulnName || '',
+    package: pkgName || vulnTitle || '',
     ip: h.ip || h.agent_ip || '',
   };
 }
 
 /**
+ * Mengambil data insiden dari Redis Cache (<cleanPrefix>:incident:*)
+ */
+async function fetchIncidentsFromRedis(databaseName: string, redisPrefix: string): Promise<Incident[]> {
+  try {
+    const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      const keys = await redis.keys(`${cleanPrefix}:incident:*`);
+      if (keys && keys.length > 0) {
+        const pipeline = redis.pipeline();
+        for (const key of keys) {
+          pipeline.hgetall(key);
+        }
+        const results = await pipeline.exec();
+        const incidents: Incident[] = [];
+        if (results) {
+          let itemIdx = 0;
+          for (let i = 0; i < results.length; i++) {
+            const [err, rawHash] = results[i];
+            const redisKey = keys[i] || `key_${i}`;
+            if (!err && rawHash && typeof rawHash === 'object') {
+              for (const [fieldKey, fieldVal] of Object.entries(rawHash)) {
+                try {
+                  const parsed = typeof fieldVal === 'string' ? JSON.parse(fieldVal) : fieldVal;
+                  if (parsed && typeof parsed === 'object') {
+                    itemIdx++;
+                    const uniqueFallback = `${redisKey}_${fieldKey}_${itemIdx}`;
+                    incidents.push(parseRawIncident(parsed, uniqueFallback));
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+        if (incidents.length > 0) {
+          incidents.sort((a, b) => {
+            const tA = new Date(a.lastObserved || a.firstObserved).getTime();
+            const tB = new Date(b.lastObserved || b.firstObserved).getTime();
+            return tB - tA;
+          });
+          return incidents;
+        }
+      }
+    }
+  } catch (redisErr: any) {
+    console.warn('[DataService] Redis incident query error:', redisErr.message);
+  }
+  return [];
+}
+
+function buildMongoDateFilter(
+  dateField: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Record<string, any> {
+  const lower = (timeRange || '').toLowerCase().trim();
+  const now = new Date();
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formatDateTime = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+    if (sStr && eStr) {
+      const start = new Date(`${sStr}T00:00:00.000`);
+      const end = new Date(`${eStr}T23:59:59.999`);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        return {
+          [dateField]: {
+            $gte: formatDateTime(start),
+            $lte: formatDateTime(end),
+          },
+        };
+      }
+    }
+    return {};
+  }
+
+  if (lower === 'today') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    return {
+      [dateField]: { $gte: formatDateTime(startOfToday) },
+    };
+  }
+
+  if (lower === 'this week' || lower === '7d') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
+    return {
+      [dateField]: { $gte: formatDateTime(mondayThisWeek) },
+    };
+  }
+
+  if (lower === 'this month' || lower === '30d') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    return {
+      [dateField]: { $gte: formatDateTime(startOfMonth) },
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Mengambil data insiden dari MongoDB Master dengan filter rentang waktu
+ */
+async function fetchIncidentsFromMongo(
+  databaseName: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<Incident[]> {
+  try {
+    const col = await getIncidentsCollection(databaseName);
+    const filter = buildMongoDateFilter('last_observed', timeRange, startDate, endDate);
+    const docs = await col
+      .find(filter)
+      .sort({ last_observed: -1, first_observed: -1, _id: -1 })
+      .limit(1000)
+      .toArray();
+
+    if (docs && docs.length > 0) {
+      return docs.map((doc: any, idx: number) => parseRawIncident(doc, `mongo-inc-${idx + 1}`));
+    }
+  } catch (mongoErr: any) {
+    console.warn('[DataService] MongoDB incident query error:', mongoErr.message);
+  }
+  return [];
+}
+
+/**
  * Mengambil data insiden tenant:
- * - 1-7 Hari: Baca dari Redis Cache (Hot storage).
- * - > 7 Hari / All / Fallback: Query ke MongoDB Master (Cold archive).
+ * - Rentang 1-7 Hari (Today, This Week, 7d, default): Prioritas ke Redis In-Memory Cache (< 1ms).
+ *   Jika Redis kosong/down, fallback ke MongoDB dengan filter 1-7 hari.
+ * - Rentang > 7 Hari (This Month, 30d, All, Custom > 7h): HANYA query ke MongoDB Master (tanpa Redis).
  */
 export async function getTenantIncidents(
   databaseName: string,
@@ -167,138 +319,155 @@ export async function getTenantIncidents(
   endDate?: string | null
 ): Promise<Incident[]> {
   const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
-  const incidents: Incident[] = [];
 
-  // 1. Jika rentang 1-7 hari, coba baca dari Redis Cache
+  // 1. Jika filter 1-7 hari, prioritas ke Redis Cache
   if (isRecent) {
-    try {
-      const redis = await getActiveRedisClient();
-      if (redis) {
-        const keys = await redis.keys(`${redisPrefix}:incident:*`);
-        if (keys && keys.length > 0) {
-          const pipeline = redis.pipeline();
-          for (const key of keys) {
-            pipeline.hgetall(key);
-          }
-          const results = await pipeline.exec();
-          if (results) {
-            let itemIdx = 0;
-            for (let i = 0; i < results.length; i++) {
-              const [err, rawHash] = results[i];
-              const redisKey = keys[i] || `key_${i}`;
-              if (!err && rawHash && typeof rawHash === 'object') {
-                for (const [fieldKey, fieldVal] of Object.entries(rawHash)) {
-                  try {
-                    const parsed = typeof fieldVal === 'string' ? JSON.parse(fieldVal) : fieldVal;
-                    if (parsed && typeof parsed === 'object') {
-                      itemIdx++;
-                      const uniqueFallback = `${redisKey}_${fieldKey}_${itemIdx}`;
-                      incidents.push(parseRawIncident(parsed, uniqueFallback));
-                    }
-                  } catch {}
-                }
+    const redisData = await fetchIncidentsFromRedis(databaseName, redisPrefix);
+    if (redisData.length > 0) {
+      return redisData;
+    }
+    // Fallback ke MongoDB dengan filter tanggal jika Redis kosong/down
+    return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+  }
+
+  // 2. Jika filter > 7 hari, HANYA query langsung ke MongoDB Master
+  return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+}
+
+/**
+ * Mengambil data kerentanan dari Redis Cache (<cleanPrefix>:vulnerability:*)
+ */
+async function fetchVulnerabilitiesFromRedis(databaseName: string, redisPrefix: string): Promise<Vulnerability[]> {
+  try {
+    const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      let keys = await redis.keys(`${cleanPrefix}:vulnerability:*`);
+      if (!keys || keys.length === 0) {
+        keys = await redis.keys(`${cleanPrefix}:vulnerabilities:*`);
+      }
+
+      if (keys && keys.length > 0) {
+        const pipeline = redis.pipeline();
+        for (const key of keys) {
+          pipeline.hgetall(key);
+        }
+        const results = await pipeline.exec();
+        const vulns: Vulnerability[] = [];
+        if (results) {
+          for (const [err, rawHash] of results) {
+            if (!err && rawHash && typeof rawHash === 'object') {
+              for (const [fieldKey, fieldVal] of Object.entries(rawHash)) {
+                try {
+                  const parsed = typeof fieldVal === 'string' ? JSON.parse(fieldVal) : fieldVal;
+                  if (parsed && typeof parsed === 'object') {
+                    vulns.push(parseRawVulnerability(parsed, fieldKey));
+                  }
+                } catch {}
               }
             }
           }
         }
+        if (vulns.length > 0) {
+          vulns.sort((a, b) => {
+            const tA = new Date(a.detected_at || a.detectionDate).getTime();
+            const tB = new Date(b.detected_at || b.detectionDate).getTime();
+            return tB - tA;
+          });
+          return vulns;
+        }
       }
-    } catch (redisErr: any) {
-      console.warn('[DataService] Redis incident query error, falling back to MongoDB:', redisErr.message);
     }
-
-    if (incidents.length > 0) {
-      incidents.sort((a, b) => {
-        const tA = new Date(a.lastObserved || a.firstObserved).getTime();
-        const tB = new Date(b.lastObserved || b.firstObserved).getTime();
-        return tB - tA;
-      });
-      return incidents;
-    }
+  } catch (redisErr: any) {
+    console.warn('[DataService] Redis vulnerability query error:', redisErr.message);
   }
+  return [];
+}
 
-  // 2. Query ke MongoDB Master (Untuk > 7 hari, All, atau jika Redis kosong / fallback)
+export interface VulnerabilitiesResult {
+  data: Vulnerability[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+/**
+ * Mengambil data kerentanan dari MongoDB Master secara bertahap (chunked/paginated)
+ */
+async function fetchVulnerabilitiesFromMongo(
+  databaseName: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null,
+  offset = 0,
+  limit = 1000
+): Promise<VulnerabilitiesResult> {
   try {
-    const col = await getIncidentsCollection(databaseName);
-    const docs = await col.find({}).sort({ last_observed: -1, first_observed: -1 }).toArray();
+    const col = await getVulnerabilitiesCollection(databaseName);
+    const filter = buildMongoDateFilter('detected_at', timeRange, startDate, endDate);
 
-    return docs.map((doc: any, idx: number) => parseRawIncident(doc, `mongo-inc-${idx + 1}`));
+    const total = await col.countDocuments(filter);
+    const docs = await col
+      .find(filter)
+      .sort({ detected_at: -1, _id: -1 })
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+
+    const data = docs.map((doc: any, idx: number) =>
+      parseRawVulnerability(doc, `mongo-vuln-${offset + idx + 1}`)
+    );
+
+    return {
+      data,
+      total,
+      offset,
+      limit,
+      hasMore: offset + data.length < total,
+    };
   } catch (mongoErr: any) {
-    console.error('[DataService] MongoDB query error for incidents:', mongoErr.message);
-    return [];
+    console.warn('[DataService] MongoDB vulnerability query error:', mongoErr.message);
+    return { data: [], total: 0, offset, limit, hasMore: false };
   }
 }
 
 /**
  * Mengambil data kerentanan (vulnerability) tenant:
- * - 1-7 Hari: Baca dari Redis Cache (<tenant>:vulnerability:*).
- * - > 7 Hari / All / Fallback: Query ke MongoDB Master.
+ * - Rentang 1-7 Hari (Today, This Week, 7d, default): Prioritas ke Redis In-Memory Cache (< 1ms).
+ *   Jika Redis kosong/down, fallback ke MongoDB dengan batching (1000 items).
+ * - Rentang > 7 Hari (This Month, 30d, All, Custom > 7h): HANYA query langsung ke MongoDB Master secara chunked.
  */
 export async function getTenantVulnerabilities(
   databaseName: string,
   redisPrefix: string,
   timeRange?: string,
   startDate?: string | null,
-  endDate?: string | null
-): Promise<Vulnerability[]> {
+  endDate?: string | null,
+  offset = 0,
+  limit = 1000
+): Promise<VulnerabilitiesResult> {
   const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
-  const vulns: Vulnerability[] = [];
 
-  // 1. Jika rentang 1-7 hari, coba baca dari Redis Cache
+  // 1. Rentang 1-7 hari: Prioritas ke Redis Cache
   if (isRecent) {
-    try {
-      const redis = await getActiveRedisClient();
-      if (redis) {
-        let keys = await redis.keys(`${redisPrefix}:vulnerability:*`);
-        if (!keys || keys.length === 0) {
-          keys = await redis.keys(`${redisPrefix}:vulnerabilities:*`);
-        }
-
-        if (keys && keys.length > 0) {
-          const pipeline = redis.pipeline();
-          for (const key of keys) {
-            pipeline.hgetall(key);
-          }
-          const results = await pipeline.exec();
-          if (results) {
-            for (const [err, rawHash] of results) {
-              if (!err && rawHash && typeof rawHash === 'object') {
-                for (const [fieldKey, fieldVal] of Object.entries(rawHash)) {
-                  try {
-                    const parsed = typeof fieldVal === 'string' ? JSON.parse(fieldVal) : fieldVal;
-                    if (parsed && typeof parsed === 'object') {
-                      vulns.push(parseRawVulnerability(parsed, fieldKey));
-                    }
-                  } catch {}
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (redisErr: any) {
-      console.warn('[DataService] Redis vulnerability query error, falling back to MongoDB:', redisErr.message);
+    const redisData = await fetchVulnerabilitiesFromRedis(databaseName, redisPrefix);
+    if (redisData.length > 0) {
+      const slice = redisData.slice(offset, offset + limit);
+      return {
+        data: slice,
+        total: redisData.length,
+        offset,
+        limit,
+        hasMore: offset + slice.length < redisData.length,
+      };
     }
-
-    if (vulns.length > 0) {
-      vulns.sort((a, b) => {
-        const tA = new Date(a.detected_at || a.detectionDate).getTime();
-        const tB = new Date(b.detected_at || b.detectionDate).getTime();
-        return tB - tA;
-      });
-      return vulns;
-    }
+    // Fallback ke MongoDB dengan filter waktu dan limit/offset yang sama
+    return await fetchVulnerabilitiesFromMongo(databaseName, timeRange, startDate, endDate, offset, limit);
   }
 
-  // 2. Query ke MongoDB Master (Untuk > 7 hari, All, atau jika Redis kosong / fallback)
-  try {
-    const col = await getVulnerabilitiesCollection(databaseName);
-    const docs = await col.find({}).sort({ detected_at: -1 }).toArray();
-
-    return docs.map((doc: any, idx: number) => parseRawVulnerability(doc, `mongo-vuln-${idx + 1}`));
-  } catch (mongoErr: any) {
-    console.error('[DataService] MongoDB query error for vulnerabilities:', mongoErr.message);
-    return [];
-  }
+  // 2. Rentang > 7 hari: HANYA query langsung ke MongoDB Master (tanpa menyentuh Redis)
+  return await fetchVulnerabilitiesFromMongo(databaseName, timeRange, startDate, endDate, offset, limit);
 }
 
 export async function getTenantReports(databaseName: string): Promise<SecurityReport[]> {
@@ -356,8 +525,6 @@ export async function getTenantDevices(databaseName: string): Promise<Device[]> 
       criticalCount: Number(doc.critical_count) || 0,
       highCount: Number(doc.high_count) || 0,
       mediumCount: Number(doc.medium_count) || 0,
-      missingPatches: doc.missing_patches || doc.missingPatches || '0',
-      protection: (doc.protection || (doc.status === 'Online' ? 'Protected' : 'Not Protected')) as any,
     }));
   } catch (err: any) {
     console.error('[DataService] MongoDB query error for devices:', err.message);
@@ -405,10 +572,14 @@ export async function getHistoricalComparisonStats(
       endOfPrev = startOfPrev;
       periodLabel = 'YESTERDAY';
     } else if (lower === 'this week' || lower === '7d') {
-      const s = new Date(now.getTime() - 14 * 24 * 3600 * 1000);
-      const e = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-      startOfPrev = formatDateKey(s);
-      endOfPrev = formatDateKey(e);
+      const dayOfWeek = now.getDay();
+      const diffToMonday = (dayOfWeek + 6) % 7;
+      const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+      const startOfWeek = mondayThisWeek;
+      const prevWeekStart = new Date(startOfWeek.getTime() - 7 * 24 * 3600 * 1000);
+      const prevWeekEnd = new Date(startOfWeek.getTime() - 24 * 3600 * 1000);
+      startOfPrev = formatDateKey(prevWeekStart);
+      endOfPrev = formatDateKey(prevWeekEnd);
       periodLabel = 'LAST WEEK';
     } else if (lower === 'this month' || lower === '30d') {
       const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);

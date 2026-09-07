@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-<<<<<<< Updated upstream
-import { fetchVulnerabilitiesData } from '@/lib/redis-sync';
-=======
+
 import { getTenantVulnerabilities } from '@/lib/data-service';
->>>>>>> Stashed changes
 import { getTenantContext } from '@/lib/tenant-context';
+import { getTimestamp } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +11,7 @@ function formatDate(val: any): string {
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     return `${dateStr} ${timeStr}`;
@@ -23,7 +21,7 @@ function formatDate(val: any): string {
 }
 
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
-  if (!range || range === 'All') return true;
+  if (!range || range.toLowerCase() === 'all') return true;
 
   const rawDate = doc.detected_at || doc.detectionDate || doc.last_seen || doc.first_seen || doc.date || doc.created_at;
   if (!rawDate) return true;
@@ -60,8 +58,10 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   }
 
   if (lower === 'this week' || lower === '7d') {
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return d >= startOfWeek;
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return d >= mondayThisWeek;
   }
 
   if (lower === 'this month' || lower === '30d') {
@@ -85,13 +85,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-<<<<<<< Updated upstream
-    // Get Tenant Context from logged in user session
-    const tenant = getTenantContext(request);
 
-    // Fetch from Redis / MongoDB strictly for this tenant
-    const { data: rawDocs, source } = await fetchVulnerabilitiesData(timeRange, tenant.databaseName, tenant.redisPrefix);
-=======
     // Authenticated Tenant Context
     const tenant = await getTenantContext(request);
     if (!tenant) {
@@ -100,11 +94,22 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
->>>>>>> Stashed changes
+
+
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10));
+    const limit = Math.min(2000, Math.max(1, parseInt(searchParams.get('limit') || '1000', 10)));
 
     // Query vulnerabilities directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
-    const rawDocs = await getTenantVulnerabilities(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
-    let docs = rawDocs;
+    const vulnRes = await getTenantVulnerabilities(
+      tenant.databaseName,
+      tenant.redisPrefix,
+      timeRange,
+      startDate,
+      endDate,
+      offset,
+      limit
+    );
+    let docs = vulnRes.data || [];
 
     if (severity && severity !== 'All') {
       const sevRegex = new RegExp(`^${severity}$`, 'i');
@@ -142,12 +147,7 @@ export async function GET(request: Request) {
       docs = docs.filter((d: any) => matchesTimeRange(d, timeRange, startDate, endDate));
     }
 
-<<<<<<< Updated upstream
-    const vulnerabilities = timeFilteredDocs.map((doc: any) => {
-      const idStr = doc._id ? doc._id.toString() : String(doc.id || Math.random());
-      const rawStatus = String(doc.status || '').trim().toLowerCase();
-      const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
-=======
+
     const mapped = docs.map((doc: any, index: number) => {
       let sev = String(doc.severity || 'Medium');
       sev = sev.charAt(0).toUpperCase() + sev.slice(1).toLowerCase();
@@ -156,7 +156,7 @@ export async function GET(request: Request) {
         String(doc.status).toLowerCase() === 'solved' ||
         String(doc.status).toLowerCase() === 'pass' ||
         String(doc.status).toLowerCase() === 'patched';
->>>>>>> Stashed changes
+
 
       return {
         id: String(doc.id || doc._id || `vuln-${index + 1}`),
@@ -176,14 +176,11 @@ export async function GET(request: Request) {
         impact: doc.impact || '',
         category: doc.category || 'Software',
         classification: doc.category || 'Software',
-<<<<<<< Updated upstream
-        ip: doc.ip || 'N/A',
-        tenant: tenant.campusName
-=======
+
         package: doc.package || '',
         ip: doc.ip || doc.agent_ip || 'N/A',
         tenant: tenant.campusName,
->>>>>>> Stashed changes
+
       };
     });
 
@@ -200,18 +197,22 @@ export async function GET(request: Request) {
       );
     }
 
+    // Ensure strict chronological sort (newest first)
+    result.sort((a: any, b: any) => {
+      const tA = getTimestamp(a.detected_at || a.detectionDate);
+      const tB = getTimestamp(b.detected_at || b.detectionDate);
+      return tB - tA;
+    });
+
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
-<<<<<<< Updated upstream
-      dataSource: source, // 'redis' (1-7d) or 'mongodb' (1 month)
-      total: vulnerabilities.length,
-      data: vulnerabilities
-=======
       data: result,
-      total: result.length,
->>>>>>> Stashed changes
+      total: vulnRes.total,
+      offset: vulnRes.offset,
+      limit: vulnRes.limit,
+      hasMore: vulnRes.hasMore,
     });
   } catch (error: any) {
     console.error('Error fetching vulnerabilities:', error);

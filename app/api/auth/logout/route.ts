@@ -23,10 +23,12 @@ export async function POST(req: NextRequest) {
       'auth_session',
     ];
 
+    const isHttps = process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false;
+
     cookieNames.forEach((name) => {
       response.cookies.set(name, '', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isHttps,
         sameSite: 'lax',
         path: '/',
         maxAge: 0,

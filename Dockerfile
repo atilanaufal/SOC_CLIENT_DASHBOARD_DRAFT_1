@@ -50,6 +50,6 @@ EXPOSE 3000
 
 # Healthcheck to ensure container stability
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/me || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/login || exit 1
 
 CMD ["node", "server.js"]
