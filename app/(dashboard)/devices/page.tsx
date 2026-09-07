@@ -133,7 +133,7 @@ function DevicesContent() {
         });
     } catch (err: any) {
       console.error('Error fetching live devices from API:', err);
-      setError(err.message || 'Gagal memuat perangkat dari database.');
+      setError(err.message || 'Failed to load devices from database.');
       setLoading(false);
     }
   };
@@ -159,13 +159,13 @@ function DevicesContent() {
     return [
       {
         key: 'status',
-        label: 'Status Perangkat',
+        label: 'Device Status',
         type: 'buttons',
         options: rawStatuses.length ? rawStatuses : ['Online', 'Offline'],
       },
       {
         key: 'os',
-        label: 'Sistem Operasi (OS)',
+        label: 'Operating System (OS)',
         type: 'select',
         options: rawOs.length ? rawOs : ['Ubuntu', 'Windows', 'Debian'],
       },
@@ -346,7 +346,7 @@ function DevicesContent() {
                     <span className="truncate">{seg.label}</span> ({seg.value})
                   </span>
                 ))}
-                {osChartSegments.length === 0 && <span className="text-gray-400 font-normal">Tidak ada data OS</span>}
+                {osChartSegments.length === 0 && <span className="text-gray-400 font-normal">No OS data available</span>}
               </div>
             </div>
           </div>
@@ -484,11 +484,11 @@ function DevicesContent() {
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
           {loading ? (
             <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
-              Memuat perangkat...
+              Loading devices...
             </div>
           ) : filteredDevices.length === 0 ? (
             <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
-              Tidak ada perangkat yang sesuai dengan filter atau pencarian.
+              No devices found matching the filter or search criteria.
             </div>
           ) : (
             <>
@@ -712,7 +712,7 @@ function DevicesContent() {
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        title="Filter Perangkat"
+        title="Filter Devices"
         sections={dynamicFilterSections}
         initialFilters={activeFilters}
         onApply={handleApplyFilters}

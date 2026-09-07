@@ -161,7 +161,7 @@ function VulnerabilitiesContent() {
     } catch (err: any) {
       if (cycleIdRef.current === currentCycle) {
         console.error('Error fetching server-side vulnerabilities:', err);
-        setError(err.message || 'Gagal memuat data kerentanan dari database.');
+        setError(err.message || 'Failed to load vulnerability data from database.');
         setLoading(false);
       }
     }
@@ -189,14 +189,12 @@ function VulnerabilitiesContent() {
     const severities = ['Critical', 'High', 'Medium', 'Low'];
     const statuses = ['Active', 'Solved'];
     const agents = filterOptions.agents || [];
-    const categories = filterOptions.categories || [];
     const names = filterOptions.vulnerabilities || [];
 
     return [
       { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities },
       { key: 'status', label: 'Status', type: 'buttons', options: statuses },
       { key: 'agent', label: 'Agent', type: 'select', options: agents },
-      { key: 'category', label: 'Category', type: 'select', options: categories },
       { key: 'vulnerability', label: 'Vulnerability Name', type: 'select', options: names },
     ];
   }, [filterOptions]);
@@ -406,24 +404,6 @@ function VulnerabilitiesContent() {
                   }}
                   className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove agent filter"
-                >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
-              </span>
-            )}
-            {activeFilters.category && activeFilters.category !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-purple-800 border-2 border-purple-500/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(147,51,234,0.12)]">
-                <span>Category: <strong className="text-purple-800 font-black">{activeFilters.category}</strong></span>
-                <button
-                  onClick={() => {
-                    setActiveFilters((prev) => {
-                      const next = { ...prev };
-                      delete next.category;
-                      return next;
-                    });
-                  }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
-                  title="Remove category filter"
                 >
                   <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>

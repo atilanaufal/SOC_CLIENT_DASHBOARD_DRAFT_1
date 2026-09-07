@@ -1,5 +1,0 @@
-2026-09-07 12:06:23 +07:00: npm notice run asoc-dashboard@0.1.0 start
-2026-09-07 12:06:23 +07:00: npm notice run next start -H 0.0.0.0
-2026-09-07 12:06:23 +07:00:  ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
-2026-09-07 12:06:24 +07:00: (node:101070) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
-2026-09-07 12:06:24 +07:00: (Use `node --trace-warnings ...` to show where the warning was created)
