@@ -170,6 +170,18 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
     return matched.join('\n');
   }, [displayedLog, logSearchQuery]);
 
+  const incidentTypeDisplay = useMemo(() => {
+    if (!incident) return 'N/A';
+    if (Array.isArray(incident.incident_type)) {
+      const joined = incident.incident_type.filter(Boolean).join(', ');
+      return joined || 'N/A';
+    }
+    if (incident.incident_type && typeof incident.incident_type === 'string' && incident.incident_type.trim()) {
+      return incident.incident_type.trim();
+    }
+    return 'N/A';
+  }, [incident]);
+
   const handleCopyLog = () => {
     navigator.clipboard.writeText(displayedLog);
     setCopied(true);
@@ -190,17 +202,6 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   if (!isOpen || !incident) return null;
 
   const ruleIdDisplay = incident.rule_id || incident.ruleId || 'N/A';
-  const incidentTypeDisplay = useMemo(() => {
-    if (!incident) return 'N/A';
-    if (Array.isArray(incident.incident_type)) {
-      const joined = incident.incident_type.filter(Boolean).join(', ');
-      return joined || 'N/A';
-    }
-    if (incident.incident_type && typeof incident.incident_type === 'string' && incident.incident_type.trim()) {
-      return incident.incident_type.trim();
-    }
-    return 'N/A';
-  }, [incident]);
   const countDisplay = incident.count !== undefined ? incident.count : 1;
   const parts = (incident.firstObserved || '').split(' ');
   const firstDate = parts.slice(0, 3).join(' ');
