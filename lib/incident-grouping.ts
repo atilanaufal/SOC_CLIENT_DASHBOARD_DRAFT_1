@@ -107,9 +107,8 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
   const rawFirst = doc.first_observed || doc.firstObserved || doc.date || '';
   const uniqueId = String(doc.id || doc._id || `alert_${index + 1}_${rawFirst}`);
 
-  const incName = Array.isArray(doc.incident_type)
-    ? doc.incident_type.join(', ')
-    : (doc.incident_type || doc.incidentName || doc.description || (doc.rule_id || doc.ruleId ? `Rule ${doc.rule_id || doc.ruleId}` : 'Security Event'));
+  // Alert name uses field description as primary source, not incident_type
+  const incName = doc.description || doc.incidentName || (doc.rule_id || doc.ruleId ? `Rule ${doc.rule_id || doc.ruleId}` : 'Security Event');
 
   return {
     id: uniqueId,
@@ -201,9 +200,8 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
     const agentId = representativeAlert.agent_id ? String(representativeAlert.agent_id) : '';
     const dateStr = extractAlertDate(representativeAlert);
 
-    const incName = Array.isArray(representativeAlert.incident_type)
-      ? representativeAlert.incident_type.join(', ')
-      : (representativeAlert.incident_type || representativeAlert.incidentName || representativeAlert.description || (ruleId ? `Rule ${ruleId}` : 'Security Event'));
+    // Name uses field description as primary source, not incident_type
+    const incName = representativeAlert.description || representativeAlert.incidentName || (ruleId ? `Rule ${ruleId}` : 'Security Event');
 
     const rawFirstDate = earliestAlert.first_observed || earliestAlert.firstObserved || earliestAlert.date || earliestAlert.created_at;
     const rawLastDate = latestAlert.first_observed || latestAlert.firstObserved || latestAlert.last_observed || latestAlert.lastObserved || latestAlert.date || latestAlert.created_at;

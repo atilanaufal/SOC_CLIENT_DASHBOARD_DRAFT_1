@@ -98,7 +98,7 @@ export const GroupByModal: React.FC<GroupByModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-gray-600 font-medium leading-relaxed mt-1">
-                Displays pure individual alert events directly from the database (1 row = 1 alert, without count or last observed).
+                Displays pure individual alert events directly.
               </p>
             </div>
           </div>

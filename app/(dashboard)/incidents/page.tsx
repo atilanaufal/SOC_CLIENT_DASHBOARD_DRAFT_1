@@ -689,10 +689,8 @@ function IncidentsContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 text-[#0066B1] font-semibold">{inc.agent}</td>
                           {groupByMode === 'incidents' && (
-                            <td className="py-3 px-3.5 xl:px-4 font-bold">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-blue-50 text-[#002B9A] border border-blue-200/80">
-                                {inc.count || 1}
-                              </span>
+                            <td className="py-3 px-3.5 xl:px-4 font-bold text-gray-900">
+                              {inc.count || 1}
                             </td>
                           )}
                           <td className="py-3 px-3.5 xl:px-4">

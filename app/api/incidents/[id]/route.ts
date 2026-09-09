@@ -108,14 +108,8 @@ export async function GET(
     }
 
     const idStr = doc._id.toString();
-    let incType = '';
-    if (Array.isArray(doc.incident_type)) {
-      incType = doc.incident_type.join(', ');
-    } else if (typeof doc.incident_type === 'string' && doc.incident_type) {
-      incType = doc.incident_type;
-    } else {
-      incType = doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert';
-    }
+    // Alert name uses field description as primary source, not incident_type
+    const incType = doc.description || doc.incidentName || (doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert');
     const incident = {
       id: idStr,
       _id: idStr,

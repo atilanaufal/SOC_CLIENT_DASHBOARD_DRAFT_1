@@ -61,9 +61,8 @@ export function isQueryForRecentDays(
  * Parser aman untuk dokumen/hash incident dari Redis maupun MongoDB
  */
 function parseRawIncident(h: any, fallbackId: string): Incident {
-  const incName = Array.isArray(h.incident_type)
-    ? h.incident_type.join(', ')
-    : (h.incident_type || h.incidentName || h.description || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event'));
+  // Name uses field description as primary source, not incident_type
+  const incName = h.description || h.incidentName || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event');
 
   const firstObs = h.first_observed || h.last_observed || h.date || h.created_at || new Date().toISOString();
   const lastObs = h.last_observed || h.first_observed || firstObs;
