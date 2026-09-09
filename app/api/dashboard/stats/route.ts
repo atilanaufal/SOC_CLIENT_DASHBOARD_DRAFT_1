@@ -203,7 +203,7 @@ export async function GET(request: Request) {
 
       targetAgents.forEach((agentKey) => {
         const st = agentSeverityMap[agentKey] || { critical: 0, high: 0, medium: 0 };
-        const agentScore = Math.min(100, st.critical * 10 + st.high * 6 + st.medium * 3);
+        const agentScore = Math.min(100, st.critical * 6 + st.high * 3 + st.medium * 1);
         sumAgentScores += agentScore;
       });
 

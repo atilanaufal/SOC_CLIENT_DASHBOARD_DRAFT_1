@@ -146,7 +146,7 @@ export async function GET(request: Request) {
     });
 
     tempMap.forEach((stats, key) => {
-      const rawScore = stats.critical * 10 + stats.high * 6 + stats.medium * 3;
+      const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
       const score = Math.min(100, rawScore);
       const cat = getRiskCategory(score);
 
