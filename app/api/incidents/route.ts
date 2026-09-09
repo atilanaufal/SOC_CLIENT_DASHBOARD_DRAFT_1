@@ -127,7 +127,7 @@ function extractFullLogs(doc: any): string {
       dstip: doc.destIp || doc.ip_destination || '',
       count: doc.count || 1,
       affected_file: doc.affected_file || '',
-      incident_type: doc.incidentName || '',
+      incident_type: doc.incident_type ? (Array.isArray(doc.incident_type) ? doc.incident_type.join(', ') : String(doc.incident_type)) : (doc.incidentName || ''),
     },
     full_log: `${doc.firstObserved || new Date().toISOString()} ${doc.host || doc.agent || ''} ossec: Alert [${doc.ruleId || doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incidentName || ''}`,
 

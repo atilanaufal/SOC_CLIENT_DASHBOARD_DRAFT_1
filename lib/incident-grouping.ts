@@ -99,6 +99,14 @@ export function extractFullLogs(doc: any): string {
   return JSON.stringify(rawObj, null, 2);
 }
 
+export function formatIncidentType(val: any): string {
+  if (!val) return '';
+  if (Array.isArray(val)) {
+    return val.filter(Boolean).join(', ');
+  }
+  return String(val).trim();
+}
+
 /**
  * Maps a single pure alert into Incident format (no count, no lastObserved)
  */
@@ -107,13 +115,16 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
   const rawFirst = doc.first_observed || doc.firstObserved || doc.date || '';
   const uniqueId = String(doc.id || doc._id || `alert_${index + 1}_${rawFirst}`);
 
+  const rawIncType = formatIncidentType(doc.incident_type);
+
   // Alert name uses field description as primary source, not incident_type
-  const incName = doc.description || doc.incidentName || (doc.rule_id || doc.ruleId ? `Rule ${doc.rule_id || doc.ruleId}` : 'Security Event');
+  const incName = doc.description || rawIncType || (doc.rule_id || doc.ruleId ? `Rule ${doc.rule_id || doc.ruleId}` : 'Security Event');
 
   return {
     id: uniqueId,
     _id: uniqueId,
     incidentName: incName,
+    incident_type: rawIncType,
     severity: docSeverity,
     agent: doc.host || doc.agent || (doc.agent_id ? `Agent ${doc.agent_id}` : ''),
     host: doc.host || doc.agent || '',
@@ -122,7 +133,7 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
     // Pure alert: NO count and NO lastObserved
     lastObserved: undefined,
     count: undefined,
-    description: doc.description || incName,
+    description: doc.description || '',
     mitre: doc.mitre || doc.mitre_technique || doc.mitre_id || '',
     mitre_id: doc.mitre_id || '',
     mitre_tactic: doc.mitre_tactic || '',
@@ -200,8 +211,10 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
     const agentId = representativeAlert.agent_id ? String(representativeAlert.agent_id) : '';
     const dateStr = extractAlertDate(representativeAlert);
 
-    // Name uses field description as primary source, not incident_type
-    const incName = representativeAlert.description || representativeAlert.incidentName || (ruleId ? `Rule ${ruleId}` : 'Security Event');
+    const rawIncType = formatIncidentType(representativeAlert.incident_type);
+
+    // Grouped incidents use incident_type as primary source for Incident Name (not description!)
+    const incName = rawIncType || (ruleId ? `Rule ${ruleId}` : 'Security Event');
 
     const rawFirstDate = earliestAlert.first_observed || earliestAlert.firstObserved || earliestAlert.date || earliestAlert.created_at;
     const rawLastDate = latestAlert.first_observed || latestAlert.firstObserved || latestAlert.last_observed || latestAlert.lastObserved || latestAlert.date || latestAlert.created_at;
@@ -218,6 +231,7 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
       id: groupId,
       _id: groupId,
       incidentName: incName,
+      incident_type: rawIncType,
       severity: highestSeverity,
       agent: agentName,
       host: representativeAlert.host || representativeAlert.agent || '',
@@ -228,7 +242,7 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
       lastObserved: formatStandardDate(rawLastDate),
       date: dateStr,
       count: alerts.length,
-      description: representativeAlert.description || incName,
+      description: representativeAlert.description || '',
       mitre: representativeAlert.mitre || representativeAlert.mitre_technique || representativeAlert.mitre_id || '',
       mitre_id: representativeAlert.mitre_id || '',
       mitre_tactic: representativeAlert.mitre_tactic || '',

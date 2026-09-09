@@ -134,7 +134,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
         srcip: incident.sourceIp || incident.agent_ip || 'N/A',
         dstip: incident.destIp || incident.ip_destination || 'N/A',
         count: incident.count || 1,
-        incident_type: incident.incidentName,
+        incident_type: Array.isArray(incident.incident_type) ? incident.incident_type.join(', ') : (incident.incident_type || 'N/A'),
         affected_file: incident.affected_file || null,
       },
       raw_log: `${incident.firstObserved || new Date().toISOString()} ${incident.host || 'Agent'} ossec: Alert [${incident.rule_id || incident.ruleId || 'N/A'}] (${incident.severity || 'Medium'}): ${incident.description || incident.incidentName}`,
@@ -190,6 +190,17 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   if (!isOpen || !incident) return null;
 
   const ruleIdDisplay = incident.rule_id || incident.ruleId || 'N/A';
+  const incidentTypeDisplay = useMemo(() => {
+    if (!incident) return 'N/A';
+    if (Array.isArray(incident.incident_type)) {
+      const joined = incident.incident_type.filter(Boolean).join(', ');
+      return joined || 'N/A';
+    }
+    if (incident.incident_type && typeof incident.incident_type === 'string' && incident.incident_type.trim()) {
+      return incident.incident_type.trim();
+    }
+    return 'N/A';
+  }, [incident]);
   const countDisplay = incident.count !== undefined ? incident.count : 1;
   const parts = (incident.firstObserved || '').split(' ');
   const firstDate = parts.slice(0, 3).join(' ');
@@ -245,9 +256,9 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             </div>
             <div>
               <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">
-                {isGrouped ? 'Incident Type' : 'Alert Type'}
+                Incident Type
               </p>
-              <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{incident.incidentName}</p>
+              <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{incidentTypeDisplay}</p>
             </div>
           </div>
 

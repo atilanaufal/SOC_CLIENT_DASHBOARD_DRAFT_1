@@ -108,19 +108,22 @@ export async function GET(
     }
 
     const idStr = doc._id.toString();
-    // Alert name uses field description as primary source, not incident_type
-    const incType = doc.description || doc.incidentName || (doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert');
+    const rawIncType = doc.incident_type
+      ? (Array.isArray(doc.incident_type) ? doc.incident_type.join(', ') : String(doc.incident_type))
+      : '';
+    const incName = rawIncType || doc.description || (doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert');
     const incident = {
       id: idStr,
       _id: idStr,
-      incidentName: incType,
+      incidentName: incName,
+      incident_type: rawIncType,
       severity: parseSeverity(doc.severity),
       agent: doc.agent_id || doc.host || doc.agent || '',
       agentsList: [doc.agent_id || doc.host || doc.agent || ''],
       host: doc.host || doc.agent_id || doc.agent || '',
       firstObserved: formatDate(doc.first_observed),
       lastObserved: formatDate(doc.last_observed || doc.first_observed),
-      description: doc.description || incType || '',
+      description: doc.description || '',
       mitre: doc.mitre_id ? `${doc.mitre_id}` : (Array.isArray(doc.mitre_technique) ? doc.mitre_technique.join(', ') : (doc.mitre_technique || '')),
       mitre_id: doc.mitre_id || '',
       mitre_tactic: doc.mitre_tactic || '',

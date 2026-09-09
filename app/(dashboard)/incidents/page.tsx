@@ -151,7 +151,7 @@ function IncidentsContent() {
       },
       {
         key: 'incidentName',
-        label: 'Incident Type / Name',
+        label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
         type: 'select',
         options: incidentNames,
       },
@@ -162,13 +162,14 @@ function IncidentsContent() {
         options: agents,
       },
     ];
-  }, [incidents]);
+  }, [incidents, groupByMode]);
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
       const matchesSearch =
         !searchTerm.trim() ||
         inc.incidentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (inc.incident_type && String(inc.incident_type).toLowerCase().includes(searchTerm.toLowerCase())) ||
         inc.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (inc.description && inc.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (inc.ruleId && inc.ruleId.toLowerCase().includes(searchTerm.toLowerCase()));

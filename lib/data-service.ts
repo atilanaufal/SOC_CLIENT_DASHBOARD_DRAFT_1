@@ -61,8 +61,11 @@ export function isQueryForRecentDays(
  * Parser aman untuk dokumen/hash incident dari Redis maupun MongoDB
  */
 function parseRawIncident(h: any, fallbackId: string): Incident {
-  // Name uses field description as primary source, not incident_type
-  const incName = h.description || h.incidentName || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event');
+  const rawIncType = Array.isArray(h.incident_type)
+    ? h.incident_type.filter(Boolean).join(', ')
+    : (h.incident_type ? String(h.incident_type).trim() : '');
+
+  const incName = rawIncType || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event');
 
   const firstObs = h.first_observed || h.last_observed || h.date || h.created_at || new Date().toISOString();
   const lastObs = h.last_observed || h.first_observed || firstObs;
@@ -100,7 +103,7 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     id: uniqueId,
     _id: uniqueId,
     incidentName: incName,
-    incident_type: h.incident_type || incName,
+    incident_type: rawIncType,
     severity: (h.severity || 'Medium') as any,
     agent: hostName,
     agentsList: [hostName || 'Agent'],
@@ -111,7 +114,7 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     lastObserved: lastObs,
     last_observed: lastObs,
     date: h.date || (typeof firstObs === 'string' ? firstObs.split('T')[0]?.split(' ')[0] : undefined),
-    description: h.description || (Array.isArray(h.incident_type) ? h.incident_type.join(', ') : h.incident_type) || incName,
+    description: h.description || '',
     mitre: mitreTechnique,
     mitre_id: mitreId,
     mitre_tactic: mitreTactic,
