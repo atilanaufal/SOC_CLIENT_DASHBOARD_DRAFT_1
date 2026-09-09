@@ -4,11 +4,13 @@ import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
+import { parseCustomDate } from '@/lib/date-utils';
+
 function formatDate(val: any): string {
   if (!val) return 'N/A';
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
+    const d = parseCustomDate(val);
+    if (!d || isNaN(d.getTime())) return String(val);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -127,7 +129,7 @@ export async function GET(request: Request) {
         soc_id: doc.soc_id,
         severity: doc.severity || 'Unspecified',
         dateGenerated: formatDate(rawDate),
-        date_generated: rawDate ? String(rawDate) : undefined,
+        date_generated: rawDate ? (rawDate instanceof Date ? rawDate.toISOString() : String(rawDate)) : undefined,
         lastUpdated: formatDate(doc.synced_at || rawDate),
         synced_at: doc.synced_at ? String(doc.synced_at) : undefined,
         summary: doc.summary || 'No summary description provided.',

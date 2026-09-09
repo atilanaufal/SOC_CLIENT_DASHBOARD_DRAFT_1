@@ -3,18 +3,20 @@ import { getReportsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
 
-import { getTenantIncidents, queryServerSideVulnerabilities, getHistoricalComparisonStats } from '@/lib/data-service';
+import { getTenantIncidents, getTenantIncidentsWithSource, queryServerSideVulnerabilities, getHistoricalComparisonStats, getWeeklyHistoricalKpiFromRedis } from '@/lib/data-service';
 
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
+import { groupAlertsToIncidents } from '@/lib/incident-grouping';
+import { getTimestamp, parseCustomDate } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
 function formatDate(val: any): string {
   if (!val) return 'N/A';
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
+    const d = parseCustomDate(val);
+    if (!d || isNaN(d.getTime())) return String(val);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -29,7 +31,7 @@ function getTimeRangeBounds(range: string, startDateParam?: string | null, endDa
   const lower = (range || 'today').toLowerCase();
 
   let startOfCurrent: Date;
-  let endOfCurrent: Date = now;
+  let endOfCurrent: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
   let startOfPrevious: Date;
   let endOfPrevious: Date;
@@ -50,34 +52,38 @@ function getTimeRangeBounds(range: string, startDateParam?: string | null, endDa
       startOfCurrent = new Date(`${sStr}T00:00:00.000`);
       endOfCurrent = new Date(`${eStr}T23:59:59.999`);
       if (isNaN(startOfCurrent.getTime())) startOfCurrent = new Date(0);
-      if (isNaN(endOfCurrent.getTime())) endOfCurrent = now;
+      if (isNaN(endOfCurrent.getTime())) endOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
       const durationMs = Math.max(1, endOfCurrent.getTime() - startOfCurrent.getTime());
       startOfPrevious = new Date(startOfCurrent.getTime() - durationMs);
       endOfPrevious = new Date(startOfCurrent.getTime() - 1);
       periodLabel = 'PREVIOUS PERIOD';
     } else {
-      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      endOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
       endOfPrevious = startOfCurrent;
       periodLabel = 'PREVIOUS PERIOD';
     }
   } else if (lower === 'today') {
-    startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    endOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
     endOfPrevious = startOfCurrent;
     periodLabel = 'YESTERDAY';
   } else if (lower === 'this week' || lower === '7d') {
     const dayOfWeek = now.getDay();
     const diffToMonday = (dayOfWeek + 6) % 7;
-    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
     startOfCurrent = mondayThisWeek;
+    endOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     startOfPrevious = new Date(startOfCurrent.getTime() - 7 * 24 * 60 * 60 * 1000);
     endOfPrevious = startOfCurrent;
     periodLabel = 'LAST WEEK';
   } else if (lower === 'this month' || lower === '30d') {
-    startOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
-    startOfPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    startOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    endOfCurrent = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    startOfPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
     endOfPrevious = startOfCurrent;
     periodLabel = 'LAST MONTH';
   } else {
@@ -94,8 +100,7 @@ function getTimeRangeBounds(range: string, startDateParam?: string | null, endDa
 function getDocDate(doc: any): Date | null {
   const raw = doc.last_observed || doc.lastObserved || doc.first_observed || doc.firstObserved || doc.detected_at || doc.detectionDate || doc.date_generated || doc.date || doc.created_at;
   if (!raw) return null;
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? null : d;
+  return parseCustomDate(raw);
 }
 
 export async function GET(request: Request) {
@@ -127,9 +132,9 @@ export async function GET(request: Request) {
     let rawIncidents: any[] = [];
     let dataSource: string = 'mongodb';
     try {
-      rawIncidents = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
-      dataSource = 'redis-or-mongodb';
-
+      const res = await getTenantIncidentsWithSource(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
+      rawIncidents = res.incidents;
+      dataSource = res.source;
     } catch (err: any) {
       console.warn('[API /api/dashboard/stats] Incidents fetch fallback:', err.message);
     }
@@ -201,7 +206,7 @@ export async function GET(request: Request) {
 
       targetAgents.forEach((agentKey) => {
         const st = agentSeverityMap[agentKey] || { critical: 0, high: 0, medium: 0 };
-        const agentScore = Math.min(100, st.critical * 10 + st.high * 6 + st.medium * 3);
+        const agentScore = Math.min(100, st.critical * 6 + st.high * 3 + st.medium * 1);
         sumAgentScores += agentScore;
       });
 
@@ -219,8 +224,8 @@ export async function GET(request: Request) {
 
     const currentStats = calculateDashboardMetrics(currentIncidents);
 
-    // Query comparison data directly from historical_statistics collection in MongoDB
-    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeFilter, startDate, endDate);
+    // Query comparison data directly from Redis Cache or historical_statistics collection in MongoDB
+    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeFilter, startDate, endDate, tenant.redisPrefix);
 
     const previousStats = histComp.found
       ? {
@@ -244,47 +249,25 @@ export async function GET(request: Request) {
     const riskLastMonth = Number(Number(previousStats.score || 0).toFixed(1));
 
 
-    // 3. Top Incidents for this tenant (list distinct recent incidents per severity, sorted by latest date)
-    const seenIncidentSignatures = new Set<string>();
-    const topIncidents: any[] = [];
-
-    currentIncidents.forEach((inc, index) => {
-      const incType = Array.isArray(inc.incident_type || inc.incidentName)
-        ? (inc.incident_type || inc.incidentName).join(', ')
-        : (inc.incident_type || inc.incidentName || inc.description || (inc.rule_id || inc.ruleId ? `Rule ${inc.rule_id || inc.ruleId}` : 'Security Alert'));
-      const name = incType || inc.description || `Rule ${inc.rule_id || inc.ruleId}`;
-
-      const agentName = inc.host || inc.agent || (inc.agent_id ? `Agent ${inc.agent_id}` : 'Agent');
-      const sev = parseSeverity(inc.severity);
-
-      const rawDateVal = inc.last_observed || inc.first_observed || inc.lastObserved || inc.firstObserved || inc.date;
-      const dateFormatted = formatDate(rawDateVal);
-      const rawTimestamp = rawDateVal ? new Date(rawDateVal).getTime() : 0;
-
-      const incCount = typeof inc.count === 'number' && inc.count > 0 ? inc.count : 1;
-
-      // Unique signature to deduplicate identical snapshots
-      const sig = `${name}:::${dateFormatted}:::${agentName}:::${sev.toLowerCase()}`;
-      if (seenIncidentSignatures.has(sig)) {
-        return;
-
-      }
-      seenIncidentSignatures.add(sig);
-
-      topIncidents.push({
-        id: String(inc._id || inc.id || `top-inc-${index + 1}_${rawTimestamp}`),
-        incidentName: name,
-        severity: sev,
-        agent: agentName,
-        agentsList: inc.agentsList && inc.agentsList.length > 0 ? inc.agentsList : [agentName],
-        host: agentName,
-        count: incCount,
-        firstObserved: formatDate(inc.first_observed || inc.firstObserved || rawDateVal),
-        lastObserved: dateFormatted,
-        rawDate: rawTimestamp,
-        ruleId: inc.rule_id || inc.ruleId ? String(inc.rule_id || inc.ruleId) : 'N/A',
+    // 3. Top Incidents for this tenant (automatically grouped by (rule_id, agent_id, ip_source, date))
+    const groupedList = groupAlertsToIncidents(currentIncidents, tenant.campusName);
+    const topIncidents = groupedList.map((inc, index) => {
+      const ts = getTimestamp(inc.lastObserved || inc.firstObserved || inc.date);
+      return {
+        id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
+        incidentName: inc.incidentName,
+        incident_type: inc.incident_type,
+        severity: inc.severity,
+        agent: inc.agent,
+        agentsList: [inc.agent],
+        host: inc.host || inc.agent,
+        count: inc.count || 1,
+        firstObserved: inc.firstObserved,
+        lastObserved: inc.lastObserved,
+        rawDate: ts,
+        ruleId: inc.ruleId || 'N/A',
         tenant: tenant.campusName,
-      });
+      };
     });
 
     topIncidents.sort((a, b) => b.rawDate - a.rawDate);
@@ -368,6 +351,7 @@ export async function GET(request: Request) {
       dataSource: {
         devices: deviceSource,
         incidents: dataSource,
+        historicalStats: histComp.source || 'mongodb',
       },
       data: {
         devices: {

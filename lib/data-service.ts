@@ -61,12 +61,30 @@ export function isQueryForRecentDays(
  * Parser aman untuk dokumen/hash incident dari Redis maupun MongoDB
  */
 function parseRawIncident(h: any, fallbackId: string): Incident {
-  const incName = Array.isArray(h.incident_type)
-    ? h.incident_type.join(', ')
-    : (h.incident_type || h.incidentName || h.description || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event'));
+  const rawIncType = Array.isArray(h.incident_type)
+    ? h.incident_type.filter(Boolean).join(', ')
+    : (h.incident_type ? String(h.incident_type).trim() : '');
 
-  const firstObs = h.first_observed || h.last_observed || h.date || h.created_at || new Date().toISOString();
-  const lastObs = h.last_observed || h.first_observed || firstObs;
+  const incName = rawIncType || (h.rule_id || h.ruleId ? `Rule ${h.rule_id || h.ruleId}` : 'Security Event');
+
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const toLocalString = (v: any) => {
+    if (!v) return '';
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return '';
+      const y = v.getUTCFullYear();
+      const m = pad2(v.getUTCMonth() + 1);
+      const d = pad2(v.getUTCDate());
+      const hr = pad2(v.getUTCHours());
+      const mn = pad2(v.getUTCMinutes());
+      const sc = pad2(v.getUTCSeconds());
+      const ms = String(v.getUTCMilliseconds()).padStart(3, '0');
+      return `${y}-${m}-${d} ${hr}:${mn}:${sc}.${ms}`;
+    }
+    return String(v);
+  };
+  const firstObs = toLocalString(h.first_observed || h.last_observed || h.date || h.created_at) || new Date().toISOString();
+  const lastObs = toLocalString(h.last_observed || h.first_observed) || firstObs;
 
   const mitreTechnique = Array.isArray(h.mitre_technique)
     ? h.mitre_technique.join(', ')
@@ -101,7 +119,7 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     id: uniqueId,
     _id: uniqueId,
     incidentName: incName,
-    incident_type: h.incident_type || incName,
+    incident_type: rawIncType,
     severity: (h.severity || 'Medium') as any,
     agent: hostName,
     agentsList: [hostName || 'Agent'],
@@ -112,7 +130,7 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     lastObserved: lastObs,
     last_observed: lastObs,
     date: h.date || (typeof firstObs === 'string' ? firstObs.split('T')[0]?.split(' ')[0] : undefined),
-    description: h.description || (Array.isArray(h.incident_type) ? h.incident_type.join(', ') : h.incident_type) || incName,
+    description: h.description || '',
     mitre: mitreTechnique,
     mitre_id: mitreId,
     mitre_tactic: mitreTactic,
@@ -176,7 +194,17 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
     cveId: cve || 'N/A',
     cve: cve || 'N/A',
     detectionDate: formatDateReadable(detectDate),
-    detected_at: String(detectDate),
+    detected_at: (detectDate instanceof Date ? (() => {
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const y = detectDate.getUTCFullYear();
+      const m = pad2(detectDate.getUTCMonth() + 1);
+      const d = pad2(detectDate.getUTCDate());
+      const hr = pad2(detectDate.getUTCHours());
+      const mn = pad2(detectDate.getUTCMinutes());
+      const sc = pad2(detectDate.getUTCSeconds());
+      const ms = String(detectDate.getUTCMilliseconds()).padStart(3, '0');
+      return `${y}-${m}-${d} ${hr}:${mn}:${sc}.${ms}`;
+    })() : String(detectDate)),
     status: (isSolved ? 'Solved' : 'Not Patched') as any,
     currentVersion: pkgVersion,
     version: pkgVersion,
@@ -190,14 +218,104 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
 }
 
 /**
+ * Menentukan tanggal-tanggal target spesifik untuk query Redis In-Memory Cache
+ */
+function getTargetDatesForRange(
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): string[] {
+  const lower = (timeRange || 'today').toLowerCase().trim();
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formatDateOnly = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (lower === 'today') {
+    return [formatDateOnly(now)];
+  }
+
+  if (lower === 'yesterday') {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return [formatDateOnly(y)];
+  }
+
+  if (lower === 'this week' || lower === '7d') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const dates: string[] = [];
+    const cur = new Date(monday);
+    while (cur <= now) {
+      dates.push(formatDateOnly(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+
+  if (lower === 'last week') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const lastMonday = new Date(thisMonday.getTime() - 7 * 24 * 3600 * 1000);
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(lastMonday.getTime() + i * 24 * 3600 * 1000);
+      dates.push(formatDateOnly(d));
+    }
+    return dates;
+  }
+
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+    if (sStr && eStr) {
+      const start = new Date(`${sStr}T00:00:00.000`);
+      const end = new Date(`${eStr}T23:59:59.999`);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const dates: string[] = [];
+        const cur = new Date(start);
+        while (cur <= end) {
+          dates.push(formatDateOnly(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+        return dates;
+      }
+    }
+  }
+
+  return [];
+}
+
+/**
  * Mengambil data insiden dari Redis Cache (<cleanPrefix>:incident:*)
  */
-async function fetchIncidentsFromRedis(databaseName: string, redisPrefix: string): Promise<Incident[]> {
+async function fetchIncidentsFromRedis(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<Incident[]> {
   try {
     const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
     const redis = await getActiveRedisClient();
     if (redis) {
-      const keys = await redis.keys(`${cleanPrefix}:incident:*`);
+      const targetDates = getTargetDatesForRange(timeRange, startDate, endDate);
+      let keys: string[] = [];
+      if (targetDates && targetDates.length > 0) {
+        keys = targetDates.map((d) => `${cleanPrefix}:incident:${d}`);
+      } else {
+        keys = await redis.keys(`${cleanPrefix}:incident:*`);
+      }
+
       if (keys && keys.length > 0) {
         const pipeline = redis.pipeline();
         for (const key of keys) {
@@ -249,7 +367,73 @@ function buildMongoDateFilter(
   const lower = (timeRange || '').toLowerCase().trim();
   const now = new Date();
 
+  const makeRange = (start: Date, end?: Date) => {
+    const dateCond: any = { $gte: start };
+    const strIsoCond: any = { $gte: start.toISOString() };
+    if (end) {
+      dateCond.$lte = end;
+      strIsoCond.$lte = end.toISOString();
+    }
+    return {
+      $or: [
+        { [dateField]: dateCond },
+        { [dateField]: strIsoCond }
+      ]
+    };
+  };
+
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+    if (sStr && eStr) {
+      const start = new Date(`${sStr}T00:00:00.000`);
+      const end = new Date(`${eStr}T23:59:59.999`);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        return makeRange(start, end);
+      }
+    }
+    return {};
+  }
+
+  if (lower === 'today') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return makeRange(startOfToday, endOfToday);
+  }
+
+  if (lower === 'this week' || lower === '7d') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
+    return makeRange(mondayThisWeek);
+  }
+
+  if (lower === 'this month' || lower === '30d') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    return makeRange(startOfMonth);
+  }
+
+  return {};
+}
+
+function buildMongoIncidentFilter(
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Record<string, any> {
+  const lower = (timeRange || '').toLowerCase().trim();
+  const now = new Date();
+
   const pad = (n: number) => String(n).padStart(2, '0');
+  const formatDateOnly = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const formatDateTime = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
@@ -267,11 +451,14 @@ function buildMongoDateFilter(
       const start = new Date(`${sStr}T00:00:00.000`);
       const end = new Date(`${eStr}T23:59:59.999`);
       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const sDateStr = formatDateOnly(start);
+        const eDateStr = formatDateOnly(end);
         return {
-          [dateField]: {
-            $gte: formatDateTime(start),
-            $lte: formatDateTime(end),
-          },
+          $or: [
+            { date: { $gte: sDateStr, $lte: eDateStr } },
+            { first_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } },
+            { last_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } }
+          ]
         };
       }
     }
@@ -280,8 +467,16 @@ function buildMongoDateFilter(
 
   if (lower === 'today') {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const todayDateStr = formatDateOnly(startOfToday);
     return {
-      [dateField]: { $gte: formatDateTime(startOfToday) },
+      $or: [
+        { date: todayDateStr },
+        { first_observed: { $gte: startOfToday, $lte: endOfToday } },
+        { first_observed: { $gte: formatDateTime(startOfToday) } },
+        { last_observed: { $gte: startOfToday, $lte: endOfToday } },
+        { last_observed: { $gte: formatDateTime(startOfToday) } }
+      ]
     };
   }
 
@@ -289,15 +484,29 @@ function buildMongoDateFilter(
     const dayOfWeek = now.getDay();
     const diffToMonday = (dayOfWeek + 6) % 7;
     const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
+    const mondayDateStr = formatDateOnly(mondayThisWeek);
     return {
-      [dateField]: { $gte: formatDateTime(mondayThisWeek) },
+      $or: [
+        { date: { $gte: mondayDateStr } },
+        { first_observed: { $gte: mondayThisWeek } },
+        { first_observed: { $gte: formatDateTime(mondayThisWeek) } },
+        { last_observed: { $gte: mondayThisWeek } },
+        { last_observed: { $gte: formatDateTime(mondayThisWeek) } }
+      ]
     };
   }
 
   if (lower === 'this month' || lower === '30d') {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    const startMonthDateStr = formatDateOnly(startOfMonth);
     return {
-      [dateField]: { $gte: formatDateTime(startOfMonth) },
+      $or: [
+        { date: { $gte: startMonthDateStr } },
+        { first_observed: { $gte: startOfMonth } },
+        { first_observed: { $gte: formatDateTime(startOfMonth) } },
+        { last_observed: { $gte: startOfMonth } },
+        { last_observed: { $gte: formatDateTime(startOfMonth) } }
+      ]
     };
   }
 
@@ -315,11 +524,10 @@ async function fetchIncidentsFromMongo(
 ): Promise<Incident[]> {
   try {
     const col = await getIncidentsCollection(databaseName);
-    const filter = buildMongoDateFilter('last_observed', timeRange, startDate, endDate);
+    const filter = buildMongoIncidentFilter(timeRange, startDate, endDate);
     const docs = await col
       .find(filter)
-      .sort({ last_observed: -1, first_observed: -1, _id: -1 })
-      .limit(1000)
+      .sort({ first_observed: -1, date: -1, last_observed: -1, _id: -1 })
       .toArray();
 
     if (docs && docs.length > 0) {
@@ -331,11 +539,43 @@ async function fetchIncidentsFromMongo(
   return [];
 }
 
+export interface TenantIncidentsResult {
+  incidents: Incident[];
+  source: 'redis' | 'mongodb';
+}
+
 /**
- * Mengambil data insiden tenant:
- * - Rentang 1-7 Hari (Today, This Week, 7d, default): Prioritas ke Redis In-Memory Cache (< 1ms).
- *   Jika Redis kosong/down, fallback ke MongoDB dengan filter 1-7 hari.
- * - Rentang > 7 Hari (This Month, 30d, All, Custom > 7h): HANYA query ke MongoDB Master (tanpa Redis).
+ * Mengambil data insiden tenant dengan deteksi sumber (Redis Hot Cache vs MongoDB Master):
+ * - Rentang 1-7 Hari (Today, This Week, 7d, Yesterday, Last Week, Custom <= 7d): Prioritas ke Redis Cache (< 2ms).
+ * - Rentang > 7 Hari atau jika Redis kosong/error: Fallback otomatis ke MongoDB Master.
+ */
+export async function getTenantIncidentsWithSource(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<TenantIncidentsResult> {
+  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
+  if (isRecent) {
+    try {
+      const redisIncidents = await fetchIncidentsFromRedis(databaseName, redisPrefix, timeRange, startDate, endDate);
+      if (redisIncidents && redisIncidents.length > 0) {
+        return { incidents: redisIncidents, source: 'redis' };
+      }
+    } catch (err: any) {
+      console.warn('[DataService] Redis incident fetch failed, falling back to Mongo:', err.message);
+    }
+  }
+
+  const mongoIncidents = await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+  return { incidents: mongoIncidents, source: 'mongodb' };
+}
+
+/**
+ * Mengambil data insiden tenant (backward-compatible):
+ * - Rentang 1-7 Hari: Prioritas Redis Hot Cache.
+ * - Rentang > 7 Hari / Fallback: MongoDB Master.
  */
 export async function getTenantIncidents(
   databaseName: string,
@@ -344,20 +584,8 @@ export async function getTenantIncidents(
   startDate?: string | null,
   endDate?: string | null
 ): Promise<Incident[]> {
-  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
-
-  // 1. Jika filter 1-7 hari, prioritas ke Redis Cache
-  if (isRecent) {
-    const redisData = await fetchIncidentsFromRedis(databaseName, redisPrefix);
-    if (redisData.length > 0) {
-      return redisData;
-    }
-    // Fallback ke MongoDB dengan filter tanggal jika Redis kosong/down
-    return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
-  }
-
-  // 2. Jika filter > 7 hari, HANYA query langsung ke MongoDB Master
-  return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+  const res = await getTenantIncidentsWithSource(databaseName, redisPrefix, timeRange, startDate, endDate);
+  return res.incidents;
 }
 
 export interface VulnerabilitiesResult {
@@ -676,6 +904,21 @@ export async function getTenantReports(databaseName: string): Promise<SecurityRe
     const col = await getReportsCollection(databaseName);
     const docs = await col.find({}).sort({ date_generated: -1, last_updated: -1 }).toArray();
 
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const toLocalString = (v: any) => {
+      if (!v) return '';
+      if (v instanceof Date) {
+        if (isNaN(v.getTime())) return '';
+        const y = v.getUTCFullYear();
+        const m = pad2(v.getUTCMonth() + 1);
+        const d = pad2(v.getUTCDate());
+        const hr = pad2(v.getUTCHours());
+        const mn = pad2(v.getUTCMinutes());
+        const sc = pad2(v.getUTCSeconds());
+        return `${y}-${m}-${d} ${hr}:${mn}:${sc}`;
+      }
+      return String(v);
+    };
     return docs.map((doc: any) => ({
       id: String(doc._id || doc.id || doc.report_uuid || Math.random()),
       reportName: doc.report_name || doc.reportName || 'Security Incident Analysis',
@@ -684,10 +927,10 @@ export async function getTenantReports(databaseName: string): Promise<SecurityRe
       report_uuid: doc.report_uuid || String(doc._id || ''),
       soc_id: doc.soc_id || '',
       type: doc.type || 'Automated Incident Response',
-      dateGenerated: doc.date_generated || doc.dateGenerated || new Date().toISOString(),
-      date_generated: doc.date_generated || doc.dateGenerated || new Date().toISOString(),
+      dateGenerated: toLocalString(doc.date_generated || doc.dateGenerated) || new Date().toISOString(),
+      date_generated: toLocalString(doc.date_generated || doc.dateGenerated) || new Date().toISOString(),
       severity: (doc.severity || 'Medium') as any,
-      lastUpdated: doc.last_updated || doc.lastUpdated || doc.date_generated,
+      lastUpdated: toLocalString(doc.last_updated || doc.lastUpdated || doc.date_generated),
       summary: doc.summary || doc.description || '',
       affectedDevices: doc.affected_devices || doc.affectedDevices || [],
       ioc: doc.ioc || { mitre: '', sourceIp: '', targetUser: '' },
@@ -741,13 +984,34 @@ function formatDateKey(d: Date): string {
 }
 
 /**
- * Mengambil statistik perbandingan historis dari koleksi `historical_statistics` di MongoDB
+ * Mengambil ringkasan KPI mingguan langsung dari Redis (<cleanPrefix>:historical_statistics:weekly)
+ */
+export async function getWeeklyHistoricalKpiFromRedis(redisPrefix: string): Promise<any | null> {
+  try {
+    const cleanPrefix = (redisPrefix || '').replace(/:+$/, '');
+    if (!cleanPrefix) return null;
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      const data = await redis.get(`${cleanPrefix}:historical_statistics:weekly`);
+      if (data) {
+        return JSON.parse(data);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[DataService] Error reading weekly KPI from Redis:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Mengambil statistik perbandingan historis dari Redis Cache atau koleksi `historical_statistics` di MongoDB
  */
 export async function getHistoricalComparisonStats(
   databaseName: string,
   timeFilter = 'Today',
   startDate?: string | null,
-  endDate?: string | null
+  endDate?: string | null,
+  redisPrefix?: string
 ): Promise<{
   criticalPrev: number;
   highPrev: number;
@@ -757,7 +1021,68 @@ export async function getHistoricalComparisonStats(
   riskPrev: number;
   periodLabel: string;
   found: boolean;
+  source?: 'redis' | 'mongodb';
 }> {
+  const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
+  const lower = (timeFilter || 'today').toLowerCase();
+
+  // 1. Coba Hot Cache Redis terlebih dahulu untuk Today & This Week
+  if (cleanPrefix) {
+    try {
+      const redis = await getActiveRedisClient();
+      if (redis) {
+        if (lower === 'this week' || lower === '7d') {
+          const weeklyStr = await redis.get(`${cleanPrefix}:historical_statistics:weekly`);
+          if (weeklyStr) {
+            const weekly = JSON.parse(weeklyStr);
+            if (weekly && typeof weekly === 'object') {
+              return {
+                criticalPrev: weekly.critical_prev || 0,
+                highPrev: weekly.high_prev || 0,
+                mediumPrev: weekly.medium_prev || 0,
+                lowPrev: weekly.low_prev || 0,
+                totalPrev: weekly.total_prev || 0,
+                riskPrev: weekly.risk_score_prev || 0,
+                periodLabel: weekly.period_label || 'LAST WEEK',
+                found: true,
+                source: 'redis',
+              };
+            }
+          }
+        } else if (lower === 'today') {
+          const now = new Date();
+          const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          const yStr = formatDateKey(yesterday);
+          const yData = await redis.get(`${cleanPrefix}:historical_statistics:${yStr}`);
+          if (yData) {
+            const parsed = JSON.parse(yData);
+            if (parsed && typeof parsed === 'object') {
+              const crit = parsed.critical || 0;
+              const high = parsed.high || 0;
+              const med = parsed.medium || 0;
+              const low = parsed.low || 0;
+              const tot = parsed.totalSeverity !== undefined ? parsed.totalSeverity : (crit + high + med + low);
+              const rScore = parsed.riskScore || 0;
+              return {
+                criticalPrev: crit,
+                highPrev: high,
+                mediumPrev: med,
+                lowPrev: low,
+                totalPrev: tot,
+                riskPrev: rScore,
+                periodLabel: 'YESTERDAY',
+                found: true,
+                source: 'redis',
+              };
+            }
+          }
+        }
+      }
+    } catch (redisErr: any) {
+      console.warn('[DataService] Redis historical stats query warning:', redisErr.message);
+    }
+  }
+
   try {
     const col = await getHistoricalStatisticsCollection(databaseName);
     const now = new Date();

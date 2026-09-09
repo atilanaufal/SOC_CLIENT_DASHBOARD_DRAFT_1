@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
 
-import { getTenantIncidents, getHistoricalComparisonStats } from '@/lib/data-service';
+import { getTenantIncidents, getTenantIncidentsWithSource, getHistoricalComparisonStats } from '@/lib/data-service';
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTimestamp } from '@/lib/date-utils';
+import { groupAlertsToIncidents, mapAlertToItem } from '@/lib/incident-grouping';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,7 +127,7 @@ function extractFullLogs(doc: any): string {
       dstip: doc.destIp || doc.ip_destination || '',
       count: doc.count || 1,
       affected_file: doc.affected_file || '',
-      incident_type: doc.incidentName || '',
+      incident_type: doc.incident_type ? (Array.isArray(doc.incident_type) ? doc.incident_type.join(', ') : String(doc.incident_type)) : (doc.incidentName || ''),
     },
     full_log: `${doc.firstObserved || new Date().toISOString()} ${doc.host || doc.agent || ''} ossec: Alert [${doc.ruleId || doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incidentName || ''}`,
 
@@ -147,6 +148,8 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
 
+    const groupBy = (searchParams.get('groupBy') || 'alerts').toLowerCase();
+
     // Authenticated Tenant Context
     const tenant = await getTenantContext(request);
     if (!tenant) {
@@ -154,11 +157,16 @@ export async function GET(request: Request) {
         { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
         { status: 401 }
       );
-
     }
 
     // Query incidents directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
-    const rawDocs = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
+    const { incidents: rawDocs, source: incidentSource } = await getTenantIncidentsWithSource(
+      tenant.databaseName,
+      tenant.redisPrefix,
+      timeRange,
+      startDate,
+      endDate
+    );
     
     // Filter out agent 000 / health-checker
     const validDocs = rawDocs.filter((doc: any) => {
@@ -196,44 +204,25 @@ export async function GET(request: Request) {
       docs = docs.filter((d: any) => matchesTimeRange(d, timeRange, startDate, endDate));
     }
 
-    let mapped = docs.map((doc: any, index: number) => {
-      const docSeverity = parseSeverity(doc.severity);
-      const rawFirst = doc.firstObserved || doc.first_observed || doc.date || "";
-      const rawLast = doc.lastObserved || doc.last_observed || rawFirst;
+    // Calculate pure alert severity breakdown
+    let critical = 0;
+    let high = 0;
+    let medium = 0;
+    let low = 0;
 
-      const fullLogString = extractFullLogs(doc);
-      const uniqueId = String(doc.id || doc._id || `inc_${index + 1}_${rawFirst}`);
-
-      return {
-
-        id: uniqueId,
-        _id: uniqueId,
-        incidentName: doc.incidentName || doc.incident_type || doc.description || 'Security Event',
-        severity: docSeverity,
-        agent: doc.host || doc.agent || '',
-        host: doc.host || doc.agent || '',
-        firstObserved: formatDate(rawFirst),
-        lastObserved: formatDate(rawLast),
-        description: doc.description || doc.incidentName || '',
-        mitre: doc.mitre || doc.mitre_technique || doc.mitre_id || '',
-        mitre_id: doc.mitre_id || '',
-        mitre_tactic: doc.mitre_tactic || '',
-        mitre_technique: doc.mitre_technique || '',
-        ruleId: String(doc.ruleId || doc.rule_id || ''),
-        rule_id: String(doc.rule_id || doc.ruleId || ''),
-        university: tenant.campusName,
-        tenant: tenant.campusName,
-        impact: Array.isArray(doc.impact) ? doc.impact : (doc.impact ? [doc.impact] : []),
-        sourceIp: doc.sourceIp || doc.agent_ip || doc.ip_source || '',
-        agent_ip: doc.agent_ip || doc.sourceIp || doc.ip_source || '',
-        ip_source: doc.ip_source || doc.agent_ip || doc.sourceIp || '',
-        destIp: doc.destIp || doc.ip_destination || '',
-        ip_destination: doc.ip_destination || doc.destIp || '',
-        affected_file: doc.affected_file || '',
-        count: Number(doc.count) || 1,
-        full_logs: fullLogString,
-      };
+    docs.forEach((doc: any) => {
+      const s = parseSeverity(doc.severity).toLowerCase();
+      if (s === 'critical') critical++;
+      else if (s === 'high') high++;
+      else if (s === 'medium') medium++;
+      else low++;
     });
+    const totalAlerts = docs.length;
+
+    // Mode-specific mapping: alerts (raw event-based) vs incidents (grouped by rule_id, agent_id, ip_source, date)
+    let mapped = groupBy === 'incidents'
+      ? groupAlertsToIncidents(docs, tenant.campusName)
+      : docs.map((doc: any, index: number) => mapAlertToItem(doc, index, tenant.campusName));
 
     if (severity && severity !== 'All') {
       mapped = mapped.filter((item) => item.severity.toLowerCase() === severity.toLowerCase());
@@ -253,26 +242,13 @@ export async function GET(request: Request) {
 
     // Ensure strict chronological sort (newest first)
     mapped.sort((a: any, b: any) => {
-      const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
-      const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
+      const tA = getTimestamp(a.lastObserved || a.firstObserved || a.date);
+      const tB = getTimestamp(b.lastObserved || b.firstObserved || b.date);
       return tB - tA;
     });
 
-    let critical = 0;
-    let high = 0;
-    let medium = 0;
-    let low = 0;
-
-    mapped.forEach((item) => {
-      const s = String(item.severity || '').toLowerCase();
-      if (s === 'critical') critical++;
-      else if (s === 'high') high++;
-      else if (s === 'medium') medium++;
-      else low++;
-    });
-
-    // Query comparison data directly from historical_statistics collection in MongoDB
-    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeRange, startDate, endDate);
+    // Query comparison data directly from Redis Cache or historical_statistics collection in MongoDB
+    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeRange, startDate, endDate, tenant.redisPrefix);
 
     const criticalPrev = histComp.criticalPrev ?? 0;
     const highPrev = histComp.highPrev ?? 0;
@@ -284,14 +260,20 @@ export async function GET(request: Request) {
     const highDelta = high - highPrev;
     const mediumDelta = medium - mediumPrev;
     const lowDelta = low - lowPrev;
-    const totalDelta = mapped.length - totalPrev;
+    const totalDelta = totalAlerts - totalPrev;
 
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
+      dataSource: {
+        incidents: incidentSource,
+        historicalStats: histComp.source || 'mongodb',
+      },
+      groupBy,
       data: mapped,
       total: mapped.length,
+      totalAlerts,
       incidents: {
         critical,
         criticalPrev,
@@ -305,7 +287,7 @@ export async function GET(request: Request) {
         low,
         lowPrev,
         lowDelta,
-        total: mapped.length,
+        total: totalAlerts,
         totalPrev,
         totalDelta,
         periodLabel: histComp.periodLabel || 'PREVIOUS PERIOD',

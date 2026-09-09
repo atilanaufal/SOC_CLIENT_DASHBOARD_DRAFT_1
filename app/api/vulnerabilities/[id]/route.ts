@@ -62,7 +62,7 @@ export async function GET(
       cveId: doc.cve || 'N/A',
       cve: doc.cve || 'N/A',
       detectionDate: formatDate(doc.detected_at),
-      detected_at: doc.detected_at ? String(doc.detected_at) : undefined,
+      detected_at: doc.detected_at ? (doc.detected_at instanceof Date ? doc.detected_at.toISOString() : String(doc.detected_at)) : undefined,
       status: statusFormatted,
       currentVersion: doc.version || 'N/A',
       version: doc.version || 'N/A',

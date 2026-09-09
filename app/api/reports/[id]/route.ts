@@ -63,7 +63,7 @@ export async function GET(
       soc_id: doc.soc_id,
       severity: doc.severity || 'Unspecified',
       dateGenerated: formatDate(doc.date_generated),
-      date_generated: doc.date_generated ? String(doc.date_generated) : undefined,
+      date_generated: doc.date_generated ? (doc.date_generated instanceof Date ? doc.date_generated.toISOString() : String(doc.date_generated)) : undefined,
       lastUpdated: formatDate(doc.synced_at || doc.date_generated),
       synced_at: doc.synced_at ? String(doc.synced_at) : undefined,
       summary: doc.summary || 'No summary description provided.',

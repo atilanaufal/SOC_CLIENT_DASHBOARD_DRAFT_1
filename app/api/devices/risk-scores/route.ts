@@ -5,6 +5,7 @@ import { getRiskCategory } from '@/lib/risk-score';
 import { getTenantIncidents } from '@/lib/data-service';
 
 import { getTenantContext } from '@/lib/tenant-context';
+import { parseCustomDate } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +15,8 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   const rawDate = doc.lastObserved || doc.firstObserved || doc.last_observed || doc.first_observed || doc.detected_at || doc.date || doc.created_at;
   if (!rawDate) return true;
 
-  const d = new Date(rawDate);
-  if (isNaN(d.getTime())) return true;
+  const d = parseCustomDate(rawDate);
+  if (!d || isNaN(d.getTime())) return true;
 
   const now = new Date();
   const lower = range.toLowerCase();
@@ -146,7 +147,7 @@ export async function GET(request: Request) {
     });
 
     tempMap.forEach((stats, key) => {
-      const rawScore = stats.critical * 10 + stats.high * 6 + stats.medium * 3;
+      const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
       const score = Math.min(100, rawScore);
       const cat = getRiskCategory(score);
 

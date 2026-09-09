@@ -20,7 +20,10 @@ const MONTHS_INDEX: Record<string, number> = {
 
 export function parseCustomDate(val: any): Date | null {
   if (!val) return null;
-  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    return new Date(val.getUTCFullYear(), val.getUTCMonth(), val.getUTCDate(), val.getUTCHours(), val.getUTCMinutes(), val.getUTCSeconds(), val.getUTCMilliseconds());
+  }
   if (typeof val === 'number') {
     const d = new Date(val);
     return isNaN(d.getTime()) ? null : d;
@@ -33,6 +36,23 @@ export function parseCustomDate(val: any): Date | null {
     // Remove any trailing (X days ago) relative parenthesized strings
     if (normalized.includes('(')) {
       normalized = normalized.split('(')[0].trim();
+    }
+
+    // Handle ISO date string (with or without Z) from MongoDB ISODate
+    // Interprets the date & time digits directly as local time to prevent double timezone shifts (+7 hours)
+    const localIsoMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?:Z|[+-]\d{2}:?\d{2})?$/);
+    if (localIsoMatch) {
+      const datePart = localIsoMatch[1];
+      const timePart = localIsoMatch[2];
+      const parts = datePart.split('-').map(Number);
+      const tParts = timePart.split(':');
+      const hour = parseInt(tParts[0], 10);
+      const min = parseInt(tParts[1], 10);
+      const secParts = tParts[2].split('.');
+      const sec = parseInt(secParts[0], 10);
+      const ms = secParts[1] ? parseInt(secParts[1].slice(0, 3).padEnd(3, '0'), 10) : 0;
+      const d = new Date(parts[0], parts[1] - 1, parts[2], hour, min, sec, ms);
+      if (!isNaN(d.getTime())) return d;
     }
 
     // Try standard ISO or RFC parse first if it looks like standard ISO string
@@ -146,5 +166,18 @@ export function formatNumber(val: number | string | undefined | null): string {
   const cleanStr = String(val).replace(/[,.]/g, '').trim();
   const num = Number(cleanStr);
   return isNaN(num) ? String(val) : String(Math.round(num));
+}
+
+/**
+ * Formats arbitrary date into standard clean string: "9 Mar 2026 13:45"
+ */
+export function formatStandardDate(val: any): string {
+  if (!val) return 'N/A';
+  const d = parseCustomDate(val);
+  if (!d) return String(val);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${dateStr} ${timeStr}`;
 }
 

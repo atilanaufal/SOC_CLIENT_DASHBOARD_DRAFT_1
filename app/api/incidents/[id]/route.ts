@@ -6,11 +6,13 @@ import { getTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
+import { parseCustomDate } from '@/lib/date-utils';
+
 function formatDate(val: any): string {
   if (!val) return 'N/A';
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
+    const d = parseCustomDate(val);
+    if (!d || isNaN(d.getTime())) return String(val);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   } catch {
@@ -43,7 +45,7 @@ function extractFullLogs(doc: any): string {
   const techniques = Array.isArray(doc.mitre_technique) ? doc.mitre_technique : (doc.mitre_technique ? [doc.mitre_technique] : []);
 
   const rawLogObj: Record<string, any> = {
-    timestamp: doc.first_observed || doc.last_observed || new Date().toISOString(),
+    timestamp: doc.first_observed instanceof Date ? doc.first_observed.toISOString() : (doc.first_observed || doc.last_observed || new Date().toISOString()),
     rule: {
       id: doc.rule_id ? String(doc.rule_id) : '',
       level: doc.severity === 'Critical' ? 12 : doc.severity === 'High' ? 10 : doc.severity === 'Medium' ? 7 : 4,
@@ -70,7 +72,7 @@ function extractFullLogs(doc: any): string {
       affected_file: doc.affected_file || '',
       incident_type: doc.incident_type || '',
     },
-    full_log: `${doc.first_observed || new Date().toISOString()} ${doc.host || doc.agent || ''} ossec: Alert [${doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incident_type || ''}`,
+    full_log: `${doc.first_observed instanceof Date ? doc.first_observed.toISOString() : (doc.first_observed || new Date().toISOString())} ${doc.host || doc.agent || ''} ossec: Alert [${doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incident_type || ''}`,
   };
 
   return JSON.stringify(rawLogObj, null, 2);
@@ -108,25 +110,22 @@ export async function GET(
     }
 
     const idStr = doc._id.toString();
-    let incType = '';
-    if (Array.isArray(doc.incident_type)) {
-      incType = doc.incident_type.join(', ');
-    } else if (typeof doc.incident_type === 'string' && doc.incident_type) {
-      incType = doc.incident_type;
-    } else {
-      incType = doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert';
-    }
+    const rawIncType = doc.incident_type
+      ? (Array.isArray(doc.incident_type) ? doc.incident_type.join(', ') : String(doc.incident_type))
+      : '';
+    const incName = rawIncType || doc.description || (doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert');
     const incident = {
       id: idStr,
       _id: idStr,
-      incidentName: incType,
+      incidentName: incName,
+      incident_type: rawIncType,
       severity: parseSeverity(doc.severity),
       agent: doc.agent_id || doc.host || doc.agent || '',
       agentsList: [doc.agent_id || doc.host || doc.agent || ''],
       host: doc.host || doc.agent_id || doc.agent || '',
       firstObserved: formatDate(doc.first_observed),
       lastObserved: formatDate(doc.last_observed || doc.first_observed),
-      description: doc.description || incType || '',
+      description: doc.description || '',
       mitre: doc.mitre_id ? `${doc.mitre_id}` : (Array.isArray(doc.mitre_technique) ? doc.mitre_technique.join(', ') : (doc.mitre_technique || '')),
       mitre_id: doc.mitre_id || '',
       mitre_tactic: doc.mitre_tactic || '',

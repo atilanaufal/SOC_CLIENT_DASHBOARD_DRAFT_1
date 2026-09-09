@@ -112,7 +112,7 @@ export async function GET(request: Request) {
         agentStatsMap.get(devIp) ||
         { critical: 0, high: 0, medium: 0, low: 0 };
 
-      const rawScore = stats.critical * 10 + stats.high * 6 + stats.medium * 3;
+      const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
       const scoreVal = Math.min(100, rawScore);
       const cat = getRiskCategory(scoreVal);
 
