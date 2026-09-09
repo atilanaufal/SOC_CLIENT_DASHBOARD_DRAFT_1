@@ -7,6 +7,8 @@ import { getTenantIncidents, queryServerSideVulnerabilities, getHistoricalCompar
 
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
+import { groupAlertsToIncidents } from '@/lib/incident-grouping';
+import { getTimestamp } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -244,47 +246,24 @@ export async function GET(request: Request) {
     const riskLastMonth = Number(Number(previousStats.score || 0).toFixed(1));
 
 
-    // 3. Top Incidents for this tenant (list distinct recent incidents per severity, sorted by latest date)
-    const seenIncidentSignatures = new Set<string>();
-    const topIncidents: any[] = [];
-
-    currentIncidents.forEach((inc, index) => {
-      const incType = Array.isArray(inc.incident_type || inc.incidentName)
-        ? (inc.incident_type || inc.incidentName).join(', ')
-        : (inc.incident_type || inc.incidentName || inc.description || (inc.rule_id || inc.ruleId ? `Rule ${inc.rule_id || inc.ruleId}` : 'Security Alert'));
-      const name = incType || inc.description || `Rule ${inc.rule_id || inc.ruleId}`;
-
-      const agentName = inc.host || inc.agent || (inc.agent_id ? `Agent ${inc.agent_id}` : 'Agent');
-      const sev = parseSeverity(inc.severity);
-
-      const rawDateVal = inc.last_observed || inc.first_observed || inc.lastObserved || inc.firstObserved || inc.date;
-      const dateFormatted = formatDate(rawDateVal);
-      const rawTimestamp = rawDateVal ? new Date(rawDateVal).getTime() : 0;
-
-      const incCount = typeof inc.count === 'number' && inc.count > 0 ? inc.count : 1;
-
-      // Unique signature to deduplicate identical snapshots
-      const sig = `${name}:::${dateFormatted}:::${agentName}:::${sev.toLowerCase()}`;
-      if (seenIncidentSignatures.has(sig)) {
-        return;
-
-      }
-      seenIncidentSignatures.add(sig);
-
-      topIncidents.push({
-        id: String(inc._id || inc.id || `top-inc-${index + 1}_${rawTimestamp}`),
-        incidentName: name,
-        severity: sev,
-        agent: agentName,
-        agentsList: inc.agentsList && inc.agentsList.length > 0 ? inc.agentsList : [agentName],
-        host: agentName,
-        count: incCount,
-        firstObserved: formatDate(inc.first_observed || inc.firstObserved || rawDateVal),
-        lastObserved: dateFormatted,
-        rawDate: rawTimestamp,
-        ruleId: inc.rule_id || inc.ruleId ? String(inc.rule_id || inc.ruleId) : 'N/A',
+    // 3. Top Incidents for this tenant (automatically grouped by (rule_id, agent_id, ip_source, date))
+    const groupedList = groupAlertsToIncidents(currentIncidents, tenant.campusName);
+    const topIncidents = groupedList.map((inc, index) => {
+      const ts = getTimestamp(inc.lastObserved || inc.firstObserved || inc.date);
+      return {
+        id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
+        incidentName: inc.incidentName,
+        severity: inc.severity,
+        agent: inc.agent,
+        agentsList: [inc.agent],
+        host: inc.host || inc.agent,
+        count: inc.count || 1,
+        firstObserved: inc.firstObserved,
+        lastObserved: inc.lastObserved,
+        rawDate: ts,
+        ruleId: inc.ruleId || 'N/A',
         tenant: tenant.campusName,
-      });
+      };
     });
 
     topIncidents.sort((a, b) => b.rawDate - a.rawDate);

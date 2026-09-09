@@ -15,6 +15,7 @@ interface IncidentDetailDrawerProps {
   incident: Incident | null;
   isOpen: boolean;
   onClose: () => void;
+  groupByMode?: 'alerts' | 'incidents';
 }
 
 /**
@@ -86,11 +87,16 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   incident,
   isOpen,
   onClose,
+  groupByMode,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isRawLogOpen, setIsRawLogOpen] = useState(false);
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'structured' | 'raw'>('structured');
+
+  const isGrouped = groupByMode
+    ? groupByMode === 'incidents'
+    : Boolean(incident?.lastObserved && typeof incident?.count === 'number');
 
   // Format full JSON log representation for debugging / SIEM export
   const fullLogText = useMemo(() => {
@@ -208,7 +214,9 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200/60 px-4 sm:px-5 xl:px-6 py-3.5 xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-          <h3 className="text-base sm:text-lg xl:text-xl font-bold text-gray-900 tracking-tight">Incident Details</h3>
+          <h3 className="text-base sm:text-lg xl:text-xl font-bold text-gray-900 tracking-tight">
+            {isGrouped ? 'Incident Details' : 'Alert Details'}
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-700 font-bold hover:text-gray-900 p-1.5 rounded-lg hover:bg-gray-100 transition cursor-pointer"
@@ -236,18 +244,39 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
               <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{ruleIdDisplay}</p>
             </div>
             <div>
-              <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Incident Type</p>
+              <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">
+                {isGrouped ? 'Incident Type' : 'Alert Type'}
+              </p>
               <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{incident.incidentName}</p>
             </div>
           </div>
 
-          {/* Count & Severity */}
-          <div className="grid grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200">
-            <div>
-              <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Count</p>
-              <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{countDisplay}</p>
+          {/* Count & Severity (Count only visible in Grouped Incident mode) */}
+          {isGrouped ? (
+            <div className="grid grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200">
+              <div>
+                <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Count</p>
+                <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{countDisplay}</p>
+              </div>
+              <div>
+                <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
+                <span
+                  className={`font-bold text-sm xl:text-base 2xl:text-lg ${
+                    incident.severity === 'Critical'
+                      ? 'text-[#B8251B]'
+                      : incident.severity === 'High'
+                      ? 'text-[#EA580C]'
+                      : incident.severity === 'Medium'
+                      ? 'text-[#5B9BD5]'
+                      : 'text-blue-600'
+                  }`}
+                >
+                  {incident.severity}
+                </span>
+              </div>
             </div>
-            <div>
+          ) : (
+            <div className="pt-3 xl:pt-4 border-t border-gray-200">
               <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
               <span
                 className={`font-bold text-sm xl:text-base 2xl:text-lg ${
@@ -263,7 +292,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
                 {incident.severity}
               </span>
             </div>
-          </div>
+          )}
 
           {/* Description */}
           <div className="pt-3 xl:pt-4 border-t border-gray-200">
@@ -302,14 +331,16 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Last Observed */}
-          <div className="pt-3 xl:pt-4 border-t border-gray-200">
-            <h4 className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-900 uppercase tracking-wider mb-1">Last Observed</h4>
-            <div className="flex flex-col text-xs sm:text-sm xl:text-base leading-tight">
-              <span className="font-bold text-gray-900">{lastDate || incident.lastObserved || incident.firstObserved}</span>
-              {lastTime && <span className="font-medium text-gray-500 mt-0.5">{lastTime}</span>}
+          {/* Last Observed (Only rendered in Grouped Incident mode) */}
+          {isGrouped && (
+            <div className="pt-3 xl:pt-4 border-t border-gray-200">
+              <h4 className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-900 uppercase tracking-wider mb-1">Last Observed</h4>
+              <div className="flex flex-col text-xs sm:text-sm xl:text-base leading-tight">
+                <span className="font-bold text-gray-900">{lastDate || incident.lastObserved || incident.firstObserved}</span>
+                {lastTime && <span className="font-medium text-gray-500 mt-0.5">{lastTime}</span>}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer with Raw Log button */}

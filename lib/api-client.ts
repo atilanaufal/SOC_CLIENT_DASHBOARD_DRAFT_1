@@ -8,6 +8,7 @@ export async function fetchIncidents(filters?: {
   timeRange?: string;
   startDate?: string;
   endDate?: string;
+  groupBy?: 'alerts' | 'incidents';
 }): Promise<Incident[] & { stats?: any }> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
@@ -17,6 +18,7 @@ export async function fetchIncidents(filters?: {
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
+  if (filters?.groupBy) params.set('groupBy', filters.groupBy);
 
   const res = await fetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {

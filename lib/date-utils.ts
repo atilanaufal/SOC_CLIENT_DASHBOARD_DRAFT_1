@@ -148,3 +148,16 @@ export function formatNumber(val: number | string | undefined | null): string {
   return isNaN(num) ? String(val) : String(Math.round(num));
 }
 
+/**
+ * Formats arbitrary date into standard clean string: "9 Mar 2026 13:45"
+ */
+export function formatStandardDate(val: any): string {
+  if (!val) return 'N/A';
+  const d = parseCustomDate(val);
+  if (!d) return String(val);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${dateStr} ${timeStr}`;
+}
+

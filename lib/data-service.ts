@@ -249,7 +249,62 @@ function buildMongoDateFilter(
   const lower = (timeRange || '').toLowerCase().trim();
   const now = new Date();
 
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+    if (sStr && eStr) {
+      const start = new Date(`${sStr}T00:00:00.000`);
+      const end = new Date(`${eStr}T23:59:59.999`);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        return {
+          [dateField]: {
+            $gte: start.toISOString(),
+            $lte: end.toISOString()
+          }
+        };
+      }
+    }
+    return {};
+  }
+
+  if (lower === 'today') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { [dateField]: { $gte: startOfToday.toISOString() } };
+  }
+
+  if (lower === 'this week' || lower === '7d') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return { [dateField]: { $gte: mondayThisWeek.toISOString() } };
+  }
+
+  if (lower === 'this month' || lower === '30d') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { [dateField]: { $gte: startOfMonth.toISOString() } };
+  }
+
+  return {};
+}
+
+function buildMongoIncidentFilter(
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Record<string, any> {
+  const lower = (timeRange || '').toLowerCase().trim();
+  const now = new Date();
+
   const pad = (n: number) => String(n).padStart(2, '0');
+  const formatDateOnly = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const formatDateTime = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
@@ -267,11 +322,14 @@ function buildMongoDateFilter(
       const start = new Date(`${sStr}T00:00:00.000`);
       const end = new Date(`${eStr}T23:59:59.999`);
       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const sDateStr = formatDateOnly(start);
+        const eDateStr = formatDateOnly(end);
         return {
-          [dateField]: {
-            $gte: formatDateTime(start),
-            $lte: formatDateTime(end),
-          },
+          $or: [
+            { date: { $gte: sDateStr, $lte: eDateStr } },
+            { first_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } },
+            { last_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } }
+          ]
         };
       }
     }
@@ -280,8 +338,13 @@ function buildMongoDateFilter(
 
   if (lower === 'today') {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const todayDateStr = formatDateOnly(startOfToday);
     return {
-      [dateField]: { $gte: formatDateTime(startOfToday) },
+      $or: [
+        { date: todayDateStr },
+        { first_observed: { $gte: formatDateTime(startOfToday) } },
+        { last_observed: { $gte: formatDateTime(startOfToday) } }
+      ]
     };
   }
 
@@ -289,15 +352,25 @@ function buildMongoDateFilter(
     const dayOfWeek = now.getDay();
     const diffToMonday = (dayOfWeek + 6) % 7;
     const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
+    const mondayDateStr = formatDateOnly(mondayThisWeek);
     return {
-      [dateField]: { $gte: formatDateTime(mondayThisWeek) },
+      $or: [
+        { date: { $gte: mondayDateStr } },
+        { first_observed: { $gte: formatDateTime(mondayThisWeek) } },
+        { last_observed: { $gte: formatDateTime(mondayThisWeek) } }
+      ]
     };
   }
 
   if (lower === 'this month' || lower === '30d') {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    const startMonthDateStr = formatDateOnly(startOfMonth);
     return {
-      [dateField]: { $gte: formatDateTime(startOfMonth) },
+      $or: [
+        { date: { $gte: startMonthDateStr } },
+        { first_observed: { $gte: formatDateTime(startOfMonth) } },
+        { last_observed: { $gte: formatDateTime(startOfMonth) } }
+      ]
     };
   }
 
@@ -315,11 +388,11 @@ async function fetchIncidentsFromMongo(
 ): Promise<Incident[]> {
   try {
     const col = await getIncidentsCollection(databaseName);
-    const filter = buildMongoDateFilter('last_observed', timeRange, startDate, endDate);
+    const filter = buildMongoIncidentFilter(timeRange, startDate, endDate);
     const docs = await col
       .find(filter)
-      .sort({ last_observed: -1, first_observed: -1, _id: -1 })
-      .limit(1000)
+      .sort({ first_observed: -1, date: -1, last_observed: -1, _id: -1 })
+      .limit(10000)
       .toArray();
 
     if (docs && docs.length > 0) {
@@ -333,9 +406,7 @@ async function fetchIncidentsFromMongo(
 
 /**
  * Mengambil data insiden tenant:
- * - Rentang 1-7 Hari (Today, This Week, 7d, default): Prioritas ke Redis In-Memory Cache (< 1ms).
- *   Jika Redis kosong/down, fallback ke MongoDB dengan filter 1-7 hari.
- * - Rentang > 7 Hari (This Month, 30d, All, Custom > 7h): HANYA query ke MongoDB Master (tanpa Redis).
+ * - Query langsung ke MongoDB Master untuk memastikan pure alerts 100% akurat.
  */
 export async function getTenantIncidents(
   databaseName: string,
@@ -344,19 +415,6 @@ export async function getTenantIncidents(
   startDate?: string | null,
   endDate?: string | null
 ): Promise<Incident[]> {
-  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
-
-  // 1. Jika filter 1-7 hari, prioritas ke Redis Cache
-  if (isRecent) {
-    const redisData = await fetchIncidentsFromRedis(databaseName, redisPrefix);
-    if (redisData.length > 0) {
-      return redisData;
-    }
-    // Fallback ke MongoDB dengan filter tanggal jika Redis kosong/down
-    return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
-  }
-
-  // 2. Jika filter > 7 hari, HANYA query langsung ke MongoDB Master
   return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
 }
 

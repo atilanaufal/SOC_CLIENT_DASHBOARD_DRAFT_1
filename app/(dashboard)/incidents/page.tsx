@@ -11,6 +11,7 @@ import {
   HiOutlineArrowTrendingUp,
   HiOutlineArrowTrendingDown,
   HiOutlineAdjustmentsHorizontal,
+  HiOutlineRectangleGroup,
   HiOutlineXMark,
   HiChevronUp,
   HiChevronDown
@@ -19,12 +20,13 @@ import { Incident } from '@/lib/types';
 import { fetchIncidents } from '@/lib/api-client';
 import { IncidentDetailDrawer } from '@/components/drawers/IncidentDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
+import { GroupByModal, GroupByMode } from '@/components/modals/GroupByModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatDateTimeAndAgo, getTimestamp, formatNumber } from '@/lib/date-utils';
 import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
-type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved';
+type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved' | 'lastObserved' | 'count';
 type SortDirection = 'asc' | 'desc';
 
 function IncidentsContent() {
@@ -39,6 +41,8 @@ function IncidentsContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [groupByMode, setGroupByMode] = useState<GroupByMode>('alerts');
+  const [isGroupByModalOpen, setIsGroupByModalOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -48,6 +52,11 @@ function IncidentsContent() {
     const paramAgent = searchParams.get('agent');
     const paramSeverity = searchParams.get('severity');
     const paramSearch = searchParams.get('search');
+    const paramGroupBy = searchParams.get('groupBy');
+
+    if (paramGroupBy === 'incidents' || paramGroupBy === 'alerts') {
+      setGroupByMode(paramGroupBy as GroupByMode);
+    }
 
     const newFilters: Record<string, string> = {};
     if (paramIncident) newFilters.incidentName = paramIncident;
@@ -72,7 +81,7 @@ function IncidentsContent() {
   const pageSize = 10;
 
   const loadData = async (forceRefresh = false) => {
-    const cacheKey = `incidents:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
 
     if (!forceRefresh) {
       try {
@@ -95,6 +104,7 @@ function IncidentsContent() {
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
+        groupBy: groupByMode,
       });
       const incidentList = data || [];
       const statsObj = (data as any)?.stats || {};
@@ -111,14 +121,14 @@ function IncidentsContent() {
 
   useEffect(() => {
     loadData();
-  }, [timeFilter, customRange]);
+  }, [groupByMode, timeFilter, customRange]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      if (key === 'firstObserved') {
+      if (key === 'firstObserved' || key === 'lastObserved' || key === 'count') {
         setSortDirection('desc');
       } else {
         setSortDirection('asc');
@@ -202,9 +212,21 @@ function IncidentsContent() {
         return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
       }
 
+      if (sortKey === 'count') {
+        const countA = Number(a.count) || 0;
+        const countB = Number(b.count) || 0;
+        return sortDirection === 'asc' ? countA - countB : countB - countA;
+      }
+
       if (sortKey === 'firstObserved') {
         const timeA = getTimestamp(aVal);
         const timeB = getTimestamp(bVal);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+
+      if (sortKey === 'lastObserved') {
+        const timeA = getTimestamp(a.lastObserved || a.firstObserved);
+        const timeB = getTimestamp(b.lastObserved || b.firstObserved);
         return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
       }
 
@@ -390,6 +412,15 @@ function IncidentsContent() {
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
               <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
             </button>
+
+            <button
+              onClick={() => setIsGroupByModalOpen(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
+              title="Select Group By Mode"
+            >
+              <HiOutlineRectangleGroup className="w-4 h-4 text-blue-300" />
+              <span>Group by: <strong className="text-blue-300 capitalize">{groupByMode}</strong></span>
+            </button>
           </div>
 
           <button
@@ -547,6 +578,19 @@ function IncidentsContent() {
                         {inc.incidentName}
                       </p>
 
+                      {groupByMode === 'incidents' && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2">
+                          <span className="bg-blue-50 text-[#002B9A] border border-blue-200/80 px-2 py-0.5 rounded-md font-bold">
+                            Count: <strong className="font-black">{inc.count || 1}</strong>
+                          </span>
+                          {inc.lastObserved && (
+                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-medium text-[11px]">
+                              Last: <strong className="font-bold text-gray-900">{inc.lastObserved}</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-1 font-semibold text-gray-600">
                           <span className="text-gray-500 font-bold">Agent:</span>
@@ -566,30 +610,46 @@ function IncidentsContent() {
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
                     <tr className="bg-[#002B9A] text-white text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                      <th onClick={() => handleSort('incidentName')} className="bg-[#002B9A] w-[42%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('incidentName')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[32%]' : 'w-[42%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
                         <div className="flex items-center text-white">
-                          <span>Incident Name</span>
+                          <span>{groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name'}</span>
                           {renderSortIndicator('incidentName')}
                         </div>
                       </th>
-                      <th onClick={() => handleSort('severity')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('severity')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[12%]' : 'w-[15%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
                         <div className="flex items-center text-white">
                           <span>Severity</span>
                           {renderSortIndicator('severity')}
                         </div>
                       </th>
-                      <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[20%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('agent')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[16%]' : 'w-[20%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
                         <div className="flex items-center text-white">
                           <span>Agent</span>
                           {renderSortIndicator('agent')}
                         </div>
                       </th>
-                      <th onClick={() => handleSort('firstObserved')} className="bg-[#002B9A] w-[23%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      {groupByMode === 'incidents' && (
+                        <th onClick={() => handleSort('count')} className="bg-[#002B9A] w-[10%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                          <div className="flex items-center text-white">
+                            <span>Count</span>
+                            {renderSortIndicator('count')}
+                          </div>
+                        </th>
+                      )}
+                      <th onClick={() => handleSort('firstObserved')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[15%]' : 'w-[23%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
                         <div className="flex items-center text-white">
                           <span>First Observed</span>
                           {renderSortIndicator('firstObserved')}
                         </div>
                       </th>
+                      {groupByMode === 'incidents' && (
+                        <th onClick={() => handleSort('lastObserved')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                          <div className="flex items-center text-white">
+                            <span>Last Observed</span>
+                            {renderSortIndicator('lastObserved')}
+                          </div>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 text-xs sm:text-sm font-normal">
@@ -598,6 +658,7 @@ function IncidentsContent() {
                       const selectedId = selectedIncident?.id || selectedIncident?._id;
                       const isSelected = Boolean(isDrawerOpen && selectedId && incId && selectedId === incId);
                       const { dateTime, timeAgo } = formatDateTimeAndAgo(inc.firstObserved);
+                      const lastFormatted = inc.lastObserved ? formatDateTimeAndAgo(inc.lastObserved) : null;
 
                       return (
                         <tr
@@ -627,12 +688,27 @@ function IncidentsContent() {
                             </span>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 text-[#0066B1] font-semibold">{inc.agent}</td>
+                          {groupByMode === 'incidents' && (
+                            <td className="py-3 px-3.5 xl:px-4 font-bold">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-blue-50 text-[#002B9A] border border-blue-200/80">
+                                {inc.count || 1}
+                              </span>
+                            </td>
+                          )}
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
                               <span className="font-semibold text-gray-900 text-xs sm:text-sm">{dateTime}</span>
                               {timeAgo && <span className="text-xs text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
+                          {groupByMode === 'incidents' && (
+                            <td className="py-3 px-3.5 xl:px-4">
+                              <div className="flex flex-col leading-tight">
+                                <span className="font-semibold text-gray-900 text-xs sm:text-sm">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
+                                {lastFormatted?.timeAgo && <span className="text-xs text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -645,7 +721,7 @@ function IncidentsContent() {
           {/* Interactive Pagination Controls */}
           <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
-              Showing {filteredIncidents.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredIncidents.length)} of {filteredIncidents.length} Incidents
+              Showing {filteredIncidents.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredIncidents.length)} of {filteredIncidents.length} {groupByMode === 'incidents' ? 'Incidents' : 'Alerts'}
             </div>
             <Pagination
               currentPage={currentPage}
@@ -661,6 +737,7 @@ function IncidentsContent() {
         incident={selectedIncident}
         isOpen={isDrawerOpen}
         onClose={() => { setIsDrawerOpen(false); setSelectedIncident(null); }}
+        groupByMode={groupByMode}
       />
 
       <FilterModal
@@ -670,6 +747,16 @@ function IncidentsContent() {
         initialFilters={activeFilters}
         sections={dynamicFilterSections}
         title="Filter Incidents"
+      />
+
+      <GroupByModal
+        isOpen={isGroupByModalOpen}
+        onClose={() => setIsGroupByModalOpen(false)}
+        currentMode={groupByMode}
+        onSelectMode={(mode) => {
+          setGroupByMode(mode);
+          setCurrentPage(1);
+        }}
       />
     </div>
   );
