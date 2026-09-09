@@ -189,14 +189,104 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
 }
 
 /**
+ * Menentukan tanggal-tanggal target spesifik untuk query Redis In-Memory Cache
+ */
+function getTargetDatesForRange(
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): string[] {
+  const lower = (timeRange || 'today').toLowerCase().trim();
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formatDateOnly = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (lower === 'today') {
+    return [formatDateOnly(now)];
+  }
+
+  if (lower === 'yesterday') {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return [formatDateOnly(y)];
+  }
+
+  if (lower === 'this week' || lower === '7d') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const dates: string[] = [];
+    const cur = new Date(monday);
+    while (cur <= now) {
+      dates.push(formatDateOnly(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+
+  if (lower === 'last week') {
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const lastMonday = new Date(thisMonday.getTime() - 7 * 24 * 3600 * 1000);
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(lastMonday.getTime() + i * 24 * 3600 * 1000);
+      dates.push(formatDateOnly(d));
+    }
+    return dates;
+  }
+
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    let eStr = endDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+        eStr = parts[1];
+      }
+    }
+    if (sStr && eStr) {
+      const start = new Date(`${sStr}T00:00:00.000`);
+      const end = new Date(`${eStr}T23:59:59.999`);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const dates: string[] = [];
+        const cur = new Date(start);
+        while (cur <= end) {
+          dates.push(formatDateOnly(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+        return dates;
+      }
+    }
+  }
+
+  return [];
+}
+
+/**
  * Mengambil data insiden dari Redis Cache (<cleanPrefix>:incident:*)
  */
-async function fetchIncidentsFromRedis(databaseName: string, redisPrefix: string): Promise<Incident[]> {
+async function fetchIncidentsFromRedis(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<Incident[]> {
   try {
     const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
     const redis = await getActiveRedisClient();
     if (redis) {
-      const keys = await redis.keys(`${cleanPrefix}:incident:*`);
+      const targetDates = getTargetDatesForRange(timeRange, startDate, endDate);
+      let keys: string[] = [];
+      if (targetDates && targetDates.length > 0) {
+        keys = targetDates.map((d) => `${cleanPrefix}:incident:${d}`);
+      } else {
+        keys = await redis.keys(`${cleanPrefix}:incident:*`);
+      }
+
       if (keys && keys.length > 0) {
         const pipeline = redis.pipeline();
         for (const key of keys) {
@@ -403,9 +493,43 @@ async function fetchIncidentsFromMongo(
   return [];
 }
 
+export interface TenantIncidentsResult {
+  incidents: Incident[];
+  source: 'redis' | 'mongodb';
+}
+
 /**
- * Mengambil data insiden tenant:
- * - Query langsung ke MongoDB Master untuk memastikan pure alerts 100% akurat.
+ * Mengambil data insiden tenant dengan deteksi sumber (Redis Hot Cache vs MongoDB Master):
+ * - Rentang 1-7 Hari (Today, This Week, 7d, Yesterday, Last Week, Custom <= 7d): Prioritas ke Redis Cache (< 2ms).
+ * - Rentang > 7 Hari atau jika Redis kosong/error: Fallback otomatis ke MongoDB Master.
+ */
+export async function getTenantIncidentsWithSource(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<TenantIncidentsResult> {
+  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
+  if (isRecent) {
+    try {
+      const redisIncidents = await fetchIncidentsFromRedis(databaseName, redisPrefix, timeRange, startDate, endDate);
+      if (redisIncidents && redisIncidents.length > 0) {
+        return { incidents: redisIncidents, source: 'redis' };
+      }
+    } catch (err: any) {
+      console.warn('[DataService] Redis incident fetch failed, falling back to Mongo:', err.message);
+    }
+  }
+
+  const mongoIncidents = await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+  return { incidents: mongoIncidents, source: 'mongodb' };
+}
+
+/**
+ * Mengambil data insiden tenant (backward-compatible):
+ * - Rentang 1-7 Hari: Prioritas Redis Hot Cache.
+ * - Rentang > 7 Hari / Fallback: MongoDB Master.
  */
 export async function getTenantIncidents(
   databaseName: string,
@@ -414,7 +538,8 @@ export async function getTenantIncidents(
   startDate?: string | null,
   endDate?: string | null
 ): Promise<Incident[]> {
-  return await fetchIncidentsFromMongo(databaseName, timeRange, startDate, endDate);
+  const res = await getTenantIncidentsWithSource(databaseName, redisPrefix, timeRange, startDate, endDate);
+  return res.incidents;
 }
 
 export interface VulnerabilitiesResult {
@@ -798,13 +923,34 @@ function formatDateKey(d: Date): string {
 }
 
 /**
- * Mengambil statistik perbandingan historis dari koleksi `historical_statistics` di MongoDB
+ * Mengambil ringkasan KPI mingguan langsung dari Redis (<cleanPrefix>:historical_statistics:weekly)
+ */
+export async function getWeeklyHistoricalKpiFromRedis(redisPrefix: string): Promise<any | null> {
+  try {
+    const cleanPrefix = (redisPrefix || '').replace(/:+$/, '');
+    if (!cleanPrefix) return null;
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      const data = await redis.get(`${cleanPrefix}:historical_statistics:weekly`);
+      if (data) {
+        return JSON.parse(data);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[DataService] Error reading weekly KPI from Redis:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Mengambil statistik perbandingan historis dari Redis Cache atau koleksi `historical_statistics` di MongoDB
  */
 export async function getHistoricalComparisonStats(
   databaseName: string,
   timeFilter = 'Today',
   startDate?: string | null,
-  endDate?: string | null
+  endDate?: string | null,
+  redisPrefix?: string
 ): Promise<{
   criticalPrev: number;
   highPrev: number;
@@ -814,7 +960,68 @@ export async function getHistoricalComparisonStats(
   riskPrev: number;
   periodLabel: string;
   found: boolean;
+  source?: 'redis' | 'mongodb';
 }> {
+  const cleanPrefix = (redisPrefix || databaseName).replace(/:+$/, '');
+  const lower = (timeFilter || 'today').toLowerCase();
+
+  // 1. Coba Hot Cache Redis terlebih dahulu untuk Today & This Week
+  if (cleanPrefix) {
+    try {
+      const redis = await getActiveRedisClient();
+      if (redis) {
+        if (lower === 'this week' || lower === '7d') {
+          const weeklyStr = await redis.get(`${cleanPrefix}:historical_statistics:weekly`);
+          if (weeklyStr) {
+            const weekly = JSON.parse(weeklyStr);
+            if (weekly && typeof weekly === 'object') {
+              return {
+                criticalPrev: weekly.critical_prev || 0,
+                highPrev: weekly.high_prev || 0,
+                mediumPrev: weekly.medium_prev || 0,
+                lowPrev: weekly.low_prev || 0,
+                totalPrev: weekly.total_prev || 0,
+                riskPrev: weekly.risk_score_prev || 0,
+                periodLabel: weekly.period_label || 'LAST WEEK',
+                found: true,
+                source: 'redis',
+              };
+            }
+          }
+        } else if (lower === 'today') {
+          const now = new Date();
+          const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          const yStr = formatDateKey(yesterday);
+          const yData = await redis.get(`${cleanPrefix}:historical_statistics:${yStr}`);
+          if (yData) {
+            const parsed = JSON.parse(yData);
+            if (parsed && typeof parsed === 'object') {
+              const crit = parsed.critical || 0;
+              const high = parsed.high || 0;
+              const med = parsed.medium || 0;
+              const low = parsed.low || 0;
+              const tot = parsed.totalSeverity !== undefined ? parsed.totalSeverity : (crit + high + med + low);
+              const rScore = parsed.riskScore || 0;
+              return {
+                criticalPrev: crit,
+                highPrev: high,
+                mediumPrev: med,
+                lowPrev: low,
+                totalPrev: tot,
+                riskPrev: rScore,
+                periodLabel: 'YESTERDAY',
+                found: true,
+                source: 'redis',
+              };
+            }
+          }
+        }
+      }
+    } catch (redisErr: any) {
+      console.warn('[DataService] Redis historical stats query warning:', redisErr.message);
+    }
+  }
+
   try {
     const col = await getHistoricalStatisticsCollection(databaseName);
     const now = new Date();

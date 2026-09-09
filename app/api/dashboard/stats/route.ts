@@ -3,7 +3,7 @@ import { getReportsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
 
-import { getTenantIncidents, queryServerSideVulnerabilities, getHistoricalComparisonStats } from '@/lib/data-service';
+import { getTenantIncidents, getTenantIncidentsWithSource, queryServerSideVulnerabilities, getHistoricalComparisonStats, getWeeklyHistoricalKpiFromRedis } from '@/lib/data-service';
 
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
@@ -129,9 +129,9 @@ export async function GET(request: Request) {
     let rawIncidents: any[] = [];
     let dataSource: string = 'mongodb';
     try {
-      rawIncidents = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
-      dataSource = 'redis-or-mongodb';
-
+      const res = await getTenantIncidentsWithSource(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
+      rawIncidents = res.incidents;
+      dataSource = res.source;
     } catch (err: any) {
       console.warn('[API /api/dashboard/stats] Incidents fetch fallback:', err.message);
     }
@@ -221,8 +221,8 @@ export async function GET(request: Request) {
 
     const currentStats = calculateDashboardMetrics(currentIncidents);
 
-    // Query comparison data directly from historical_statistics collection in MongoDB
-    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeFilter, startDate, endDate);
+    // Query comparison data directly from Redis Cache or historical_statistics collection in MongoDB
+    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeFilter, startDate, endDate, tenant.redisPrefix);
 
     const previousStats = histComp.found
       ? {
@@ -347,6 +347,7 @@ export async function GET(request: Request) {
       dataSource: {
         devices: deviceSource,
         incidents: dataSource,
+        historicalStats: histComp.source || 'mongodb',
       },
       data: {
         devices: {

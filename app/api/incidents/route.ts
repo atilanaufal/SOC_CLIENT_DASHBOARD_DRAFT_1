@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
 
-import { getTenantIncidents, getHistoricalComparisonStats } from '@/lib/data-service';
+import { getTenantIncidents, getTenantIncidentsWithSource, getHistoricalComparisonStats } from '@/lib/data-service';
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTimestamp } from '@/lib/date-utils';
 import { groupAlertsToIncidents, mapAlertToItem } from '@/lib/incident-grouping';
@@ -160,7 +160,13 @@ export async function GET(request: Request) {
     }
 
     // Query incidents directly for tenant (1-7 days from Redis, > 7 days from MongoDB)
-    const rawDocs = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
+    const { incidents: rawDocs, source: incidentSource } = await getTenantIncidentsWithSource(
+      tenant.databaseName,
+      tenant.redisPrefix,
+      timeRange,
+      startDate,
+      endDate
+    );
     
     // Filter out agent 000 / health-checker
     const validDocs = rawDocs.filter((doc: any) => {
@@ -241,8 +247,8 @@ export async function GET(request: Request) {
       return tB - tA;
     });
 
-    // Query comparison data directly from historical_statistics collection in MongoDB
-    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeRange, startDate, endDate);
+    // Query comparison data directly from Redis Cache or historical_statistics collection in MongoDB
+    const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeRange, startDate, endDate, tenant.redisPrefix);
 
     const criticalPrev = histComp.criticalPrev ?? 0;
     const highPrev = histComp.highPrev ?? 0;
@@ -260,6 +266,10 @@ export async function GET(request: Request) {
       success: true,
       tenant: tenant.campusName,
       database: tenant.databaseName,
+      dataSource: {
+        incidents: incidentSource,
+        historicalStats: histComp.source || 'mongodb',
+      },
       groupBy,
       data: mapped,
       total: mapped.length,
