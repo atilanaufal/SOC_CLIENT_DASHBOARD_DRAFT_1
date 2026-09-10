@@ -17,7 +17,7 @@ import {
   HiChevronDown
 } from 'react-icons/hi2';
 import { Incident } from '@/lib/types';
-import { fetchIncidents } from '@/lib/api-client';
+import { fetchIncidents, FetchIncidentsResponse } from '@/lib/api-client';
 import { IncidentDetailDrawer } from '@/components/drawers/IncidentDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { GroupByModal, GroupByMode } from '@/components/modals/GroupByModal';
@@ -34,17 +34,44 @@ function IncidentsContent() {
 
   const { timeFilter, customRange } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalAlerts, setTotalAlerts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [statsData, setStatsData] = useState<any>(null);
+  const [filterOptions, setFilterOptions] = useState<{
+    agents: string[];
+    incidentNames: string[];
+    severities: string[];
+  }>({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [groupByMode, setGroupByMode] = useState<GroupByMode>('alerts');
   const [isGroupByModalOpen, setIsGroupByModalOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Sorting state (default: newest first)
+  const [sortKey, setSortKey] = useState<SortKey>('firstObserved');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Cycle tracking to discard stale async responses
+  const cycleIdRef = React.useRef<number>(0);
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Sync URL search parameters (e.g. from Dashboard Top Incidents view)
   useEffect(() => {
@@ -73,26 +100,35 @@ function IncidentsContent() {
     }
   }, [searchParams]);
 
-  // Sorting state (default: newest first)
-  const [sortKey, setSortKey] = useState<SortKey>('firstObserved');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  // Reset to page 1 whenever filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, activeFilters, timeFilter, customRange, groupByMode]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-
+  // Fetch server-side paginated & aggregated data with in-memory caching
   const loadData = async (forceRefresh = false) => {
-    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+    cycleIdRef.current += 1;
+    const currentCycle = cycleIdRef.current;
+
+    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}:${currentPage}:${sortKey}:${sortDirection}:${debouncedSearch}:${JSON.stringify(activeFilters)}`;
 
     if (!forceRefresh) {
       try {
-        const cached = await getClientCache<{ data: any[]; stats: any }>(cacheKey);
+        const cached = await getClientCache<FetchIncidentsResponse>(cacheKey);
+        if (cycleIdRef.current !== currentCycle) return;
         if (cached && Array.isArray(cached.data)) {
           setIncidents(cached.data);
-          setStatsData({ incidents: cached.stats || {} });
+          setTotal(cached.total);
+          setTotalAlerts(cached.totalAlerts);
+          setTotalPages(cached.totalPages);
+          if (cached.stats) setStatsData({ incidents: cached.stats });
+          if (cached.filterOptions) setFilterOptions(cached.filterOptions);
           setIsLoading(false);
           return;
         }
-      } catch {}
+      } catch (cacheErr) {
+        console.warn('[Incidents] Cache read notice:', cacheErr);
+      }
     } else {
       await invalidateClientCache(cacheKey);
     }
@@ -100,28 +136,45 @@ function IncidentsContent() {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchIncidents({
+      const res = await fetchIncidents({
+        page: currentPage,
+        limit: pageSize,
+        search: debouncedSearch,
+        severity: activeFilters.severity,
+        incidentType: activeFilters.incidentName,
+        agent: activeFilters.agent,
+        sortBy: sortKey,
+        sortOrder: sortDirection,
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
         groupBy: groupByMode,
       });
-      const incidentList = data || [];
-      const statsObj = (data as any)?.stats || {};
-      setIncidents(incidentList);
-      setStatsData({ incidents: statsObj });
-      setClientCache(cacheKey, { data: incidentList, stats: statsObj });
+
+      if (cycleIdRef.current !== currentCycle) return;
+
+      setIncidents(res.data || []);
+      setTotal(res.total);
+      setTotalAlerts(res.totalAlerts);
+      setTotalPages(res.totalPages);
+      if (res.stats) setStatsData({ incidents: res.stats });
+      if (res.filterOptions) setFilterOptions(res.filterOptions);
+
+      setClientCache(cacheKey, res);
     } catch (err: any) {
+      if (cycleIdRef.current !== currentCycle) return;
       console.error('Failed to load incidents data:', err);
       setError(err.message || 'Failed to load incidents');
     } finally {
-      setIsLoading(false);
+      if (cycleIdRef.current === currentCycle) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [groupByMode, timeFilter, customRange]);
+  }, [groupByMode, timeFilter, customRange, currentPage, sortKey, sortDirection, debouncedSearch, activeFilters]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -138,109 +191,30 @@ function IncidentsContent() {
   };
 
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(incidents.map((i) => i.severity))).filter(Boolean);
-    const incidentNames = Array.from(new Set(incidents.map((i) => i.incidentName))).filter(Boolean);
-    const agents = Array.from(new Set(incidents.map((i) => i.agent))).filter(Boolean);
-
     return [
       {
         key: 'severity',
         label: 'Severity Level',
         type: 'buttons',
-        options: severities.length ? severities : ['Critical', 'High', 'Medium'],
+        options: filterOptions.severities.length ? filterOptions.severities : ['Critical', 'High', 'Medium', 'Low'],
       },
       {
         key: 'incidentName',
         label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
         type: 'select',
-        options: incidentNames,
+        options: filterOptions.incidentNames || [],
       },
       {
         key: 'agent',
         label: 'Agent Affected',
         type: 'select',
-        options: agents,
+        options: filterOptions.agents || [],
       },
     ];
-  }, [incidents, groupByMode]);
+  }, [filterOptions, groupByMode]);
 
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter((inc) => {
-      const matchesSearch =
-        !searchTerm.trim() ||
-        inc.incidentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inc.incident_type && String(inc.incident_type).toLowerCase().includes(searchTerm.toLowerCase())) ||
-        inc.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inc.description && inc.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (inc.ruleId && inc.ruleId.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : inc.severity.toLowerCase() === activeFilters.severity.toLowerCase();
-
-      const matchesIncidentName =
-        !activeFilters.incidentName || activeFilters.incidentName === 'All'
-          ? true
-          : inc.incidentName.trim().toLowerCase() === activeFilters.incidentName.trim().toLowerCase();
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : inc.agent.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase() ||
-            (inc.host && inc.host.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase());
-
-      return matchesSearch && matchesSeverity && matchesIncidentName && matchesAgent;
-    });
-  }, [incidents, searchTerm, activeFilters]);
-
-  // Handle Sort with proper numeric timestamp sorting
-  const sortedIncidents = useMemo(() => {
-    return [...filteredIncidents].sort((a, b) => {
-      let aVal = a[sortKey] || '';
-      let bVal = b[sortKey] || '';
-
-      if (sortKey === 'severity') {
-        const severityWeight: Record<string, number> = {
-          critical: 4,
-          high: 3,
-          medium: 2,
-          low: 1,
-          informational: 0,
-        };
-        const aWeight = severityWeight[String(aVal).toLowerCase()] || 0;
-        const bWeight = severityWeight[String(bVal).toLowerCase()] || 0;
-        return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
-      }
-
-      if (sortKey === 'count') {
-        const countA = Number(a.count) || 0;
-        const countB = Number(b.count) || 0;
-        return sortDirection === 'asc' ? countA - countB : countB - countA;
-      }
-
-      if (sortKey === 'firstObserved') {
-        const timeA = getTimestamp(aVal);
-        const timeB = getTimestamp(bVal);
-        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
-      }
-
-      if (sortKey === 'lastObserved') {
-        const timeA = getTimestamp(a.lastObserved || a.firstObserved);
-        const timeB = getTimestamp(b.lastObserved || b.firstObserved);
-        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
-      }
-
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredIncidents, sortKey, sortDirection]);
-
-  // Pagination Slice
-  const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedIncidents = sortedIncidents.slice(startIndex, startIndex + pageSize);
+  const paginatedIncidents = incidents;
 
   const handleApplyFilters = (filters: Record<string, string>) => {
     setActiveFilters(filters);
@@ -720,7 +694,7 @@ function IncidentsContent() {
           {/* Interactive Pagination Controls */}
           <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
-              Showing {filteredIncidents.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredIncidents.length)} of {filteredIncidents.length} {groupByMode === 'incidents' ? 'Incidents' : 'Alerts'}
+              Showing {total === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, total)} of {formatNumber(total)} {groupByMode === 'incidents' ? 'Incidents' : 'Alerts'}
             </div>
             <Pagination
               currentPage={currentPage}

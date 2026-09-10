@@ -1,7 +1,10 @@
 import { getActiveRedisClient } from '@/lib/redis';
 import { getDb, getIncidentsCollection, getVulnerabilitiesCollection, getReportsCollection, getHistoricalStatisticsCollection } from '@/lib/db';
 import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
-import { parseCustomDate } from '@/lib/date-utils';
+import { parseCustomDate, formatStandardDate, getTimestamp } from '@/lib/date-utils';
+import { parseSeverity } from '@/lib/severity';
+import { getRiskCategory } from '@/lib/risk-score';
+import { groupAlertsToIncidents, mapAlertToItem, formatIncidentType } from '@/lib/incident-grouping';
 
 /**
  * Data Service (Dual-Tier Real-Time & Historical Architecture)
@@ -137,9 +140,9 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
     mitre_technique: mitreTechnique,
     ruleId: String(h.rule_id || h.ruleId || ''),
     rule_id: String(h.rule_id || h.ruleId || ''),
-    sourceIp: h.ip_source || h.agent_ip || h.sourceIp || '',
-    agent_ip: h.agent_ip || h.ip_source || h.sourceIp || '',
-    ip_source: h.ip_source || h.agent_ip || h.sourceIp || '',
+    sourceIp: h.ip_source || h.sourceIp || '',
+    agent_ip: h.agent_ip || '',
+    ip_source: h.ip_source || h.sourceIp || '',
     destIp: h.ip_destination || h.destIp || '',
     ip_destination: h.ip_destination || h.destIp || '',
     affected_file: h.affected_file || '',
@@ -453,13 +456,7 @@ function buildMongoIncidentFilter(
       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
         const sDateStr = formatDateOnly(start);
         const eDateStr = formatDateOnly(end);
-        return {
-          $or: [
-            { date: { $gte: sDateStr, $lte: eDateStr } },
-            { first_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } },
-            { last_observed: { $gte: formatDateTime(start), $lte: formatDateTime(end) } }
-          ]
-        };
+        return { date: { $gte: sDateStr, $lte: eDateStr } };
       }
     }
     return {};
@@ -467,17 +464,8 @@ function buildMongoIncidentFilter(
 
   if (lower === 'today') {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const todayDateStr = formatDateOnly(startOfToday);
-    return {
-      $or: [
-        { date: todayDateStr },
-        { first_observed: { $gte: startOfToday, $lte: endOfToday } },
-        { first_observed: { $gte: formatDateTime(startOfToday) } },
-        { last_observed: { $gte: startOfToday, $lte: endOfToday } },
-        { last_observed: { $gte: formatDateTime(startOfToday) } }
-      ]
-    };
+    return { date: todayDateStr };
   }
 
   if (lower === 'this week' || lower === '7d') {
@@ -485,29 +473,13 @@ function buildMongoIncidentFilter(
     const diffToMonday = (dayOfWeek + 6) % 7;
     const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
     const mondayDateStr = formatDateOnly(mondayThisWeek);
-    return {
-      $or: [
-        { date: { $gte: mondayDateStr } },
-        { first_observed: { $gte: mondayThisWeek } },
-        { first_observed: { $gte: formatDateTime(mondayThisWeek) } },
-        { last_observed: { $gte: mondayThisWeek } },
-        { last_observed: { $gte: formatDateTime(mondayThisWeek) } }
-      ]
-    };
+    return { date: { $gte: mondayDateStr } };
   }
 
   if (lower === 'this month' || lower === '30d') {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
     const startMonthDateStr = formatDateOnly(startOfMonth);
-    return {
-      $or: [
-        { date: { $gte: startMonthDateStr } },
-        { first_observed: { $gte: startOfMonth } },
-        { first_observed: { $gte: formatDateTime(startOfMonth) } },
-        { last_observed: { $gte: startOfMonth } },
-        { last_observed: { $gte: formatDateTime(startOfMonth) } }
-      ]
-    };
+    return { date: { $gte: startMonthDateStr } };
   }
 
   return {};
@@ -586,6 +558,1048 @@ export async function getTenantIncidents(
 ): Promise<Incident[]> {
   const res = await getTenantIncidentsWithSource(databaseName, redisPrefix, timeRange, startDate, endDate);
   return res.incidents;
+}
+
+export interface DashboardIncidentAggregatedResult {
+  stats: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    total: number;
+    score: number;
+  };
+  topIncidents: any[];
+  source: 'redis' | 'mongodb';
+}
+
+/**
+ * Agregasi super cepat untuk Dashboard Incidents:
+ * - Jika data ada di Redis (Today/This Week): hitung langsung dari in-memory cache.
+ * - Jika di MongoDB (This Month/30d/All): gunakan MongoDB $facet aggregation server-side
+ *   sehingga tidak perlu me-load puluhan ribu dokumen ke RAM Node.js.
+ */
+export async function queryDashboardIncidentStats(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null,
+  registeredAgentKeys: string[] = [],
+  tenantCampusName: string = ''
+): Promise<DashboardIncidentAggregatedResult> {
+  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
+  if (isRecent) {
+    try {
+      const redisIncidents = await fetchIncidentsFromRedis(databaseName, redisPrefix, timeRange, startDate, endDate);
+      if (redisIncidents && redisIncidents.length > 0) {
+        const validIncidents = redisIncidents.filter((inc) => {
+          const idStr = String(inc.agent_id || inc.agent || inc.host || '').trim();
+          const hostStr = String(inc.host || '').trim().toLowerCase();
+          const agentStr = String(inc.agent || '').trim().toLowerCase();
+          const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
+          const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
+          const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
+          return !isAgent000 && !isHealthChecker && !isCampusWeb;
+        });
+
+        let critical = 0;
+        let high = 0;
+        let medium = 0;
+        let low = 0;
+        const agentSeverityMap: Record<string, { critical: number; high: number; medium: number }> = {};
+
+        validIncidents.forEach((inc) => {
+          const sev = parseSeverity(inc.severity).toLowerCase();
+          if (sev === 'critical') critical++;
+          else if (sev === 'high') high++;
+          else if (sev === 'medium') medium++;
+          else low++;
+
+          const canonicalKey = String(inc.host || inc.agent || inc.agent_id || '').trim().toLowerCase();
+          if (canonicalKey) {
+            if (!agentSeverityMap[canonicalKey]) {
+              agentSeverityMap[canonicalKey] = { critical: 0, high: 0, medium: 0 };
+            }
+            if (sev === 'critical') agentSeverityMap[canonicalKey].critical++;
+            else if (sev === 'high') agentSeverityMap[canonicalKey].high++;
+            else if (sev === 'medium') agentSeverityMap[canonicalKey].medium++;
+          }
+        });
+
+        const targetAgents = registeredAgentKeys.length > 0
+          ? registeredAgentKeys
+          : Object.keys(agentSeverityMap);
+        const totalAgentsCount = Math.max(1, targetAgents.length);
+        let sumAgentScores = 0;
+        targetAgents.forEach((agentKey) => {
+          const st = agentSeverityMap[agentKey] || { critical: 0, high: 0, medium: 0 };
+          sumAgentScores += Math.min(100, st.critical * 6 + st.high * 3 + st.medium * 1);
+        });
+        const score = Math.round((sumAgentScores / totalAgentsCount) * 10) / 10;
+
+        const groupedList = groupAlertsToIncidents(validIncidents, tenantCampusName);
+        const topIncidents = groupedList.slice(0, 30).map((inc, index) => {
+          const ts = getTimestamp(inc.lastObserved || inc.firstObserved || inc.date);
+          return {
+            id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
+            incidentName: inc.incidentName,
+            incident_type: inc.incident_type,
+            severity: inc.severity,
+            agent: inc.agent,
+            agentsList: [inc.agent],
+            host: inc.host || inc.agent,
+            count: inc.count || 1,
+            firstObserved: inc.firstObserved,
+            lastObserved: inc.lastObserved,
+            rawDate: ts,
+            ruleId: inc.ruleId || 'N/A',
+            tenant: tenantCampusName,
+          };
+        });
+
+        return {
+          stats: { critical, high, medium, low, total: critical + high + medium + low, score },
+          topIncidents,
+          source: 'redis',
+        };
+      }
+    } catch (err: any) {
+      console.warn('[DashboardStats] Redis incident aggregation failed, fallback to Mongo:', err.message);
+    }
+  }
+
+  // MongoDB Server-Side Fast Aggregation
+  try {
+    const col = await getIncidentsCollection(databaseName);
+    const baseFilter = buildMongoIncidentFilter(timeRange, startDate, endDate);
+    const matchFilter: Record<string, any> = {
+      ...baseFilter,
+      agent_id: { $nin: ['000', '0', 0] },
+      host: { $not: /srv-web\.campus\.ac\.id/i },
+    };
+
+    const facetRes = await col.aggregate([
+      { $match: matchFilter },
+      {
+        $facet: {
+          severityCounts: [
+            {
+              $group: {
+                _id: '$severity',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          agentCounts: [
+            {
+              $group: {
+                _id: {
+                  agent: { $ifNull: ['$host', '$agent'] },
+                  severity: '$severity',
+                },
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          topIncidentsCritical: [
+            {
+              $match: {
+                $or: [
+                  { severity: { $gte: 15 } },
+                  { severity: { $in: ['Critical', 'critical', 'CRITICAL'] } },
+                ],
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  rule_id: '$rule_id',
+                  agent: { $ifNull: ['$host', '$agent'] },
+                  ip_source: { $ifNull: ['$ip_source', ''] },
+                  date: '$date',
+                },
+                firstDoc: { $first: '$$ROOT' },
+                count: { $sum: 1 },
+                firstObserved: { $min: '$first_observed' },
+                lastObserved: { $max: '$first_observed' },
+              },
+            },
+            { $sort: { lastObserved: -1 } },
+            { $limit: 10 },
+          ],
+          topIncidentsHigh: [
+            {
+              $match: {
+                $or: [
+                  { severity: { $gte: 12, $lte: 14 } },
+                  { severity: { $in: ['High', 'high', 'HIGH'] } },
+                ],
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  rule_id: '$rule_id',
+                  agent: { $ifNull: ['$host', '$agent'] },
+                  ip_source: { $ifNull: ['$ip_source', ''] },
+                  date: '$date',
+                },
+                firstDoc: { $first: '$$ROOT' },
+                count: { $sum: 1 },
+                firstObserved: { $min: '$first_observed' },
+                lastObserved: { $max: '$first_observed' },
+              },
+            },
+            { $sort: { lastObserved: -1 } },
+            { $limit: 10 },
+          ],
+          topIncidentsMedium: [
+            {
+              $match: {
+                $or: [
+                  { severity: { $gte: 7, $lte: 11 } },
+                  { severity: { $in: ['Medium', 'medium', 'MEDIUM'] } },
+                ],
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  rule_id: '$rule_id',
+                  agent: { $ifNull: ['$host', '$agent'] },
+                  ip_source: { $ifNull: ['$ip_source', ''] },
+                  date: '$date',
+                },
+                firstDoc: { $first: '$$ROOT' },
+                count: { $sum: 1 },
+                firstObserved: { $min: '$first_observed' },
+                lastObserved: { $max: '$first_observed' },
+              },
+            },
+            { $sort: { lastObserved: -1 } },
+            { $limit: 10 },
+          ],
+        },
+      },
+    ]).toArray();
+
+    const facet = facetRes[0] || {};
+    const severityCounts = facet.severityCounts || [];
+    let critical = 0;
+    let high = 0;
+    let medium = 0;
+    let low = 0;
+
+    for (const item of severityCounts) {
+      const sev = parseSeverity(item._id).toLowerCase();
+      const count = Number(item.count) || 0;
+      if (sev === 'critical') critical += count;
+      else if (sev === 'high') high += count;
+      else if (sev === 'medium') medium += count;
+      else low += count;
+    }
+
+    const agentCounts = facet.agentCounts || [];
+    const agentSeverityMap: Record<string, { critical: number; high: number; medium: number }> = {};
+    for (const item of agentCounts) {
+      const rawAgent = item._id?.agent;
+      const canonicalKey = String(rawAgent || '').trim().toLowerCase();
+      if (!canonicalKey) continue;
+      if (!agentSeverityMap[canonicalKey]) {
+        agentSeverityMap[canonicalKey] = { critical: 0, high: 0, medium: 0 };
+      }
+      const sev = parseSeverity(item._id?.severity).toLowerCase();
+      const count = Number(item.count) || 0;
+      if (sev === 'critical') agentSeverityMap[canonicalKey].critical += count;
+      else if (sev === 'high') agentSeverityMap[canonicalKey].high += count;
+      else if (sev === 'medium') agentSeverityMap[canonicalKey].medium += count;
+    }
+
+    const targetAgents = registeredAgentKeys.length > 0
+      ? registeredAgentKeys
+      : Object.keys(agentSeverityMap);
+    const totalAgentsCount = Math.max(1, targetAgents.length);
+    let sumAgentScores = 0;
+    targetAgents.forEach((agentKey) => {
+      const st = agentSeverityMap[agentKey] || { critical: 0, high: 0, medium: 0 };
+      sumAgentScores += Math.min(100, st.critical * 6 + st.high * 3 + st.medium * 1);
+    });
+    const score = Math.round((sumAgentScores / totalAgentsCount) * 10) / 10;
+
+    const rawTopList = [
+      ...(facet.topIncidentsCritical || []),
+      ...(facet.topIncidentsHigh || []),
+      ...(facet.topIncidentsMedium || []),
+    ];
+
+    const topIncidents = rawTopList.map((item: any, idx: number) => {
+      const doc = item.firstDoc || {};
+      const agentName = item._id?.agent || doc.host || doc.agent || 'Agent';
+      const ruleId = item._id?.rule_id || doc.rule_id || '';
+      const ipSource = item._id?.ip_source || doc.ip_source || '';
+      const lastObs = item.lastObserved || doc.last_observed || doc.first_observed || '';
+      const firstObs = item.firstObserved || doc.first_observed || lastObs;
+      const ts = getTimestamp(lastObs || item._id?.date);
+      const rawType = doc.incident_type;
+      const incType = Array.isArray(rawType) ? rawType.join(', ') : (rawType || 'Unknown');
+      const incName = doc.description || (ruleId ? `Rule ${ruleId}` : 'Security Incident');
+      return {
+        id: String(doc._id || `top-inc-${idx + 1}_${ts}`),
+        incidentName: incName,
+        incident_type: incType,
+        severity: parseSeverity(doc.severity),
+        agent: agentName,
+        agentsList: [agentName],
+        host: doc.host || agentName,
+        count: item.count || 1,
+        firstObserved: firstObs,
+        lastObserved: lastObs,
+        rawDate: ts,
+        ruleId: String(ruleId || 'N/A'),
+        sourceIp: ipSource,
+        ip_source: ipSource,
+        tenant: tenantCampusName,
+      };
+    });
+
+    return {
+      stats: { critical, high, medium, low, total: critical + high + medium + low, score },
+      topIncidents,
+      source: 'mongodb',
+    };
+  } catch (err: any) {
+    console.error('[DashboardStats] Mongo aggregation error:', err);
+    return {
+      stats: { critical: 0, high: 0, medium: 0, low: 0, total: 0, score: 0 },
+      topIncidents: [],
+      source: 'mongodb',
+    };
+  }
+}
+
+/**
+ * Server-side Aggregation untuk Device Risk Scores:
+ * - Menghitung skor risiko dan sebaran severity per agen langsung di MongoDB / Redis Hot Cache
+ *   tanpa menarik puluhan ribu dokumen mentah ke memori server.
+ */
+export async function queryDeviceRiskScores(
+  databaseName: string,
+  redisPrefix: string,
+  timeRange?: string,
+  startDate?: string | null,
+  endDate?: string | null
+): Promise<Record<string, {
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  score: number;
+  riskCategory: string;
+  detectedIssues: string[];
+}>> {
+  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
+  if (isRecent) {
+    try {
+      const redisIncidents = await fetchIncidentsFromRedis(databaseName, redisPrefix, timeRange, startDate, endDate);
+      if (redisIncidents && redisIncidents.length > 0) {
+        const validIncidents = redisIncidents.filter((inc) => {
+          const idStr = String(inc.agent_id || inc.agent || inc.host || '').trim();
+          const hostStr = String(inc.host || '').trim().toLowerCase();
+          const agentStr = String(inc.agent || '').trim().toLowerCase();
+          const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
+          const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
+          const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
+          return !isAgent000 && !isHealthChecker && !isCampusWeb;
+        });
+
+        const tempMap = new Map<string, { critical: number; high: number; medium: number; low: number; issues: Set<string> }>();
+        validIncidents.forEach((inc) => {
+          const agentIdKey = String(inc.agent_id || inc.agent || inc.host || '').trim().toLowerCase();
+          const hostKey = String(inc.host || inc.agent || '').trim().toLowerCase();
+          const nameKey = String(inc.agent || inc.host || '').trim().toLowerCase();
+          const ipKey = String(inc.agent_ip || '').trim().toLowerCase();
+
+          const sev = parseSeverity(inc.severity).toLowerCase();
+          const count = 1;
+          const issueText = String(inc.description || inc.incident_type || inc.incidentName || '');
+
+          const keysToUpdate = Array.from(new Set([agentIdKey, hostKey, nameKey, ipKey])).filter(Boolean);
+          keysToUpdate.forEach((key) => {
+            if (!tempMap.has(key)) {
+              tempMap.set(key, { critical: 0, high: 0, medium: 0, low: 0, issues: new Set<string>() });
+            }
+            const stat = tempMap.get(key)!;
+            if (sev === 'critical') stat.critical += count;
+            else if (sev === 'high') stat.high += count;
+            else if (sev === 'medium') stat.medium += count;
+            else stat.low += count;
+            if (issueText && stat.issues.size < 5) {
+              stat.issues.add(issueText);
+            }
+          });
+        });
+
+        const scoresMap: Record<string, any> = {};
+        tempMap.forEach((stats, key) => {
+          const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
+          const score = Math.min(100, rawScore);
+          const cat = getRiskCategory(score);
+          scoresMap[key] = {
+            criticalCount: stats.critical,
+            highCount: stats.high,
+            mediumCount: stats.medium,
+            lowCount: stats.low,
+            score,
+            riskCategory: cat.label,
+            detectedIssues: Array.from(stats.issues),
+          };
+        });
+        return scoresMap;
+      }
+    } catch {
+      // fallback to Mongo
+    }
+  }
+
+  // MongoDB Server-Side Fast Aggregation
+  try {
+    const col = await getIncidentsCollection(databaseName);
+    const baseFilter = buildMongoIncidentFilter(timeRange, startDate, endDate);
+    const matchFilter: Record<string, any> = {
+      ...baseFilter,
+      agent_id: { $nin: ['000', '0', 0] },
+      host: { $not: /srv-web\.campus\.ac\.id/i },
+    };
+
+    const grouped = await col.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: {
+            agent_id: '$agent_id',
+            host: { $ifNull: ['$host', '$agent'] },
+            ip: { $ifNull: ['$agent_ip', ''] },
+            severity: '$severity',
+          },
+          count: { $sum: 1 },
+          sampleDesc: { $first: { $ifNull: ['$description', '$incident_type'] } },
+        },
+      },
+    ]).toArray();
+
+    const tempMap = new Map<string, { critical: number; high: number; medium: number; low: number; issues: Set<string> }>();
+
+    for (const item of grouped) {
+      const g = item._id || {};
+      const agentIdKey = String(g.agent_id || '').trim().toLowerCase();
+      const hostKey = String(g.host || '').trim().toLowerCase();
+      const ipKey = String(g.ip || '').trim().toLowerCase();
+
+      const sev = parseSeverity(g.severity).toLowerCase();
+      const count = Number(item.count) || 1;
+      const issueText = Array.isArray(item.sampleDesc) ? item.sampleDesc.join(', ') : String(item.sampleDesc || '');
+
+      const keysToUpdate = Array.from(new Set([agentIdKey, hostKey, ipKey])).filter(Boolean);
+      keysToUpdate.forEach((key) => {
+        if (!tempMap.has(key)) {
+          tempMap.set(key, { critical: 0, high: 0, medium: 0, low: 0, issues: new Set<string>() });
+        }
+        const stat = tempMap.get(key)!;
+        if (sev === 'critical') stat.critical += count;
+        else if (sev === 'high') stat.high += count;
+        else if (sev === 'medium') stat.medium += count;
+        else stat.low += count;
+        if (issueText && stat.issues.size < 5) {
+          stat.issues.add(issueText);
+        }
+      });
+    }
+
+    const scoresMap: Record<string, any> = {};
+    tempMap.forEach((stats, key) => {
+      const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
+      const score = Math.min(100, rawScore);
+      const cat = getRiskCategory(score);
+      scoresMap[key] = {
+        criticalCount: stats.critical,
+        highCount: stats.high,
+        mediumCount: stats.medium,
+        lowCount: stats.low,
+        score,
+        riskCategory: cat.label,
+        detectedIssues: Array.from(stats.issues),
+      };
+    });
+
+    return scoresMap;
+  } catch (err: any) {
+    console.error('[queryDeviceRiskScores] Error:', err);
+    return {};
+  }
+}
+
+export interface ServerSideIncidentsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  severity?: string;
+  incidentType?: string;
+  agent?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  timeRange?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  groupBy?: 'alerts' | 'incidents';
+  tenantName?: string;
+}
+
+export interface ServerSideIncidentsResult {
+  data: Incident[];
+  total: number;
+  totalAlerts: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  dataSource: {
+    incidents: 'redis' | 'mongodb';
+    historicalStats: string;
+  };
+  groupBy: 'alerts' | 'incidents';
+  incidents: {
+    critical: number;
+    criticalPrev: number;
+    criticalDelta: number;
+    high: number;
+    highPrev: number;
+    highDelta: number;
+    medium: number;
+    mediumPrev: number;
+    mediumDelta: number;
+    low: number;
+    lowPrev: number;
+    lowDelta: number;
+    total: number;
+    totalPrev: number;
+    totalDelta: number;
+    periodLabel: string;
+  };
+  filterOptions?: {
+    agents: string[];
+    incidentNames: string[];
+    severities: string[];
+  };
+}
+
+/**
+ * High-Performance Server-Side Aggregation and Pagination for Incidents (Wazuh / OpenSearch style).
+ * - Rentang 1-7 Hari: Prioritas ke Redis Hot-Cache dengan memory pagination & grouping.
+ * - Rentang > 7 Hari (This Month, 30d, etc.): Pipeline $facet MongoDB dengan projection tanpa log mentah berat (< 150ms).
+ * - Lazy Loading: Kolom full_logs tidak dimuat di tabel list, hanya diambil on-demand saat View Full Log dibuka.
+ */
+export async function queryServerSideIncidents(
+  databaseName: string,
+  redisPrefix: string,
+  options: ServerSideIncidentsQuery
+): Promise<ServerSideIncidentsResult> {
+  const page = Math.max(1, Number(options.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(options.limit) || 10));
+  const skip = (page - 1) * limit;
+  const groupBy = options.groupBy === 'incidents' ? 'incidents' : 'alerts';
+  const tenantName = options.tenantName || databaseName;
+  const timeRange = options.timeRange || 'Today';
+  const startDate = options.startDate;
+  const endDate = options.endDate;
+
+  const isRecent = isQueryForRecentDays(timeRange, startDate, endDate);
+
+  // 1. Prioritas ke Redis Hot Cache untuk rentang 1-7 hari
+  if (isRecent) {
+    try {
+      const rawDocs = await fetchIncidentsFromRedis(databaseName, redisPrefix, timeRange, startDate, endDate);
+      if (rawDocs && rawDocs.length > 0) {
+        // Filter out agent 000 / health-checker
+        const validDocs = rawDocs.filter((doc: any) => {
+          const idStr = String(doc.agent_id || doc.agent || doc.host || '').trim();
+          const hostStr = String(doc.host || '').trim().toLowerCase();
+          const agentStr = String(doc.agent || '').trim().toLowerCase();
+
+          const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
+          const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
+          const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
+
+          return !isAgent000 && !isHealthChecker && !isCampusWeb;
+        });
+
+        let filtered = validDocs;
+
+        if (options.incidentType && options.incidentType !== 'All') {
+          const typeRegex = new RegExp(options.incidentType, 'i');
+          filtered = filtered.filter((d: any) => {
+            const incType = Array.isArray(d.incidentName || d.incident_type) ? (d.incidentName || d.incident_type).join(', ') : String(d.incidentName || d.incident_type || '');
+            const desc = String(d.description || '');
+            return typeRegex.test(incType) || typeRegex.test(desc);
+          });
+        }
+
+        if (options.agent && options.agent !== 'All') {
+          const agentRegex = new RegExp(options.agent, 'i');
+          filtered = filtered.filter((d: any) => {
+            const h = String(d.host || d.agent || '');
+            return agentRegex.test(h);
+          });
+        }
+
+        // Calculate severity breakdown on raw alerts
+        let critical = 0;
+        let high = 0;
+        let medium = 0;
+        let low = 0;
+
+        filtered.forEach((doc: any) => {
+          const s = parseSeverity(doc.severity).toLowerCase();
+          if (s === 'critical') critical++;
+          else if (s === 'high') high++;
+          else if (s === 'medium') medium++;
+          else low++;
+        });
+        const totalAlerts = filtered.length;
+
+        // Group or map with includeFullLogs = false (lazy loading!)
+        let mapped = groupBy === 'incidents'
+          ? groupAlertsToIncidents(filtered, tenantName, false)
+          : filtered.map((doc: any, index: number) => mapAlertToItem(doc, index, tenantName, false));
+
+        if (options.severity && options.severity !== 'All') {
+          mapped = mapped.filter((item) => item.severity.toLowerCase() === options.severity?.toLowerCase());
+        }
+
+        if (options.search && options.search.trim()) {
+          const q = options.search.toLowerCase().trim();
+          mapped = mapped.filter(
+            (item) =>
+              item.incidentName.toLowerCase().includes(q) ||
+              item.agent.toLowerCase().includes(q) ||
+              item.description.toLowerCase().includes(q) ||
+              item.mitre.toLowerCase().includes(q) ||
+              (item.sourceIp && item.sourceIp.toLowerCase().includes(q))
+          );
+        }
+
+        // Sort
+        const sortDirection = options.sortOrder === 'asc' ? 1 : -1;
+        mapped.sort((a: any, b: any) => {
+          if (options.sortBy === 'count') {
+            return ((a.count || 1) - (b.count || 1)) * sortDirection;
+          }
+          if (options.sortBy === 'severity') {
+            const order: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+            const sA = order[String(a.severity).toLowerCase()] || 0;
+            const sB = order[String(b.severity).toLowerCase()] || 0;
+            return (sA - sB) * sortDirection;
+          }
+          if (options.sortBy === 'agent') {
+            return a.agent.localeCompare(b.agent) * sortDirection;
+          }
+          if (options.sortBy === 'incidentName' || options.sortBy === 'name') {
+            return a.incidentName.localeCompare(b.incidentName) * sortDirection;
+          }
+          if (options.sortBy === 'lastObserved' && groupBy === 'incidents') {
+            const tA = getTimestamp(a.lastObserved || a.firstObserved || a.date);
+            const tB = getTimestamp(b.lastObserved || b.firstObserved || b.date);
+            return (tA - tB) * sortDirection;
+          }
+          const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
+          const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
+          return (tA - tB) * sortDirection;
+        });
+
+        const total = mapped.length;
+        const totalPages = Math.ceil(total / limit) || 1;
+        const paginatedDocs = mapped.slice(skip, skip + limit);
+
+        // Historical comparison
+        const histComp = await getHistoricalComparisonStats(databaseName, timeRange, startDate, endDate, redisPrefix);
+        const criticalPrev = histComp.criticalPrev ?? 0;
+        const highPrev = histComp.highPrev ?? 0;
+        const mediumPrev = histComp.mediumPrev ?? 0;
+        const lowPrev = histComp.lowPrev ?? 0;
+        const totalPrev = histComp.totalPrev ?? 0;
+
+        return {
+          data: paginatedDocs,
+          total,
+          totalAlerts,
+          page,
+          limit,
+          totalPages,
+          groupBy,
+          dataSource: {
+            incidents: 'redis',
+            historicalStats: histComp.source || 'redis',
+          },
+          incidents: {
+            critical,
+            criticalPrev,
+            criticalDelta: critical - criticalPrev,
+            high,
+            highPrev,
+            highDelta: high - highPrev,
+            medium,
+            mediumPrev,
+            mediumDelta: medium - mediumPrev,
+            low,
+            lowPrev,
+            lowDelta: low - lowPrev,
+            total: totalAlerts,
+            totalPrev,
+            totalDelta: totalAlerts - totalPrev,
+            periodLabel: histComp.periodLabel || 'PREVIOUS PERIOD',
+          },
+          filterOptions: {
+            agents: Array.from(new Set(validDocs.map((d: any) => d.host || d.agent).filter(Boolean))).sort(),
+            incidentNames: Array.from(new Set(validDocs.map((d: any) => {
+              if (Array.isArray(d.incident_type) && d.incident_type.length > 0) return d.incident_type[0];
+              return d.incident_type || d.incidentName || d.description;
+            }).filter(Boolean))).sort(),
+            severities: ['Critical', 'High', 'Medium', 'Low'],
+          },
+        };
+      }
+    } catch (redisErr: any) {
+      console.warn('[DataService] Redis server-side incident query notice:', redisErr.message);
+    }
+  }
+
+  // 2. High-performance MongoDB $facet Aggregation for > 7 days or Fallback
+  try {
+    const col = await getIncidentsCollection(databaseName);
+    const baseDateFilter = buildMongoIncidentFilter(timeRange, startDate, endDate);
+
+    const matchConditions: any[] = [
+      {
+        agent_id: { $nin: ['000', '0', 0] },
+        host: { $nin: ['health-checker', '000', /srv-web\.campus\.ac\.id/i] }
+      }
+    ];
+
+    if (Object.keys(baseDateFilter).length > 0) {
+      matchConditions.push(baseDateFilter);
+    }
+
+    if (options.severity && options.severity !== 'All') {
+      const sLower = options.severity.trim().toLowerCase();
+      if (sLower === 'critical') {
+        matchConditions.push({
+          $or: [
+            { severity: { $regex: /^critical$/i } },
+            { severity: { $gte: 15 } }
+          ]
+        });
+      } else if (sLower === 'high') {
+        matchConditions.push({
+          $or: [
+            { severity: { $regex: /^high$/i } },
+            { severity: { $gte: 12, $lte: 14 } }
+          ]
+        });
+      } else if (sLower === 'medium') {
+        matchConditions.push({
+          $or: [
+            { severity: { $regex: /^medium$/i } },
+            { severity: { $gte: 7, $lte: 11 } }
+          ]
+        });
+      } else if (sLower === 'low') {
+        matchConditions.push({
+          $or: [
+            { severity: { $regex: /^low$/i } },
+            { severity: { $gte: 1, $lte: 6 } }
+          ]
+        });
+      } else {
+        matchConditions.push({ severity: { $regex: new RegExp(`^${options.severity}$`, 'i') } });
+      }
+    }
+
+    if (options.agent && options.agent !== 'All') {
+      const aRegex = new RegExp(options.agent, 'i');
+      matchConditions.push({
+        $or: [{ host: aRegex }, { agent: aRegex }, { agent_id: aRegex }]
+      });
+    }
+
+    if (options.incidentType && options.incidentType !== 'All') {
+      const tRegex = new RegExp(options.incidentType, 'i');
+      matchConditions.push({
+        $or: [{ incident_type: tRegex }, { description: tRegex }]
+      });
+    }
+
+    if (options.search && options.search.trim()) {
+      const q = options.search.trim();
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sRegex = new RegExp(escaped, 'i');
+      matchConditions.push({
+        $or: [
+          { description: sRegex },
+          { incident_type: sRegex },
+          { host: sRegex },
+          { agent: sRegex },
+          { agent_id: sRegex },
+          { agent_ip: sRegex },
+          { ip_source: sRegex },
+          { sourceIp: sRegex },
+          { rule_id: sRegex }
+        ]
+      });
+    }
+
+    const searchAndFilter = matchConditions.length === 1 ? matchConditions[0] : { $and: matchConditions };
+
+    const sortDirection: 1 | -1 = options.sortOrder === 'asc' ? 1 : -1;
+
+    let facetPipeline: Record<string, any> = {};
+
+    if (groupBy === 'incidents') {
+      let groupSortStage: Record<string, 1 | -1> = { last_observed: -1 };
+      if (options.sortBy === 'count') {
+        groupSortStage = { count: sortDirection, last_observed: -1 };
+      } else if (options.sortBy === 'severity') {
+        groupSortStage = { severity: sortDirection, last_observed: -1 };
+      } else if (options.sortBy === 'agent') {
+        groupSortStage = { host: sortDirection, last_observed: -1 };
+      } else if (options.sortBy === 'firstObserved') {
+        groupSortStage = { first_observed: sortDirection };
+      } else if (options.sortBy === 'lastObserved') {
+        groupSortStage = { last_observed: sortDirection };
+      }
+
+      facetPipeline = {
+        severityStats: [
+          { $group: { _id: '$severity', count: { $sum: 1 } } }
+        ],
+        totalAlerts: [
+          { $count: 'count' }
+        ],
+        uniqueAgents: [
+          { $match: { host: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$host' } },
+          { $limit: 100 }
+        ],
+        uniqueIncidentNames: [
+          { $match: { incident_type: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$incident_type' } },
+          { $limit: 100 }
+        ],
+        groupedCount: [
+          {
+            $group: {
+              _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' }
+            }
+          },
+          { $count: 'count' }
+        ],
+        paginatedRows: [
+          {
+            $group: {
+              _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+              count: { $sum: 1 },
+              sample_id: { $first: '$_id' },
+              first_observed: { $min: '$first_observed' },
+              last_observed: { $max: '$first_observed' },
+              severity: { $first: '$severity' },
+              incident_type: { $first: '$incident_type' },
+              description: { $first: '$description' },
+              rule_id: { $first: '$rule_id' },
+              host: { $first: '$host' },
+              agent_id: { $first: '$agent_id' },
+              agent_ip: { $first: '$agent_ip' },
+              ip_source: { $first: '$ip_source' },
+              ip_destination: { $first: '$ip_destination' },
+              affected_file: { $first: '$affected_file' },
+              mitre_id: { $first: '$mitre_id' },
+              mitre_tactic: { $first: '$mitre_tactic' },
+              mitre_technique: { $first: '$mitre_technique' }
+            }
+          },
+          { $sort: groupSortStage },
+          { $skip: skip },
+          { $limit: limit }
+        ]
+      };
+    } else {
+      let alertSortStage: Record<string, 1 | -1> = { first_observed: -1, _id: -1 };
+      if (options.sortBy === 'severity') {
+        alertSortStage = { severity: sortDirection, first_observed: -1 };
+      } else if (options.sortBy === 'agent') {
+        alertSortStage = { host: sortDirection, first_observed: -1 };
+      } else if (options.sortBy === 'firstObserved') {
+        alertSortStage = { first_observed: sortDirection, _id: -1 };
+      }
+
+      facetPipeline = {
+        severityStats: [
+          { $group: { _id: '$severity', count: { $sum: 1 } } }
+        ],
+        totalAlerts: [
+          { $count: 'count' }
+        ],
+        uniqueAgents: [
+          { $match: { host: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$host' } },
+          { $limit: 100 }
+        ],
+        uniqueIncidentNames: [
+          { $match: { description: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$description' } },
+          { $limit: 100 }
+        ],
+        paginatedRows: [
+          { $sort: alertSortStage },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              full_logs: 0,
+              full_log: 0,
+              raw_log: 0,
+              log: 0
+            }
+          }
+        ]
+      };
+    }
+
+    const [facetRes] = await col.aggregate([
+      { $match: searchAndFilter },
+      { $facet: facetPipeline }
+    ]).toArray();
+
+    let critical = 0;
+    let high = 0;
+    let medium = 0;
+    let low = 0;
+
+    for (const s of facetRes.severityStats || []) {
+      const parsed = parseSeverity(s._id).toLowerCase();
+      if (parsed === 'critical') critical += s.count;
+      else if (parsed === 'high') high += s.count;
+      else if (parsed === 'medium') medium += s.count;
+      else if (parsed === 'low') low += s.count;
+    }
+
+    const totalAlerts = facetRes.totalAlerts?.[0]?.count || 0;
+    const total = groupBy === 'incidents'
+      ? (facetRes.groupedCount?.[0]?.count || 0)
+      : totalAlerts;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    let mappedData: Incident[] = [];
+
+    if (groupBy === 'incidents') {
+      mappedData = (facetRes.paginatedRows || []).map((row: any) => {
+        const gKey = row._id || {};
+        const ruleId = String(row.rule_id || gKey.rule_id || '');
+        const agentName = row.host || gKey.agent || (row.agent_id ? `Agent ${row.agent_id}` : 'Agent');
+        const rawIncType = formatIncidentType(row.incident_type);
+        const incName = rawIncType || (ruleId ? `Rule ${ruleId}` : 'Security Event');
+        const rawFirst = row.first_observed || row.date;
+        const rawLast = row.last_observed || rawFirst;
+        const uniqueId = `inc_grp_${ruleId}:::${row.agent_id || agentName}:::${row.ip_source || gKey.ip || ''}:::${row.date || gKey.date || ''}`.replace(/[:\/ ]+/g, '_');
+
+        const sampleId = String(row.sample_id || uniqueId);
+
+        return {
+          id: uniqueId,
+          _id: uniqueId,
+          sample_id: sampleId,
+          incidentName: incName,
+          incident_type: rawIncType,
+          severity: parseSeverity(row.severity),
+          agent: agentName,
+          host: agentName,
+          agent_id: row.agent_id ? String(row.agent_id) : undefined,
+          ruleId,
+          rule_id: ruleId,
+          firstObserved: formatStandardDate(rawFirst),
+          lastObserved: formatStandardDate(rawLast),
+          count: row.count || 1,
+          description: row.description || '',
+          mitre: row.mitre_id || row.mitre_technique || '',
+          mitre_id: row.mitre_id || '',
+          mitre_tactic: row.mitre_tactic || '',
+          mitre_technique: row.mitre_technique || '',
+          sourceIp: row.ip_source || row.sourceIp || '',
+          agent_ip: row.agent_ip || '',
+          ip_source: row.ip_source || row.sourceIp || '',
+          destIp: row.ip_destination || '',
+          ip_destination: row.ip_destination || '',
+          affected_file: row.affected_file || '',
+          university: tenantName,
+          tenant: tenantName,
+          full_logs: '', // LAZY LOADED: Loaded on-demand when "View Full Log" is clicked
+        };
+      });
+    } else {
+      mappedData = (facetRes.paginatedRows || []).map((doc: any, index: number) => {
+        const item = mapAlertToItem(doc, skip + index, tenantName, false);
+        return item;
+      });
+    }
+
+    const histComp = await getHistoricalComparisonStats(databaseName, timeRange, startDate, endDate, redisPrefix);
+    const criticalPrev = histComp.criticalPrev ?? 0;
+    const highPrev = histComp.highPrev ?? 0;
+    const mediumPrev = histComp.mediumPrev ?? 0;
+    const lowPrev = histComp.lowPrev ?? 0;
+    const totalPrev = histComp.totalPrev ?? 0;
+
+    return {
+      data: mappedData,
+      total,
+      totalAlerts,
+      page,
+      limit,
+      totalPages,
+      groupBy,
+      dataSource: {
+        incidents: 'mongodb',
+        historicalStats: histComp.source || 'mongodb',
+      },
+      incidents: {
+        critical,
+        criticalPrev,
+        criticalDelta: critical - criticalPrev,
+        high,
+        highPrev,
+        highDelta: high - highPrev,
+        medium,
+        mediumPrev,
+        mediumDelta: medium - mediumPrev,
+        low,
+        lowPrev,
+        lowDelta: low - lowPrev,
+        total: totalAlerts,
+        totalPrev,
+        totalDelta: totalAlerts - totalPrev,
+        periodLabel: histComp.periodLabel || 'PREVIOUS PERIOD',
+      },
+      filterOptions: {
+        agents: (facetRes.uniqueAgents || []).map((a: any) => String(a._id || '')).filter(Boolean).sort(),
+        incidentNames: (facetRes.uniqueIncidentNames || []).map((i: any) => {
+          const val = i._id;
+          if (Array.isArray(val)) return val[0] || '';
+          return String(val || '');
+        }).filter(Boolean).sort(),
+        severities: ['Critical', 'High', 'Medium', 'Low'],
+      },
+    };
+  } catch (mongoErr: any) {
+    console.error('[queryServerSideIncidents] MongoDB error:', mongoErr);
+    throw mongoErr;
+  }
 }
 
 export interface VulnerabilitiesResult {

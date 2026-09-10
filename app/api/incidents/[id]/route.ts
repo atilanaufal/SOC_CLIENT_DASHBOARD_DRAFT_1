@@ -3,10 +3,10 @@ import { getIncidentsCollection } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { parseSeverity } from '@/lib/severity';
 import { getTenantContext } from '@/lib/tenant-context';
+import { parseCustomDate } from '@/lib/date-utils';
+import { extractFullLogs } from '@/lib/incident-grouping';
 
 export const dynamic = 'force-dynamic';
-
-import { parseCustomDate } from '@/lib/date-utils';
 
 function formatDate(val: any): string {
   if (!val) return 'N/A';
@@ -20,70 +20,15 @@ function formatDate(val: any): string {
   }
 }
 
-function extractFullLogs(doc: any): string {
-  if (typeof doc.full_logs === 'string' && doc.full_logs.trim()) {
-    return doc.full_logs;
-  }
-  if (typeof doc.full_log === 'string' && doc.full_log.trim()) {
-    return doc.full_log;
-  }
-  if (typeof doc.raw_log === 'string' && doc.raw_log.trim()) {
-    return doc.raw_log;
-  }
-  if (typeof doc.log === 'string' && doc.log.trim()) {
-    return doc.log;
-  }
-  if (doc.full_logs && typeof doc.full_logs === 'object') {
-    return JSON.stringify(doc.full_logs, null, 2);
-  }
-  if (doc.data && typeof doc.data === 'object') {
-    return JSON.stringify(doc.data, null, 2);
-  }
-
-  const mitreIds = doc.mitre_id ? [doc.mitre_id] : (doc.mitre ? [doc.mitre] : []);
-  const tactics = Array.isArray(doc.mitre_tactic) ? doc.mitre_tactic : (doc.mitre_tactic ? [doc.mitre_tactic] : []);
-  const techniques = Array.isArray(doc.mitre_technique) ? doc.mitre_technique : (doc.mitre_technique ? [doc.mitre_technique] : []);
-
-  const rawLogObj: Record<string, any> = {
-    timestamp: doc.first_observed instanceof Date ? doc.first_observed.toISOString() : (doc.first_observed || doc.last_observed || new Date().toISOString()),
-    rule: {
-      id: doc.rule_id ? String(doc.rule_id) : '',
-      level: doc.severity === 'Critical' ? 12 : doc.severity === 'High' ? 10 : doc.severity === 'Medium' ? 7 : 4,
-      description: doc.description || doc.incident_type || '',
-      mitre: {
-        id: mitreIds,
-        tactic: tactics,
-        technique: techniques,
-      },
-    },
-    agent: {
-      id: doc.agent_id ? String(doc.agent_id) : (doc.agent || ''),
-      name: doc.host || doc.agent || '',
-      ip: doc.agent_ip || doc.ip_source || '',
-    },
-    manager: {
-      name: 'wazuh.manager',
-    },
-    location: doc.affected_file || doc.location || '',
-    data: {
-      srcip: doc.ip_source || doc.agent_ip || '',
-      dstip: doc.ip_destination || '',
-      count: doc.count || 1,
-      affected_file: doc.affected_file || '',
-      incident_type: doc.incident_type || '',
-    },
-    full_log: `${doc.first_observed instanceof Date ? doc.first_observed.toISOString() : (doc.first_observed || new Date().toISOString())} ${doc.host || doc.agent || ''} ossec: Alert [${doc.rule_id || ''}] (${doc.severity || 'Medium'}): ${doc.description || doc.incident_type || ''}`,
-  };
-
-  return JSON.stringify(rawLogObj, null, 2);
-}
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const sampleId = searchParams.get('sampleId');
+
     const tenant = await getTenantContext(request);
     if (!tenant) {
       return NextResponse.json(
@@ -94,10 +39,31 @@ export async function GET(
 
     const collection = await getIncidentsCollection(tenant.databaseName);
 
-    let doc = null;
-    if (ObjectId.isValid(id)) {
+    let doc: any = null;
+
+    // 1. Try sampleId if provided
+    if (sampleId && ObjectId.isValid(sampleId)) {
+      doc = await collection.findOne({ _id: new ObjectId(sampleId) });
+    }
+
+    // 2. Try direct ObjectId
+    if (!doc && ObjectId.isValid(id)) {
       doc = await collection.findOne({ _id: new ObjectId(id) });
     }
+
+    // 3. Try parsing group ID if starts with inc_grp_
+    if (!doc && id.startsWith('inc_grp_')) {
+      const clean = id.replace(/^inc_grp_/, '');
+      const parts = clean.split(':::');
+      if (parts.length >= 2) {
+        const query: any = {};
+        if (parts[0]) query.rule_id = parts[0];
+        if (parts[1]) query.host = new RegExp(`^${parts[1]}$`, 'i');
+        doc = await collection.findOne(query, { sort: { first_observed: -1 } });
+      }
+    }
+
+    // 4. Try matching rule_id
     if (!doc) {
       doc = await collection.findOne({ rule_id: id });
     }
@@ -109,14 +75,17 @@ export async function GET(
       );
     }
 
-    const idStr = doc._id.toString();
+    const idStr = doc._id ? doc._id.toString() : id;
     const rawIncType = doc.incident_type
       ? (Array.isArray(doc.incident_type) ? doc.incident_type.join(', ') : String(doc.incident_type))
       : '';
     const incName = rawIncType || doc.description || (doc.rule_id ? `Rule ${doc.rule_id}` : 'General Alert');
+    const logs = extractFullLogs(doc);
+
     const incident = {
       id: idStr,
       _id: idStr,
+      sample_id: idStr,
       incidentName: incName,
       incident_type: rawIncType,
       severity: parseSeverity(doc.severity),
@@ -139,10 +108,9 @@ export async function GET(
       ip_destination: doc.ip_destination || '',
       affected_file: doc.affected_file || undefined,
       count: typeof doc.count === 'number' ? doc.count : 1,
-      full_logs: extractFullLogs(doc),
-
+      full_logs: logs,
+      full_log: logs,
       tenant: tenant.campusName,
-
     };
 
     return NextResponse.json({ success: true, data: incident });

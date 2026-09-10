@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HiOutlineXMark,
   HiOutlineClipboardDocument,
@@ -8,8 +8,10 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineMagnifyingGlass,
   HiOutlineCodeBracket,
+  HiOutlineArrowPath,
 } from 'react-icons/hi2';
 import { Incident } from '@/lib/types';
+import { fetchIncidentDetail } from '@/lib/api-client';
 
 interface IncidentDetailDrawerProps {
   incident: Incident | null;
@@ -94,13 +96,78 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'structured' | 'raw'>('structured');
 
+  const [fetchedFullLog, setFetchedFullLog] = useState<string | null>(null);
+  const [isLoadingLog, setIsLoadingLog] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
+
   const isGrouped = groupByMode
     ? groupByMode === 'incidents'
     : Boolean(incident?.lastObserved && typeof incident?.count === 'number');
 
+  // Reset lazy-loaded state when selected incident changes
+  useEffect(() => {
+    setFetchedFullLog(null);
+    setLogError(null);
+    setIsLoadingLog(false);
+  }, [incident?.id, incident?.sample_id]);
+
+  // Lazy load full logs on-demand when "View Full Log" modal is opened
+  useEffect(() => {
+    if (!isRawLogOpen || !incident) return;
+    if (incident.full_logs && incident.full_logs.trim()) return;
+    if (fetchedFullLog) return;
+
+    let isMounted = true;
+    const loadRawLog = async () => {
+      try {
+        setIsLoadingLog(true);
+        setLogError(null);
+        const targetId = incident.sample_id || incident.id;
+        const res = await fetchIncidentDetail(targetId, { sampleId: incident.sample_id });
+        if (!isMounted) return;
+        if (res && (res.full_logs || res.full_log)) {
+          const logVal = res.full_logs || res.full_log;
+          setFetchedFullLog(typeof logVal === 'object' ? JSON.stringify(logVal, null, 2) : String(logVal));
+        } else {
+          setFetchedFullLog(null);
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        setLogError(err.message || 'Gagal memuat raw log.');
+      } finally {
+        if (isMounted) setIsLoadingLog(false);
+      }
+    };
+
+    loadRawLog();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isRawLogOpen, incident, fetchedFullLog]);
+
   // Format full JSON log representation for debugging / SIEM export
   const fullLogText = useMemo(() => {
     if (!incident) return '';
+    if (fetchedFullLog) {
+      if (typeof fetchedFullLog === 'object') {
+        return JSON.stringify(fetchedFullLog, null, 2);
+      }
+      try {
+        const parsed = JSON.parse(fetchedFullLog);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return fetchedFullLog;
+      }
+    }
+    if (incident.full_logs && incident.full_logs.trim()) {
+      try {
+        const parsed = JSON.parse(incident.full_logs);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return incident.full_logs;
+      }
+    }
     if (incident.full_log) {
       if (typeof incident.full_log === 'object') {
         return JSON.stringify(incident.full_log, null, 2);
@@ -452,11 +519,32 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
 
             {/* Code Log Content - Clean Light Theme */}
             <div className="p-4 sm:p-5 overflow-y-auto flex-1 bg-slate-50/90 font-mono text-xs sm:text-xs xl:text-sm select-text leading-relaxed border-t border-slate-200/70">
-              <pre className="whitespace-pre-wrap break-all text-slate-800 font-mono">
-                {viewMode === 'structured' && !logSearchQuery.trim()
-                  ? renderHighlightedJson(filteredLog)
-                  : filteredLog}
-              </pre>
+              {isLoadingLog ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center select-none">
+                  <HiOutlineArrowPath className="w-8 h-8 text-[#002B9A] animate-spin mb-3" />
+                  <p className="text-sm font-bold text-gray-800">Fetching complete raw log from cluster...</p>
+                  <p className="text-xs text-gray-500 mt-1">On-demand payload extraction in progress</p>
+                </div>
+              ) : logError ? (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center">
+                  <p className="text-xs sm:text-sm text-rose-700 font-semibold mb-2">{logError}</p>
+                  <button
+                    onClick={() => {
+                      setFetchedFullLog(null);
+                      setLogError(null);
+                    }}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition"
+                  >
+                    Retry Loading Log
+                  </button>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap break-all text-slate-800 font-mono">
+                  {viewMode === 'structured' && !logSearchQuery.trim()
+                    ? renderHighlightedJson(filteredLog)
+                    : filteredLog}
+                </pre>
+              )}
             </div>
           </div>
         </div>

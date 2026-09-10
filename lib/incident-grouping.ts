@@ -110,7 +110,7 @@ export function formatIncidentType(val: any): string {
 /**
  * Maps a single pure alert into Incident format (no count, no lastObserved)
  */
-export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incident {
+export function mapAlertToItem(doc: any, index: number, tenantName = '', includeFullLogs = true): Incident {
   const docSeverity = parseSeverity(doc.severity);
   const rawFirst = doc.first_observed || doc.firstObserved || doc.date || '';
   const uniqueId = String(doc.id || doc._id || `alert_${index + 1}_${rawFirst}`);
@@ -123,6 +123,7 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
   return {
     id: uniqueId,
     _id: uniqueId,
+    sample_id: String(doc._id || doc.id || uniqueId),
     incidentName: incName,
     incident_type: rawIncType,
     severity: docSeverity,
@@ -149,7 +150,7 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
     destIp: doc.destIp || doc.ip_destination || '',
     ip_destination: doc.ip_destination || doc.destIp || '',
     affected_file: doc.affected_file || '',
-    full_logs: extractFullLogs(doc),
+    full_logs: includeFullLogs ? extractFullLogs(doc) : '',
   };
 }
 
@@ -157,7 +158,7 @@ export function mapAlertToItem(doc: any, index: number, tenantName = ''): Incide
  * Groups alerts by (rule_id, agent_id, ip_source, date) into aggregated incidents.
  * Each grouped incident includes count and lastObserved.
  */
-export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[] {
+export function groupAlertsToIncidents(docs: any[], tenantName = '', includeFullLogs = true): Incident[] {
   const groupsMap = new Map<string, any[]>();
 
   docs.forEach((doc) => {
@@ -230,6 +231,7 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
     groupedIncidents.push({
       id: groupId,
       _id: groupId,
+      sample_id: String(representativeAlert._id || representativeAlert.id || groupId),
       incidentName: incName,
       incident_type: rawIncType,
       severity: highestSeverity,
@@ -255,7 +257,7 @@ export function groupAlertsToIncidents(docs: any[], tenantName = ''): Incident[]
       affected_file: representativeAlert.affected_file || '',
       university: representativeAlert.university || tenantName,
       tenant: representativeAlert.tenant || tenantName,
-      full_logs: fullLogsCombined || extractFullLogs(representativeAlert),
+      full_logs: includeFullLogs ? (fullLogsCombined || extractFullLogs(representativeAlert)) : '',
     });
   });
 

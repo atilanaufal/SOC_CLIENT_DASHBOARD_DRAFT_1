@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
 
-import { getTenantIncidents } from '@/lib/data-service';
+import { queryDeviceRiskScores } from '@/lib/data-service';
 
 import { getTenantContext } from '@/lib/tenant-context';
 import { parseCustomDate } from '@/lib/date-utils';
@@ -90,77 +90,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const rawIncidents = await getTenantIncidents(tenant.databaseName, tenant.redisPrefix, timeRange, startDate, endDate);
-    
-    // Filter out agent 000 / health-checker
-    const validIncidents = rawIncidents.filter((inc) => {
-      const idStr = String(inc.agent_id || inc.agent || inc.host || '').trim();
-      const hostStr = String(inc.host || '').trim().toLowerCase();
-      const agentStr = String(inc.agent || '').trim().toLowerCase();
-
-      const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
-      const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
-      const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
-
-      return !isAgent000 && !isHealthChecker && !isCampusWeb;
-    });
-
-    const incidents = validIncidents.filter((inc) => matchesTimeRange(inc, timeRange, startDate, endDate));
-
-
-    const tempMap = new Map<
-      string,
-      { critical: number; high: number; medium: number; low: number; issues: Set<string> }
-    >();
-
-    incidents.forEach((inc) => {
-      const agentIdKey = String(inc.agent_id || inc.agent || inc.host || '').trim().toLowerCase();
-      const hostKey = String(inc.host || inc.agent || '').trim().toLowerCase();
-      const nameKey = String(inc.agent || inc.host || '').trim().toLowerCase();
-      const ipKey = String(inc.agent_ip || inc.sourceIp || inc.ip_source || '').trim().toLowerCase();
-
-      const sev = parseSeverity(inc.severity).toLowerCase();
-      const count = 1;
-
-      const rawIncType = inc.incident_type || inc.incidentName;
-      const issueText =
-        (Array.isArray(rawIncType) ? rawIncType.join(', ') : String(rawIncType || '')) ||
-        inc.description ||
-        (inc.ruleId || inc.rule_id ? `Rule ${inc.ruleId || inc.rule_id}` : 'Security Alert');
-
-      const keysToUpdate = Array.from(new Set([agentIdKey, hostKey, nameKey, ipKey])).filter(Boolean);
-
-      keysToUpdate.forEach((key) => {
-        if (!tempMap.has(key)) {
-          tempMap.set(key, { critical: 0, high: 0, medium: 0, low: 0, issues: new Set<string>() });
-        }
-        const stat = tempMap.get(key)!;
-        if (sev === 'critical') stat.critical += count;
-        else if (sev === 'high') stat.high += count;
-        else if (sev === 'medium') stat.medium += count;
-        else stat.low += count;
-
-        if (issueText && stat.issues.size < 5) {
-          stat.issues.add(String(issueText));
-        }
-      });
-    });
-
-    tempMap.forEach((stats, key) => {
-      const rawScore = stats.critical * 6 + stats.high * 3 + stats.medium * 1;
-      const score = Math.min(100, rawScore);
-      const cat = getRiskCategory(score);
-
-      scoresMap[key] = {
-        criticalCount: stats.critical,
-        highCount: stats.high,
-        mediumCount: stats.medium,
-        lowCount: stats.low,
-        score,
-        riskCategory: cat.label,
-        detectedIssues: Array.from(stats.issues),
-      };
-    });
+    const scoresMap = await queryDeviceRiskScores(
+      tenant.databaseName,
+      tenant.redisPrefix,
+      timeRange,
+      startDate,
+      endDate
+    );
 
     return NextResponse.json({
       success: true,

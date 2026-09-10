@@ -3,7 +3,12 @@ import { getReportsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
 import { getRiskCategory } from '@/lib/risk-score';
 
-import { getTenantIncidents, getTenantIncidentsWithSource, queryServerSideVulnerabilities, getHistoricalComparisonStats, getWeeklyHistoricalKpiFromRedis } from '@/lib/data-service';
+import {
+  queryDashboardIncidentStats,
+  queryServerSideVulnerabilities,
+  getHistoricalComparisonStats,
+  getWeeklyHistoricalKpiFromRedis,
+} from '@/lib/data-service';
 
 import { getTenantContext } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
@@ -128,115 +133,36 @@ export async function GET(request: Request) {
     const onlineDevices = summaryData.online_devices;
     const offlineDevices = summaryData.offline_devices;
 
-    // 2. Fetch Incidents strictly for this tenant (1-7 days from Redis, > 7 days from MongoDB)
-    let rawIncidents: any[] = [];
-    let dataSource: string = 'mongodb';
-    try {
-      const res = await getTenantIncidentsWithSource(tenant.databaseName, tenant.redisPrefix, timeFilter, startDate, endDate);
-      rawIncidents = res.incidents;
-      dataSource = res.source;
-    } catch (err: any) {
-      console.warn('[API /api/dashboard/stats] Incidents fetch fallback:', err.message);
-    }
-
-    const { startOfCurrent, endOfCurrent, startOfPrevious, endOfPrevious, periodLabel } = getTimeRangeBounds(timeFilter, startDate, endDate);
-
-    // Filter out agent 000 / health-checker
-    const validIncidents = rawIncidents.filter((inc) => {
-      const idStr = String(inc.agent_id || inc.agent || inc.host || '').trim();
-      const hostStr = String(inc.host || '').trim().toLowerCase();
-      const agentStr = String(inc.agent || '').trim().toLowerCase();
-
-      const isAgent000 = idStr === '000' || idStr === '0' || Number(idStr) === 0;
-      const isHealthChecker = hostStr === 'health-checker' || agentStr === 'health-checker' || hostStr === '000';
-      const isCampusWeb = hostStr.includes('srv-web.campus.ac.id') || agentStr.includes('srv-web.campus.ac.id');
-
-      return !isAgent000 && !isHealthChecker && !isCampusWeb;
-    });
-
-    const currentIncidents = validIncidents.filter((inc) => {
-      const d = getDocDate(inc);
-      if (!d) return true;
-      if (timeFilter.toLowerCase() === 'all') return true;
-      return d >= startOfCurrent && d <= endOfCurrent;
-    });
-
-    const previousIncidents = validIncidents.filter((inc) => {
-      const d = getDocDate(inc);
-      if (!d) return false;
-      if (timeFilter.toLowerCase() === 'all') return false;
-      return d >= startOfPrevious && d < endOfPrevious;
-    });
-
     const registeredAgentKeys = devicesList.map((a) => String(a.name || a.agent || a.id).trim().toLowerCase());
 
-    const calculateDashboardMetrics = (list: any[]) => {
-      let critical = 0;
-      let high = 0;
-      let medium = 0;
-      let low = 0;
-      const agentSeverityMap: Record<string, { critical: number; high: number; medium: number }> = {};
+    // 2. Fetch Incidents and Top Incidents via high-speed server aggregation / Redis Cache
+    const incResult = await queryDashboardIncidentStats(
+      tenant.databaseName,
+      tenant.redisPrefix,
+      timeFilter,
+      startDate,
+      endDate,
+      registeredAgentKeys,
+      tenant.campusName
+    );
 
-      list.forEach((inc) => {
-        const sev = parseSeverity(inc.severity).toLowerCase();
-        const count = 1;
+    const currentStats = incResult.stats;
+    const dataSource = incResult.source;
+    const topIncidents = incResult.topIncidents;
 
-        if (sev === 'critical') critical += count;
-        else if (sev === 'high') high += count;
-        else if (sev === 'medium') medium += count;
-        else low += count;
-
-        const canonicalKey = String(inc.host || inc.agent || inc.agent_id || '').trim().toLowerCase();
-        if (canonicalKey) {
-          if (!agentSeverityMap[canonicalKey]) {
-            agentSeverityMap[canonicalKey] = { critical: 0, high: 0, medium: 0 };
-          }
-          if (sev === 'critical') agentSeverityMap[canonicalKey].critical += count;
-          else if (sev === 'high') agentSeverityMap[canonicalKey].high += count;
-          else if (sev === 'medium') agentSeverityMap[canonicalKey].medium += count;
-        }
-      });
-
-      const targetAgents = registeredAgentKeys.length > 0
-        ? registeredAgentKeys
-        : Object.keys(agentSeverityMap);
-
-      const totalAgentsCount = Math.max(1, targetAgents.length);
-      let sumAgentScores = 0;
-
-      targetAgents.forEach((agentKey) => {
-        const st = agentSeverityMap[agentKey] || { critical: 0, high: 0, medium: 0 };
-        const agentScore = Math.min(100, st.critical * 6 + st.high * 3 + st.medium * 1);
-        sumAgentScores += agentScore;
-      });
-
-      const avgDashboardRiskScore = Math.round((sumAgentScores / totalAgentsCount) * 10) / 10;
-
-      return {
-        critical,
-        high,
-        medium,
-        low,
-        total: critical + high + medium + low,
-        score: avgDashboardRiskScore,
-      };
-    };
-
-    const currentStats = calculateDashboardMetrics(currentIncidents);
+    const { startOfCurrent, endOfCurrent, periodLabel } = getTimeRangeBounds(timeFilter, startDate, endDate);
 
     // Query comparison data directly from Redis Cache or historical_statistics collection in MongoDB
     const histComp = await getHistoricalComparisonStats(tenant.databaseName, timeFilter, startDate, endDate, tenant.redisPrefix);
 
-    const previousStats = histComp.found
-      ? {
-          critical: histComp.criticalPrev,
-          high: histComp.highPrev,
-          medium: histComp.mediumPrev,
-          low: histComp.lowPrev,
-          total: histComp.totalPrev,
-          score: histComp.riskPrev,
-        }
-      : calculateDashboardMetrics(previousIncidents);
+    const previousStats = {
+      critical: histComp.criticalPrev,
+      high: histComp.highPrev,
+      medium: histComp.mediumPrev,
+      low: histComp.lowPrev,
+      total: histComp.totalPrev,
+      score: histComp.riskPrev,
+    };
 
     const dynamicPeriodLabel = histComp.periodLabel || periodLabel;
 
@@ -247,30 +173,6 @@ export async function GET(request: Request) {
 
     const riskScore = Number(Number(currentStats.score || 0).toFixed(1));
     const riskLastMonth = Number(Number(previousStats.score || 0).toFixed(1));
-
-
-    // 3. Top Incidents for this tenant (automatically grouped by (rule_id, agent_id, ip_source, date))
-    const groupedList = groupAlertsToIncidents(currentIncidents, tenant.campusName);
-    const topIncidents = groupedList.map((inc, index) => {
-      const ts = getTimestamp(inc.lastObserved || inc.firstObserved || inc.date);
-      return {
-        id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
-        incidentName: inc.incidentName,
-        incident_type: inc.incident_type,
-        severity: inc.severity,
-        agent: inc.agent,
-        agentsList: [inc.agent],
-        host: inc.host || inc.agent,
-        count: inc.count || 1,
-        firstObserved: inc.firstObserved,
-        lastObserved: inc.lastObserved,
-        rawDate: ts,
-        ruleId: inc.ruleId || 'N/A',
-        tenant: tenant.campusName,
-      };
-    });
-
-    topIncidents.sort((a, b) => b.rawDate - a.rawDate);
 
 
     // 4. Fetch Vulnerabilities count and severity breakdown via high-speed server aggregation

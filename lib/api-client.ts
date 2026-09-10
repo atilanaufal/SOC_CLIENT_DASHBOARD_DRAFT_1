@@ -1,5 +1,40 @@
 import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
 
+export interface FetchIncidentsResponse {
+  data: Incident[];
+  total: number;
+  totalAlerts: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    critical: number;
+    criticalPrev: number;
+    criticalDelta: number;
+    high: number;
+    highPrev: number;
+    highDelta: number;
+    medium: number;
+    mediumPrev: number;
+    mediumDelta: number;
+    low: number;
+    lowPrev: number;
+    lowDelta: number;
+    total: number;
+    totalPrev: number;
+    totalDelta: number;
+    periodLabel: string;
+  };
+  filterOptions?: {
+    agents: string[];
+    incidentNames: string[];
+    severities: string[];
+  };
+  groupBy?: 'alerts' | 'incidents';
+  tenant?: string;
+  database?: string;
+}
+
 export async function fetchIncidents(filters?: {
   search?: string;
   severity?: string;
@@ -9,7 +44,11 @@ export async function fetchIncidents(filters?: {
   startDate?: string;
   endDate?: string;
   groupBy?: 'alerts' | 'incidents';
-}): Promise<Incident[] & { stats?: any }> {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<FetchIncidentsResponse> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
@@ -19,15 +58,65 @@ export async function fetchIncidents(filters?: {
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
   if (filters?.groupBy) params.set('groupBy', filters.groupBy);
+  if (typeof filters?.page === 'number') params.set('page', String(filters.page));
+  if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
+  if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
 
   const res = await fetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch incidents: ${res.statusText}`);
   }
   const json = await res.json();
-  const list = (json.data || []) as any;
-  list.stats = json.incidents || null;
-  return list;
+  return {
+    data: json.data || [],
+    total: typeof json.total === 'number' ? json.total : (json.data || []).length,
+    totalAlerts: typeof json.totalAlerts === 'number' ? json.totalAlerts : (json.total || 0),
+    page: json.page || 1,
+    limit: json.limit || 10,
+    totalPages: json.totalPages || 1,
+    stats: json.incidents || {
+      critical: 0,
+      criticalPrev: 0,
+      criticalDelta: 0,
+      high: 0,
+      highPrev: 0,
+      highDelta: 0,
+      medium: 0,
+      mediumPrev: 0,
+      mediumDelta: 0,
+      low: 0,
+      lowPrev: 0,
+      lowDelta: 0,
+      total: 0,
+      totalPrev: 0,
+      totalDelta: 0,
+      periodLabel: 'PREVIOUS PERIOD',
+    },
+    filterOptions: json.filterOptions || { agents: [], incidentNames: [], severities: [] },
+    groupBy: json.groupBy,
+    tenant: json.tenant,
+    database: json.database,
+  };
+}
+
+export async function fetchIncidentDetail(
+  id: string,
+  options?: { sampleId?: string }
+): Promise<Incident> {
+  const params = new URLSearchParams();
+  if (options?.sampleId) {
+    params.set('sampleId', options.sampleId);
+  }
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`/api/incidents/${encodeURIComponent(id)}${queryString}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch incident detail: ${res.statusText}`);
+  }
+  const json = await res.json();
+  return json.data;
 }
 
 export interface FetchVulnerabilitiesResponse {

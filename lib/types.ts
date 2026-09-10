@@ -23,6 +23,7 @@ export interface Device {
 export interface Incident {
   id: string;
   _id?: string;
+  sample_id?: string;
   incidentName: string;
   incident_type?: string | string[];
   severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
