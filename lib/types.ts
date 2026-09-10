@@ -53,7 +53,7 @@ export interface Incident {
   ip_destination?: string;
   affected_file?: string;
   count?: number;
-  full_logs?: string;
+  full_logs?: string | string[];
   full_log?: any;
 }
 

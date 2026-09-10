@@ -100,16 +100,19 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
 
   // Format full JSON log representation for debugging / SIEM export
   const fullLogText = useMemo(() => {
-    if (!incident) return '';
-    if (incident.full_log) {
-      if (typeof incident.full_log === 'object') {
-        return JSON.stringify(incident.full_log, null, 2);
+    const rawLogs = incident.full_logs || incident.full_log;
+    if (rawLogs) {
+      if (Array.isArray(rawLogs)) {
+        return rawLogs.join('\n');
+      }
+      if (typeof rawLogs === 'object') {
+        return JSON.stringify(rawLogs, null, 2);
       }
       try {
-        const parsed = JSON.parse(incident.full_log);
+        const parsed = JSON.parse(rawLogs);
         return JSON.stringify(parsed, null, 2);
       } catch {
-        return incident.full_log;
+        return rawLogs;
       }
     }
     // Fallback constructed standard Wazuh alert structure
