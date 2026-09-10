@@ -499,7 +499,7 @@ async function fetchIncidentsFromMongo(
     const filter = buildMongoIncidentFilter(timeRange, startDate, endDate);
     const docs = await col
       .find(filter)
-      .sort({ first_observed: -1, date: -1, last_observed: -1, _id: -1 })
+      .sort({ first_observed: -1, date: -1, _id: -1 })
       .toArray();
 
     if (docs && docs.length > 0) {
@@ -1104,7 +1104,7 @@ export async function queryServerSideIncidents(
   options: ServerSideIncidentsQuery
 ): Promise<ServerSideIncidentsResult> {
   const page = Math.max(1, Number(options.page) || 1);
-  const limit = Math.max(1, Math.min(5000, Number(options.limit) || 5000));
+  const limit = Math.max(1, Math.min(100, Number(options.limit) || 10));
   const skip = (page - 1) * limit;
   const groupBy = options.groupBy === 'incidents' ? 'incidents' : 'alerts';
   const tenantName = options.tenantName || databaseName;
@@ -1280,7 +1280,7 @@ export async function queryServerSideIncidents(
     const matchConditions: any[] = [
       {
         agent_id: { $nin: ['000', '0', 0] },
-        host: { $nin: ['health-checker', '000', /srv-web\.campus\.ac\.id/i] }
+        host: { $nin: ['health-checker', '000'], $not: /srv-web\.campus\.ac\.id/i }
       }
     ];
 
@@ -1362,6 +1362,19 @@ export async function queryServerSideIncidents(
 
     let facetPipeline: Record<string, any> = {};
 
+    let alertSortStage: Record<string, 1 | -1> = { date: -1, first_observed: -1, _id: -1 };
+    if (options.sortBy === 'severity') {
+      alertSortStage = { severity: sortDirection, date: -1, first_observed: -1 };
+    } else if (options.sortBy === 'agent') {
+      alertSortStage = { host: sortDirection, date: -1, first_observed: -1 };
+    } else if (options.sortBy === 'firstObserved') {
+      alertSortStage = { date: sortDirection, first_observed: sortDirection, _id: -1 };
+    } else if (options.sortBy === 'lastObserved') {
+      alertSortStage = { date: sortDirection, first_observed: sortDirection, _id: -1 };
+    } else if (options.sortBy === 'incidentName') {
+      alertSortStage = { incident_type: sortDirection, description: sortDirection, date: -1, _id: -1 };
+    }
+
     if (groupBy === 'incidents') {
       let groupSortStage: Record<string, 1 | -1> = { last_observed: -1 };
       if (options.sortBy === 'count') {
@@ -1430,15 +1443,6 @@ export async function queryServerSideIncidents(
         ]
       };
     } else {
-      let alertSortStage: Record<string, 1 | -1> = { first_observed: -1, _id: -1 };
-      if (options.sortBy === 'severity') {
-        alertSortStage = { severity: sortDirection, first_observed: -1 };
-      } else if (options.sortBy === 'agent') {
-        alertSortStage = { host: sortDirection, first_observed: -1 };
-      } else if (options.sortBy === 'firstObserved') {
-        alertSortStage = { first_observed: sortDirection, _id: -1 };
-      }
-
       facetPipeline = {
         severityStats: [
           { $group: { _id: '$severity', count: { $sum: 1 } } }
@@ -1456,26 +1460,36 @@ export async function queryServerSideIncidents(
           { $group: { _id: '$description' } },
           { $limit: 100 }
         ],
-        paginatedRows: [
-          { $sort: alertSortStage },
-          { $skip: skip },
-          { $limit: limit },
-          {
-            $project: {
-              full_logs: 0,
-              full_log: 0,
-              raw_log: 0,
-              log: 0
-            }
-          }
-        ]
       };
     }
 
-    const [facetRes] = await col.aggregate([
-      { $match: searchAndFilter },
-      { $facet: facetPipeline }
-    ]).toArray();
+    let rawAlertRows: any[] = [];
+    let facetRes: any = {};
+
+    if (groupBy === 'alerts') {
+      const rowsPromise = col.find(searchAndFilter, {
+        projection: { full_logs: 0, full_log: 0, raw_log: 0, log: 0 }
+      })
+      .sort(alertSortStage)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+      const statsPromise = col.aggregate([
+        { $match: searchAndFilter },
+        { $facet: facetPipeline }
+      ]).toArray();
+
+      const [rows, [statsResult]] = await Promise.all([rowsPromise, statsPromise]);
+      rawAlertRows = rows || [];
+      facetRes = statsResult || {};
+    } else {
+      const [fRes] = await col.aggregate([
+        { $match: searchAndFilter },
+        { $facet: facetPipeline }
+      ]).toArray();
+      facetRes = fRes || {};
+    }
 
     let critical = 0;
     let high = 0;
@@ -1543,7 +1557,7 @@ export async function queryServerSideIncidents(
         };
       });
     } else {
-      mappedData = (facetRes.paginatedRows || []).map((doc: any, index: number) => {
+      mappedData = (rawAlertRows.length > 0 ? rawAlertRows : (facetRes.paginatedRows || [])).map((doc: any, index: number) => {
         const item = mapAlertToItem(doc, skip + index, tenantName, false);
         return item;
       });

@@ -34,7 +34,9 @@ function IncidentsContent() {
 
   const { timeFilter, customRange } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [total, setTotal] = useState(0);
   const [totalAlerts, setTotalAlerts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [statsData, setStatsData] = useState<any>(null);
   const [filterOptions, setFilterOptions] = useState<{
     agents: string[];
@@ -42,6 +44,7 @@ function IncidentsContent() {
     severities: string[];
   }>({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'] });
   const [isLoading, setIsLoading] = useState(true);
+  const [isTableFetching, setIsTableFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,28 +101,37 @@ function IncidentsContent() {
     }
   }, [searchParams]);
 
-  // Reset to page 1 whenever filters or search change
+  // Reset to page 1 whenever search or activeFilters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, activeFilters, timeFilter, customRange, groupByMode]);
+  }, [debouncedSearch, activeFilters]);
 
-  // Fetch data with in-memory caching per time range and group by mode
+  // Clear incidents and reset page when time range or group mode changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setIncidents([]);
+  }, [timeFilter, customRange, groupByMode]);
+
+  // Fetch server-side paginated & aggregated data with in-memory caching
   const loadData = async (forceRefresh = false) => {
     cycleIdRef.current += 1;
     const currentCycle = cycleIdRef.current;
 
-    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}:${currentPage}:${sortKey}:${sortDirection}:${debouncedSearch}:${JSON.stringify(activeFilters)}`;
 
     if (!forceRefresh) {
       try {
-        const cached = await getClientCache<{ data: Incident[]; totalAlerts: number; stats: any; filterOptions: any }>(cacheKey);
+        const cached = await getClientCache<FetchIncidentsResponse>(cacheKey);
         if (cycleIdRef.current !== currentCycle) return;
         if (cached && Array.isArray(cached.data)) {
           setIncidents(cached.data);
-          setTotalAlerts(cached.totalAlerts || cached.data.length);
+          setTotal(cached.total);
+          setTotalAlerts(cached.totalAlerts);
+          setTotalPages(cached.totalPages);
           if (cached.stats) setStatsData({ incidents: cached.stats });
           if (cached.filterOptions) setFilterOptions(cached.filterOptions);
           setIsLoading(false);
+          setIsTableFetching(false);
           return;
         }
       } catch (cacheErr) {
@@ -130,9 +142,22 @@ function IncidentsContent() {
     }
 
     try {
-      setIsLoading(true);
+      if (incidents.length === 0) {
+        setIsLoading(true);
+      } else {
+        setIsTableFetching(true);
+      }
       setError(null);
+
       const res = await fetchIncidents({
+        page: currentPage,
+        limit: pageSize,
+        search: debouncedSearch,
+        severity: activeFilters.severity,
+        incidentType: activeFilters.incidentName,
+        agent: activeFilters.agent,
+        sortBy: sortKey,
+        sortOrder: sortDirection,
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
@@ -141,19 +166,14 @@ function IncidentsContent() {
 
       if (cycleIdRef.current !== currentCycle) return;
 
-      const incidentList = res.data || [];
-      const statsObj = res.stats || (res as any).incidents || {};
-      setIncidents(incidentList);
-      setTotalAlerts(res.totalAlerts || incidentList.length);
-      if (statsObj) setStatsData({ incidents: statsObj });
+      setIncidents(res.data || []);
+      setTotal(res.total);
+      setTotalAlerts(res.totalAlerts);
+      setTotalPages(res.totalPages);
+      if (res.stats) setStatsData({ incidents: res.stats });
       if (res.filterOptions) setFilterOptions(res.filterOptions);
 
-      setClientCache(cacheKey, {
-        data: incidentList,
-        totalAlerts: res.totalAlerts || incidentList.length,
-        stats: statsObj,
-        filterOptions: res.filterOptions,
-      });
+      setClientCache(cacheKey, res);
     } catch (err: any) {
       if (cycleIdRef.current !== currentCycle) return;
       console.error('Failed to load incidents data:', err);
@@ -161,13 +181,14 @@ function IncidentsContent() {
     } finally {
       if (cycleIdRef.current === currentCycle) {
         setIsLoading(false);
+        setIsTableFetching(false);
       }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [groupByMode, timeFilter, customRange]);
+  }, [groupByMode, timeFilter, customRange, currentPage, sortKey, sortDirection, debouncedSearch, activeFilters]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -184,129 +205,32 @@ function IncidentsContent() {
   };
 
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(incidents.map((i) => i.severity))).filter(Boolean);
-    const incidentNames = Array.from(new Set(incidents.map((i) => i.incidentName))).filter(Boolean);
-    const agents = Array.from(new Set(incidents.map((i) => i.agent))).filter(Boolean);
-
     return [
       {
         key: 'severity',
         label: 'Severity Level',
         type: 'buttons',
-        options: severities.length ? severities : (filterOptions.severities.length ? filterOptions.severities : ['Critical', 'High', 'Medium', 'Low']),
+        options: filterOptions.severities && filterOptions.severities.length > 0
+          ? filterOptions.severities
+          : ['Critical', 'High', 'Medium', 'Low'],
       },
       {
         key: 'incidentName',
         label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
         type: 'select',
-        options: incidentNames.length ? incidentNames : (filterOptions.incidentNames || []),
+        options: filterOptions.incidentNames || [],
       },
       {
         key: 'agent',
         label: 'Agent Affected',
         type: 'select',
-        options: agents.length ? agents : (filterOptions.agents || []),
+        options: filterOptions.agents || [],
       },
     ];
-  }, [incidents, filterOptions, groupByMode]);
+  }, [filterOptions, groupByMode]);
 
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter((inc) => {
-      const q = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        inc.incidentName.toLowerCase().includes(q) ||
-        (inc.incident_type && String(inc.incident_type).toLowerCase().includes(q)) ||
-        inc.agent.toLowerCase().includes(q) ||
-        (inc.description && inc.description.toLowerCase().includes(q)) ||
-        (inc.ruleId && String(inc.ruleId).toLowerCase().includes(q)) ||
-        (inc.sourceIp && inc.sourceIp.toLowerCase().includes(q)) ||
-        (inc.agent_ip && inc.agent_ip.toLowerCase().includes(q));
-
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : inc.severity.toLowerCase() === activeFilters.severity.toLowerCase();
-
-      const matchesIncidentName =
-        !activeFilters.incidentName || activeFilters.incidentName === 'All'
-          ? true
-          : inc.incidentName.trim().toLowerCase() === activeFilters.incidentName.trim().toLowerCase();
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : inc.agent.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase() ||
-            (inc.host && inc.host.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase());
-
-      return matchesSearch && matchesSeverity && matchesIncidentName && matchesAgent;
-    });
-  }, [incidents, searchTerm, activeFilters]);
-
-  // Handle Sort with proper numeric timestamp sorting (INSTANT IN-MEMORY)
-  const sortedIncidents = useMemo(() => {
-    return [...filteredIncidents].sort((a, b) => {
-      let aVal = a[sortKey] || '';
-      let bVal = b[sortKey] || '';
-
-      if (sortKey === 'severity') {
-        const severityWeight: Record<string, number> = {
-          critical: 4,
-          high: 3,
-          medium: 2,
-          low: 1,
-          informational: 0,
-        };
-        const aWeight = severityWeight[String(aVal).toLowerCase()] || 0;
-        const bWeight = severityWeight[String(bVal).toLowerCase()] || 0;
-        if (aWeight !== bWeight) {
-          return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
-        }
-        const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
-        const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
-        return tB - tA;
-      }
-
-      if (sortKey === 'count') {
-        const countA = Number(a.count) || 0;
-        const countB = Number(b.count) || 0;
-        if (countA !== countB) {
-          return sortDirection === 'asc' ? countA - countB : countB - countA;
-        }
-        const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
-        const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
-        return tB - tA;
-      }
-
-      if (sortKey === 'firstObserved') {
-        const timeA = getTimestamp(aVal);
-        const timeB = getTimestamp(bVal);
-        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
-      }
-
-      if (sortKey === 'lastObserved') {
-        const timeA = getTimestamp(a.lastObserved || a.firstObserved);
-        const timeB = getTimestamp(b.lastObserved || b.firstObserved);
-        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
-      }
-
-      const strA = (aVal || '').toString().toLowerCase();
-      const strB = (bVal || '').toString().toLowerCase();
-      if (strA !== strB) {
-        return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
-      }
-      const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
-      const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
-      return tB - tA;
-    });
-  }, [filteredIncidents, sortKey, sortDirection]);
-
-  const total = filteredIncidents.length;
-  const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedIncidents = useMemo(() => {
-    return sortedIncidents.slice(startIndex, startIndex + pageSize);
-  }, [sortedIncidents, startIndex, pageSize]);
+  const paginatedIncidents = incidents;
 
   const handleApplyFilters = (filters: Record<string, string>) => {
     setActiveFilters(filters);
@@ -592,7 +516,7 @@ function IncidentsContent() {
 
         {/* Data Container */}
         <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-          {isLoading ? (
+          {isLoading && incidents.length === 0 ? (
             <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
               Loading incidents...
             </div>
@@ -605,7 +529,7 @@ function IncidentsContent() {
               No incidents found.
             </div>
           ) : (
-            <>
+            <div className={`flex-1 flex flex-col justify-between min-w-0 transition-opacity duration-150 ${isTableFetching ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
               {/* MOBILE CARD LIST VIEW (Phones: < md) */}
               <div className="block md:hidden divide-y divide-gray-100 p-2 overflow-y-auto max-h-[calc(100vh-280px)]">
                 {paginatedIncidents.map((inc) => {
@@ -780,7 +704,7 @@ function IncidentsContent() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           )}
 
           {/* Interactive Pagination Controls */}
