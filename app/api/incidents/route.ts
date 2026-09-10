@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
     const groupBy = (searchParams.get('groupBy') || 'alerts').toLowerCase() === 'incidents' ? 'incidents' : 'alerts';
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const limit = searchParams.has('limit') ? parseInt(searchParams.get('limit')!, 10) : 5000;
     const sortBy = searchParams.get('sortBy') || 'firstObserved';
     const sortOrder = (searchParams.get('sortOrder') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       limit: result.limit,
       totalPages: result.totalPages,
       incidents: result.incidents,
+      stats: result.incidents,
       filterOptions: result.filterOptions,
     });
   } catch (error: any) {

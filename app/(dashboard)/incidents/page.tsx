@@ -34,9 +34,7 @@ function IncidentsContent() {
 
   const { timeFilter, customRange } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [total, setTotal] = useState(0);
   const [totalAlerts, setTotalAlerts] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [statsData, setStatsData] = useState<any>(null);
   const [filterOptions, setFilterOptions] = useState<{
     agents: string[];
@@ -105,22 +103,20 @@ function IncidentsContent() {
     setCurrentPage(1);
   }, [debouncedSearch, activeFilters, timeFilter, customRange, groupByMode]);
 
-  // Fetch server-side paginated & aggregated data with in-memory caching
+  // Fetch data with in-memory caching per time range and group by mode
   const loadData = async (forceRefresh = false) => {
     cycleIdRef.current += 1;
     const currentCycle = cycleIdRef.current;
 
-    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}:${currentPage}:${sortKey}:${sortDirection}:${debouncedSearch}:${JSON.stringify(activeFilters)}`;
+    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
 
     if (!forceRefresh) {
       try {
-        const cached = await getClientCache<FetchIncidentsResponse>(cacheKey);
+        const cached = await getClientCache<{ data: Incident[]; totalAlerts: number; stats: any; filterOptions: any }>(cacheKey);
         if (cycleIdRef.current !== currentCycle) return;
         if (cached && Array.isArray(cached.data)) {
           setIncidents(cached.data);
-          setTotal(cached.total);
-          setTotalAlerts(cached.totalAlerts);
-          setTotalPages(cached.totalPages);
+          setTotalAlerts(cached.totalAlerts || cached.data.length);
           if (cached.stats) setStatsData({ incidents: cached.stats });
           if (cached.filterOptions) setFilterOptions(cached.filterOptions);
           setIsLoading(false);
@@ -137,14 +133,6 @@ function IncidentsContent() {
       setIsLoading(true);
       setError(null);
       const res = await fetchIncidents({
-        page: currentPage,
-        limit: pageSize,
-        search: debouncedSearch,
-        severity: activeFilters.severity,
-        incidentType: activeFilters.incidentName,
-        agent: activeFilters.agent,
-        sortBy: sortKey,
-        sortOrder: sortDirection,
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
@@ -153,14 +141,19 @@ function IncidentsContent() {
 
       if (cycleIdRef.current !== currentCycle) return;
 
-      setIncidents(res.data || []);
-      setTotal(res.total);
-      setTotalAlerts(res.totalAlerts);
-      setTotalPages(res.totalPages);
-      if (res.stats) setStatsData({ incidents: res.stats });
+      const incidentList = res.data || [];
+      const statsObj = res.stats || (res as any).incidents || {};
+      setIncidents(incidentList);
+      setTotalAlerts(res.totalAlerts || incidentList.length);
+      if (statsObj) setStatsData({ incidents: statsObj });
       if (res.filterOptions) setFilterOptions(res.filterOptions);
 
-      setClientCache(cacheKey, res);
+      setClientCache(cacheKey, {
+        data: incidentList,
+        totalAlerts: res.totalAlerts || incidentList.length,
+        stats: statsObj,
+        filterOptions: res.filterOptions,
+      });
     } catch (err: any) {
       if (cycleIdRef.current !== currentCycle) return;
       console.error('Failed to load incidents data:', err);
@@ -174,11 +167,11 @@ function IncidentsContent() {
 
   useEffect(() => {
     loadData();
-  }, [groupByMode, timeFilter, customRange, currentPage, sortKey, sortDirection, debouncedSearch, activeFilters]);
+  }, [groupByMode, timeFilter, customRange]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
       if (key === 'firstObserved' || key === 'lastObserved' || key === 'count') {
@@ -191,30 +184,129 @@ function IncidentsContent() {
   };
 
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
+    const severities = Array.from(new Set(incidents.map((i) => i.severity))).filter(Boolean);
+    const incidentNames = Array.from(new Set(incidents.map((i) => i.incidentName))).filter(Boolean);
+    const agents = Array.from(new Set(incidents.map((i) => i.agent))).filter(Boolean);
+
     return [
       {
         key: 'severity',
         label: 'Severity Level',
         type: 'buttons',
-        options: filterOptions.severities.length ? filterOptions.severities : ['Critical', 'High', 'Medium', 'Low'],
+        options: severities.length ? severities : (filterOptions.severities.length ? filterOptions.severities : ['Critical', 'High', 'Medium', 'Low']),
       },
       {
         key: 'incidentName',
         label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
         type: 'select',
-        options: filterOptions.incidentNames || [],
+        options: incidentNames.length ? incidentNames : (filterOptions.incidentNames || []),
       },
       {
         key: 'agent',
         label: 'Agent Affected',
         type: 'select',
-        options: filterOptions.agents || [],
+        options: agents.length ? agents : (filterOptions.agents || []),
       },
     ];
-  }, [filterOptions, groupByMode]);
+  }, [incidents, filterOptions, groupByMode]);
 
+  const filteredIncidents = useMemo(() => {
+    return incidents.filter((inc) => {
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        inc.incidentName.toLowerCase().includes(q) ||
+        (inc.incident_type && String(inc.incident_type).toLowerCase().includes(q)) ||
+        inc.agent.toLowerCase().includes(q) ||
+        (inc.description && inc.description.toLowerCase().includes(q)) ||
+        (inc.ruleId && String(inc.ruleId).toLowerCase().includes(q)) ||
+        (inc.sourceIp && inc.sourceIp.toLowerCase().includes(q)) ||
+        (inc.agent_ip && inc.agent_ip.toLowerCase().includes(q));
+
+      const matchesSeverity =
+        !activeFilters.severity || activeFilters.severity === 'All'
+          ? true
+          : inc.severity.toLowerCase() === activeFilters.severity.toLowerCase();
+
+      const matchesIncidentName =
+        !activeFilters.incidentName || activeFilters.incidentName === 'All'
+          ? true
+          : inc.incidentName.trim().toLowerCase() === activeFilters.incidentName.trim().toLowerCase();
+
+      const matchesAgent =
+        !activeFilters.agent || activeFilters.agent === 'All'
+          ? true
+          : inc.agent.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase() ||
+            (inc.host && inc.host.trim().toLowerCase() === activeFilters.agent.trim().toLowerCase());
+
+      return matchesSearch && matchesSeverity && matchesIncidentName && matchesAgent;
+    });
+  }, [incidents, searchTerm, activeFilters]);
+
+  // Handle Sort with proper numeric timestamp sorting (INSTANT IN-MEMORY)
+  const sortedIncidents = useMemo(() => {
+    return [...filteredIncidents].sort((a, b) => {
+      let aVal = a[sortKey] || '';
+      let bVal = b[sortKey] || '';
+
+      if (sortKey === 'severity') {
+        const severityWeight: Record<string, number> = {
+          critical: 4,
+          high: 3,
+          medium: 2,
+          low: 1,
+          informational: 0,
+        };
+        const aWeight = severityWeight[String(aVal).toLowerCase()] || 0;
+        const bWeight = severityWeight[String(bVal).toLowerCase()] || 0;
+        if (aWeight !== bWeight) {
+          return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
+        }
+        const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
+        const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
+        return tB - tA;
+      }
+
+      if (sortKey === 'count') {
+        const countA = Number(a.count) || 0;
+        const countB = Number(b.count) || 0;
+        if (countA !== countB) {
+          return sortDirection === 'asc' ? countA - countB : countB - countA;
+        }
+        const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
+        const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
+        return tB - tA;
+      }
+
+      if (sortKey === 'firstObserved') {
+        const timeA = getTimestamp(aVal);
+        const timeB = getTimestamp(bVal);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+
+      if (sortKey === 'lastObserved') {
+        const timeA = getTimestamp(a.lastObserved || a.firstObserved);
+        const timeB = getTimestamp(b.lastObserved || b.firstObserved);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+
+      const strA = (aVal || '').toString().toLowerCase();
+      const strB = (bVal || '').toString().toLowerCase();
+      if (strA !== strB) {
+        return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+      }
+      const tA = getTimestamp(a.firstObserved || a.lastObserved || a.date);
+      const tB = getTimestamp(b.firstObserved || b.lastObserved || b.date);
+      return tB - tA;
+    });
+  }, [filteredIncidents, sortKey, sortDirection]);
+
+  const total = filteredIncidents.length;
+  const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedIncidents = incidents;
+  const paginatedIncidents = useMemo(() => {
+    return sortedIncidents.slice(startIndex, startIndex + pageSize);
+  }, [sortedIncidents, startIndex, pageSize]);
 
   const handleApplyFilters = (filters: Record<string, string>) => {
     setActiveFilters(filters);

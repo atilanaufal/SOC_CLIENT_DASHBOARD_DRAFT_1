@@ -1104,7 +1104,7 @@ export async function queryServerSideIncidents(
   options: ServerSideIncidentsQuery
 ): Promise<ServerSideIncidentsResult> {
   const page = Math.max(1, Number(options.page) || 1);
-  const limit = Math.max(1, Math.min(100, Number(options.limit) || 10));
+  const limit = Math.max(1, Math.min(5000, Number(options.limit) || 5000));
   const skip = (page - 1) * limit;
   const groupBy = options.groupBy === 'incidents' ? 'incidents' : 'alerts';
   const tenantName = options.tenantName || databaseName;
