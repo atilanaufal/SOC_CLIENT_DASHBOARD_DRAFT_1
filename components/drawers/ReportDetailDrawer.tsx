@@ -155,10 +155,23 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
           {recommendedActionText && (
             <div className="pt-3 xl:pt-4 border-t border-gray-200/80">
               <h4 className="font-bold text-xs xl:text-sm text-emerald-900 uppercase tracking-wider mb-1.5">Recommended Action</h4>
-              <div className="bg-emerald-50/70 p-3.5 xl:p-4 rounded-xl border border-emerald-200 max-h-56 overflow-y-auto">
-                <p className="text-xs sm:text-sm xl:text-base text-emerald-900 font-normal leading-relaxed whitespace-pre-line">
-                  {recommendedActionText}
-                </p>
+              <div className="bg-emerald-50/70 p-3.5 xl:p-4 rounded-xl border border-emerald-200 max-h-56 overflow-y-auto space-y-2">
+                {recommendedActionText.split('\n').map((l) => l.trim()).filter(Boolean).map((line, idx) => {
+                  const m = line.match(/^(\s*(?:[0-9]+[.)]\s*)?[^-–—:]+?)\s*([-–—:])\s*(.*)$/);
+                  if (m) {
+                    return (
+                      <p key={idx} className="text-xs sm:text-sm xl:text-base leading-relaxed text-emerald-950">
+                        <strong className="font-bold">{m[1]} - </strong>
+                        <span className="font-normal text-emerald-900">{m[3]}</span>
+                      </p>
+                    );
+                  }
+                  return (
+                    <p key={idx} className="text-xs sm:text-sm xl:text-base font-normal text-emerald-900 leading-relaxed">
+                      {line}
+                    </p>
+                  );
+                })}
               </div>
             </div>
           )}

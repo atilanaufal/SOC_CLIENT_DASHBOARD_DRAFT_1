@@ -540,9 +540,22 @@ export default function DashboardPage() {
                     {renderSeverityBadge(act.severity)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm md:text-base font-extrabold text-gray-900 leading-snug">
-                      {act.action}
-                    </p>
+                    {(() => {
+                      const m = (act.action || '').match(/^(\s*(?:[0-9]+[.)]\s*)?[^-–—:]+?)\s*([-–—:])\s*(.*)$/);
+                      if (m) {
+                        return (
+                          <p className="text-xs sm:text-sm md:text-base leading-snug text-gray-900">
+                            <strong className="font-bold text-gray-900">{m[1]} - </strong>
+                            <span className="font-normal text-gray-700">{m[3]}</span>
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-xs sm:text-sm md:text-base font-normal text-gray-900 leading-snug">
+                          {act.action}
+                        </p>
+                      );
+                    })()}
                     <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mt-1">
                       <span>{act.date}</span>
                       {act.time && <span>{act.time}</span>}

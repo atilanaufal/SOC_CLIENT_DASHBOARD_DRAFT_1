@@ -7,6 +7,7 @@ import {
   HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowPath,
   HiOutlineXMark,
+  HiOutlineInformationCircle,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
@@ -545,7 +546,7 @@ function DevicesContent() {
                       </div>
 
                       <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100">
-                        <div className="flex items-center gap-1.5 font-bold">
+                        <div className="flex items-center gap-1.5 font-bold relative group/mobscore cursor-help">
                           <span className="text-gray-500">Risk Score:</span>
                           <span className="text-gray-900 font-black">{scoreVal}</span>
                           <span
@@ -554,6 +555,23 @@ function DevicesContent() {
                           >
                             {cat.label}
                           </span>
+                          <HiOutlineInformationCircle className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+
+                          {/* Mobile Tooltip */}
+                          <div className="absolute bottom-full left-0 mb-2 hidden group-hover/mobscore:block z-50 pointer-events-none w-72 p-3 bg-gray-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-gray-700 text-left font-normal normal-case">
+                            <div className="font-bold text-[11px] text-gray-200 mb-1 border-b border-gray-700 pb-1 flex items-center gap-1">
+                              <HiOutlineInformationCircle className="w-3.5 h-3.5 text-blue-400" />
+                              <span>Rumus Agent Risk Score</span>
+                            </div>
+                            <div className="font-mono text-[10px] text-emerald-400 font-bold bg-gray-800/90 p-1.5 rounded border border-gray-700/80 mb-1.5">
+                              AgentScore(e) = min(100, Σ SeverityWeight)
+                            </div>
+                            <div className="text-[10px] text-gray-300">
+                              • rule.level 15 (Critical): Weight 6<br/>
+                              • rule.level 12-14 (High): Weight 3<br/>
+                              • rule.level 7-11 (Medium): Weight 1
+                            </div>
+                          </div>
                         </div>
                         <div className="text-right text-gray-500 text-[11px] font-medium">
                           <span>{timeAgo || dateTime}</span>
@@ -592,10 +610,49 @@ function DevicesContent() {
                           <span>Severity Breakdown</span>
                         </div>
                       </th>
-                      <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
-                        <div className="flex items-center text-white">
+                      <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition relative group/scorecol">
+                        <div className="flex items-center gap-1.5 text-white">
                           <span>Risk Score</span>
+                          <HiOutlineInformationCircle className="w-4 h-4 text-blue-200 group-hover/scorecol:text-white flex-shrink-0" />
                           {renderSortIndicator('score')}
+                        </div>
+
+                        {/* Tooltip on header hover */}
+                        <div className="absolute top-full right-0 mt-1.5 hidden group-hover/scorecol:block z-50 pointer-events-none w-80 p-3.5 bg-gray-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-gray-700 text-left font-normal normal-case">
+                          <div className="font-bold text-xs text-gray-200 mb-1.5 border-b border-gray-700 pb-1 flex items-center gap-1.5">
+                            <HiOutlineInformationCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                            <span>Rumus Agent Risk Score</span>
+                          </div>
+                          <div className="font-mono text-[11px] text-emerald-400 font-bold bg-gray-800/90 p-2 rounded-lg border border-gray-700/80 mb-2 leading-relaxed text-center">
+                            AgentScore(e) = min(100, Σ SeverityWeight+SeverityWeight+...)
+                          </div>
+                          <div className="text-[11px] text-gray-300 mb-1.5 font-semibold">Tabel Bobot Severity:</div>
+                          <table className="w-full text-[11px] text-left border border-gray-700 rounded overflow-hidden">
+                            <thead className="bg-gray-800 text-gray-300 font-semibold">
+                              <tr>
+                                <th className="py-1 px-2.5 border-b border-gray-700">rule.level</th>
+                                <th className="py-1 px-2.5 border-b border-gray-700">Bucket</th>
+                                <th className="py-1 px-2.5 border-b border-gray-700 text-right">Weight</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-700/60 font-mono text-gray-200">
+                              <tr>
+                                <td className="py-1 px-2.5">15</td>
+                                <td className="py-1 px-2.5 text-rose-400 font-sans font-bold">Critical</td>
+                                <td className="py-1 px-2.5 text-right font-bold text-rose-400">6</td>
+                              </tr>
+                              <tr>
+                                <td className="py-1 px-2.5">12-14</td>
+                                <td className="py-1 px-2.5 text-orange-400 font-sans font-bold">High</td>
+                                <td className="py-1 px-2.5 text-right font-bold text-orange-400">3</td>
+                              </tr>
+                              <tr>
+                                <td className="py-1 px-2.5">7-11</td>
+                                <td className="py-1 px-2.5 text-blue-400 font-sans font-bold">Medium</td>
+                                <td className="py-1 px-2.5 text-right font-bold text-blue-400">1</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </th>
                       <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
@@ -658,7 +715,7 @@ function DevicesContent() {
                             </div>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
-                            <div className="flex items-center gap-2 font-bold">
+                            <div className="flex items-center gap-2 font-bold relative group/scorecell cursor-help">
                               <span className="text-xs sm:text-sm text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
                               <span
                                 style={{ backgroundColor: cat.color }}
@@ -667,6 +724,44 @@ function DevicesContent() {
                               >
                                 {cat.label}
                               </span>
+
+                              {/* Tooltip on cell hover */}
+                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover/scorecell:block z-50 pointer-events-none w-80 p-3.5 bg-gray-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-gray-700 text-left font-normal normal-case">
+                                <div className="font-bold text-xs text-gray-200 mb-1.5 border-b border-gray-700 pb-1 flex items-center gap-1.5">
+                                  <HiOutlineInformationCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                  <span>Rumus Agent Risk Score</span>
+                                </div>
+                                <div className="font-mono text-[11px] text-emerald-400 font-bold bg-gray-800/90 p-2 rounded-lg border border-gray-700/80 mb-2 leading-relaxed text-center">
+                                  AgentScore(e) = min(100, Σ SeverityWeight+SeverityWeight+...)
+                                </div>
+                                <div className="text-[11px] text-gray-300 mb-1.5 font-semibold">Tabel Bobot Severity:</div>
+                                <table className="w-full text-[11px] text-left border border-gray-700 rounded overflow-hidden">
+                                  <thead className="bg-gray-800 text-gray-300 font-semibold">
+                                    <tr>
+                                      <th className="py-1 px-2.5 border-b border-gray-700">rule.level</th>
+                                      <th className="py-1 px-2.5 border-b border-gray-700">Bucket</th>
+                                      <th className="py-1 px-2.5 border-b border-gray-700 text-right">Weight</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-700/60 font-mono text-gray-200">
+                                    <tr>
+                                      <td className="py-1 px-2.5">15</td>
+                                      <td className="py-1 px-2.5 text-rose-400 font-sans font-bold">Critical</td>
+                                      <td className="py-1 px-2.5 text-right font-bold text-rose-400">6</td>
+                                    </tr>
+                                    <tr>
+                                      <td className="py-1 px-2.5">12-14</td>
+                                      <td className="py-1 px-2.5 text-orange-400 font-sans font-bold">High</td>
+                                      <td className="py-1 px-2.5 text-right font-bold text-orange-400">3</td>
+                                    </tr>
+                                    <tr>
+                                      <td className="py-1 px-2.5">7-11</td>
+                                      <td className="py-1 px-2.5 text-blue-400 font-sans font-bold">Medium</td>
+                                      <td className="py-1 px-2.5 text-right font-bold text-blue-400">1</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 text-gray-900 font-medium">

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { HiOutlineArrowUp, HiOutlineArrowDown, HiOutlineMinus } from 'react-icons/hi2';
+import { HiOutlineArrowUp, HiOutlineArrowDown, HiOutlineMinus, HiOutlineInformationCircle } from 'react-icons/hi2';
 import { getRiskCategory, RISK_CATEGORIES } from '@/lib/risk-score';
 
 interface RiskScoreWidgetProps {
@@ -88,8 +88,24 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
   return (
     <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex flex-col h-full justify-between">
       {/* Top Navy Header - Standardized Height */}
-      <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base tracking-wide flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-        Risk Score
+      <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between text-xs sm:text-sm md:text-sm xl:text-base tracking-wide flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+        <span>Risk Score</span>
+        <div className="group/hdr relative cursor-help">
+          <HiOutlineInformationCircle className="w-4 h-4 text-blue-200 hover:text-white transition-colors" />
+          <div className="absolute top-full right-0 mt-2 hidden group-hover/hdr:flex flex-col items-end z-50 pointer-events-none w-72 text-left">
+            <div className="bg-gray-900/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-gray-700 w-full">
+              <div className="font-bold text-[11px] text-gray-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5 border-b border-gray-700/80 pb-1">
+                <span>Rumus Tenant Risk Score</span>
+              </div>
+              <div className="font-mono text-emerald-400 text-[11px] font-bold bg-gray-800/90 p-2 rounded-lg border border-gray-700/80 leading-relaxed mb-1.5 text-center">
+                RiskScore = (AS1 + AS2 + Agent Score 3, dst) / Total Agent
+              </div>
+              <div className="text-[10px] text-gray-300 leading-normal">
+                Akumulasi seluruh <strong>Agent Score (AS)</strong> dibagi dengan <strong>Total Agent</strong> terdaftar.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Content Body */}
@@ -128,11 +144,30 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
               />
             </svg>
 
-            {/* Matching Font Size HTML Center Overlay - Number Only */}
-            <div className="absolute inset-0 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center pointer-events-none">
-              <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight">
-                {displayScore}
-              </span>
+            {/* Matching Font Size HTML Center Overlay - Number Only with Tooltip */}
+            <div className="absolute inset-0 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center">
+              <div className="group/score relative cursor-help inline-flex items-center justify-center pointer-events-auto">
+                <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight hover:text-[#002B9A] transition-colors">
+                  {displayScore}
+                </span>
+
+                {/* Tooltip on hover score */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-72 text-left">
+                  <div className="bg-gray-900/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-gray-700 w-full">
+                    <div className="font-bold text-[11px] text-gray-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5 border-b border-gray-700/80 pb-1">
+                      <HiOutlineInformationCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                      <span>Rumus Tenant Risk Score</span>
+                    </div>
+                    <div className="font-mono text-emerald-400 text-[11px] font-bold bg-gray-800/90 p-2 rounded-lg border border-gray-700/80 leading-relaxed mb-1.5 text-center">
+                      RiskScore = (AS1 + AS2 + Agent Score 3, dst) / Total Agent
+                    </div>
+                    <div className="text-[10px] text-gray-300 leading-normal">
+                      Akumulasi seluruh <strong>Agent Score (AS)</strong> dibagi dengan <strong>Total Agent</strong> terdaftar.
+                    </div>
+                  </div>
+                  <div className="w-2.5 h-2.5 bg-gray-900/95 rotate-45 -mt-1 border-r border-b border-gray-700"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
