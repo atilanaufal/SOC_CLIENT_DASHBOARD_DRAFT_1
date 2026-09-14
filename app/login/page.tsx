@@ -82,7 +82,7 @@ export default function LoginPage() {
           
           <div>
             <h1 className="text-xl font-black text-[#002B9A] tracking-tight">
-              ASOC Dashboard
+              SOC LAB Dashboard
             </h1>
             <p className="text-xs font-bold text-gray-600 mt-1">
               Sign in to manage and monitor your security posture

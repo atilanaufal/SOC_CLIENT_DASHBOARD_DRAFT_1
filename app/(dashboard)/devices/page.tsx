@@ -658,11 +658,11 @@ function DevicesContent() {
                             </div>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
-                            <div className="flex items-center gap-1.5 font-bold">
-                              <span className="text-xs sm:text-sm text-gray-900 font-bold">{scoreVal}</span>
+                            <div className="flex items-center gap-2 font-bold">
+                              <span className="text-xs sm:text-sm text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
                               <span
                                 style={{ backgroundColor: cat.color }}
-                                className="text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0"
+                                className="text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 w-16 text-center"
                                 title={cat.meaning}
                               >
                                 {cat.label}

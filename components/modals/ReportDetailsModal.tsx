@@ -33,8 +33,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
   const socIdDisplay = report.soc_id || 'N/A';
   const uuidDisplay = report.report_uuid || report.id;
-  const recommendedActionText = report.recommendedAction || report.recommended_action || '';
-
+  
   return createPortal(
     <div
       onClick={onClose}
@@ -106,15 +105,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             <MarkdownRenderer content={report.summary || 'No detailed summary available.'} />
           </section>
 
-          {/* Recommended Action Section */}
-          {recommendedActionText && (
-            <section className="bg-white/80 backdrop-blur-xl p-4 sm:p-5 rounded-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
-              <div className="mb-3 pb-2 border-b border-emerald-200">
-                <h4 className="text-xs sm:text-sm font-bold text-emerald-900 uppercase tracking-wider">Recommended Action</h4>
-              </div>
-              <MarkdownRenderer content={recommendedActionText} />
-            </section>
-          )}
+
 
           {/* Affected Devices List */}
           {report.affectedDevices && report.affectedDevices.length > 0 && (

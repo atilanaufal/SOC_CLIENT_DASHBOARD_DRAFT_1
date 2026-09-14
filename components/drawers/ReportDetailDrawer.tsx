@@ -1,14 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   HiOutlineXMark,
-  HiOutlineDocumentText,
   HiOutlineArrowsPointingOut,
-  HiOutlineLightBulb,
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
 } from 'react-icons/hi2';
 import { SecurityReport } from '@/lib/types';
-import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 interface ReportDetailDrawerProps {
   report: SecurityReport | null;
@@ -17,11 +16,27 @@ interface ReportDetailDrawerProps {
   onOpenFullSummary?: (report: SecurityReport) => void;
 }
 
-function truncateSummary(text?: string, maxLength: number = 220): string {
-  if (!text) return 'No summary provided.';
-  const cleanText = text.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '[Image]').replace(/[#*`_]/g, '');
-  if (cleanText.length <= maxLength) return cleanText;
-  return cleanText.substring(0, maxLength) + '...';
+const SUMMARY_HEADING_RE = /^[ \t]*(?:#{1,3}\s*|\*{2}\s*|[0-9]+[.)]\s*)*(?:[0-9]+[.)]\s*)?.*(?:ringkasan\s*insiden|ringkasan|summary|executive\s*summary).*$/im;
+const NEXT_HEADING_RE = /\n[ \t]*(?:#{1,6}\s+|[0-9]+[.)]\s*(?:\*{1,2})?[A-Z]{2,}|\*{1,2}[0-9.]*\s*[A-Z\s0-9]{2,}\*{1,2})/;
+
+function extractIncidentSummary(rawText?: string): string {
+  if (!rawText) return 'No summary provided.';
+  
+  const m = SUMMARY_HEADING_RE.exec(rawText);
+  let targetBlock = rawText;
+  if (m) {
+    const rest = rawText.slice(m.index + m[0].length);
+    const nm = NEXT_HEADING_RE.exec(rest);
+    const sec = (nm ? rest.slice(0, nm.index) : rest).trim();
+    if (sec) {
+      targetBlock = sec;
+    }
+  }
+
+  return targetBlock
+    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '[Image]')
+    .replace(/[#*`_]/g, '')
+    .trim();
 }
 
 function renderSeverityBadge(sev: string) {
@@ -39,11 +54,19 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
   onClose,
   onOpenFullSummary,
 }) => {
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+
   if (!isOpen || !report) return null;
 
   const socIdDisplay = report.soc_id || 'N/A';
   const uuidDisplay = report.report_uuid || report.id;
   const recommendedActionText = report.recommendedAction || report.recommended_action || '';
+
+  const fullCleanSummary = extractIncidentSummary(report.summary);
+  const isLongSummary = fullCleanSummary.length > 220;
+  const displayedSummary = isLongSummary && !isSummaryExpanded
+    ? fullCleanSummary.substring(0, 220) + '...'
+    : fullCleanSummary;
 
   return (
     <>
@@ -108,10 +131,23 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
             <div className="flex items-center justify-between mb-1.5">
               <h4 className="font-bold text-xs xl:text-sm text-gray-900 uppercase tracking-wider">Summary</h4>
             </div>
-            <div className="bg-blue-50/70 p-3.5 xl:p-4 rounded-xl border border-blue-100 max-h-64 overflow-y-auto">
-              <p className="text-xs sm:text-sm xl:text-base text-gray-700 font-normal leading-relaxed">
-                {truncateSummary(report.summary, 220)}
+            <div className="bg-blue-50/70 p-3.5 xl:p-4 rounded-xl border border-blue-100 max-h-80 overflow-y-auto">
+              <p className="text-xs sm:text-sm xl:text-base text-gray-700 font-normal leading-relaxed whitespace-pre-line">
+                {displayedSummary}
               </p>
+              {isLongSummary && (
+                <button
+                  onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                  className="mt-2 text-xs sm:text-sm xl:text-base font-semibold text-[#002B9A] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{isSummaryExpanded ? 'Show Less' : 'Read More'}</span>
+                  {isSummaryExpanded ? (
+                    <HiOutlineChevronUp className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                  ) : (
+                    <HiOutlineChevronDown className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -120,8 +156,8 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
             <div className="pt-3 xl:pt-4 border-t border-gray-200/80">
               <h4 className="font-bold text-xs xl:text-sm text-emerald-900 uppercase tracking-wider mb-1.5">Recommended Action</h4>
               <div className="bg-emerald-50/70 p-3.5 xl:p-4 rounded-xl border border-emerald-200 max-h-56 overflow-y-auto">
-                <p className="text-xs sm:text-sm xl:text-base text-emerald-900 font-normal leading-relaxed">
-                  {truncateSummary(recommendedActionText, 220)}
+                <p className="text-xs sm:text-sm xl:text-base text-emerald-900 font-normal leading-relaxed whitespace-pre-line">
+                  {recommendedActionText}
                 </p>
               </div>
             </div>

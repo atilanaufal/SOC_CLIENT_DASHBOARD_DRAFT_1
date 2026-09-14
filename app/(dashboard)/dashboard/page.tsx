@@ -533,7 +533,7 @@ export default function DashboardPage() {
           ) : recommendedActionsSource.length === 0 ? (
             <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No recommended actions found.</div>
           ) : (
-            recommendedActionsSource.slice(0, 3).map((act, idx) => (
+            recommendedActionsSource.slice(0, 1).map((act, idx) => (
               <div key={idx} className="p-3 sm:p-3.5 md:p-4 px-3.5 sm:px-4 md:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
                 <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                   <div className="flex-shrink-0 mt-0.5 sm:mt-0">

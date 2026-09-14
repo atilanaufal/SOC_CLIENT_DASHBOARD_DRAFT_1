@@ -226,9 +226,19 @@ export async function GET(request: Request) {
           return actionText !== '' && actionText.toLowerCase() !== 'no recommended action specified.' && actionText.toLowerCase() !== 'n/a' && actionText.toLowerCase() !== '-';
         })
         .map((r) => {
-          const actionText = Array.isArray(r.recommended_action || r.recommendedAction || r.recommended_actions)
-            ? (r.recommended_action || r.recommendedAction || r.recommended_actions).join(', ').trim()
+          let fullAction = Array.isArray(r.recommended_action || r.recommendedAction || r.recommended_actions)
+            ? (r.recommended_action || r.recommendedAction || r.recommended_actions).join('\n').trim()
             : String(r.recommended_action || r.recommendedAction || r.recommended_actions || '').trim();
+
+          // For dashboard widget: take only first item/line of recommendation
+          let firstAction = fullAction;
+          const lines = fullAction.split('\n').map((l: string) => l.trim()).filter(Boolean);
+          if (lines.length > 0) {
+            // Strip leading 1.  if present so it reads cleanly: Team - Action
+            firstAction = lines[0].replace(/^[0-9]+[.)]\s*/, '');
+          }
+
+          const actionText = firstAction;
           const rawDate = r.date_generated || r.synced_at || (r._id && r._id.getTimestamp ? r._id.getTimestamp() : null);
           const rawTimestamp = rawDate ? new Date(rawDate).getTime() : 0;
 
