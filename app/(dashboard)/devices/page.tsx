@@ -600,12 +600,12 @@ function DevicesContent() {
 
                         {/* Tooltip on header hover only */}
                         <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:flex flex-col items-end z-50 pointer-events-none w-80 sm:w-[350px] text-left font-normal normal-case">
-                          <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-100 rotate-45 -mb-1.5 mr-6 z-10"></div>
-                          <div className="bg-white/95 backdrop-blur-xl text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_12px_36px_rgba(0,43,154,0.18)] border border-blue-100 w-full">
+                          <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 mr-6 z-10"></div>
+                          <div className="bg-white text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
                             <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
                               Agent Risk Score Formula
                             </div>
-                            <div className="bg-[#002B9A]/5 py-2.5 px-3 rounded-lg border border-[#002B9A]/15 mb-2.5 text-center font-mono text-[#002B9A]">
+                            <div className="bg-[#f4f7ff] py-2.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2.5 text-center font-mono text-[#002B9A]">
                               <div className="font-bold text-xs whitespace-nowrap">
                                 AgentScore(e) = min(100, ∑ SeverityWeight)
                               </div>
@@ -615,14 +615,14 @@ function DevicesContent() {
                             </div>
                             <div className="text-xs text-gray-600 mb-1.5 font-bold">Severity Weight Reference:</div>
                             <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white">
-                              <thead className="bg-gray-50 text-gray-600 font-bold text-[11px]">
+                              <thead className="bg-gray-100 text-gray-600 font-bold text-[11px]">
                                 <tr>
                                   <th className="py-1.5 px-3 border-b border-gray-200">Rule Level</th>
                                   <th className="py-1.5 px-3 border-b border-gray-200">Severity Bucket</th>
                                   <th className="py-1.5 px-3 border-b border-gray-200 text-right">Weight</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-xs">
+                              <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-xs bg-white">
                                 <tr className="hover:bg-rose-50/40">
                                   <td className="py-1 px-3 font-mono">15</td>
                                   <td className="py-1 px-3 text-rose-600 font-bold">Critical</td>

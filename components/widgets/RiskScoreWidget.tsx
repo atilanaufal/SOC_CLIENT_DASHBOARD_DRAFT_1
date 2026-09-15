@@ -137,12 +137,12 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
 
                 {/* Tooltip on hover score */}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-80 sm:w-[340px] text-left">
-                  <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-100 rotate-45 -mb-1.5 z-10"></div>
-                  <div className="bg-white/95 backdrop-blur-xl text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_12px_36px_rgba(0,43,154,0.18)] border border-blue-100 w-full">
+                  <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 z-10"></div>
+                  <div className="bg-white text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
                     <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
                       Tenant Risk Score Formula
                     </div>
-                    <div className="bg-[#002B9A]/5 py-2.5 px-3 rounded-lg border border-[#002B9A]/15 mb-2 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
+                    <div className="bg-[#f4f7ff] py-2.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
                       <span className="font-bold text-xs sm:text-sm">RiskScore =</span>
                       <div className="inline-flex flex-col items-center">
                         <span className="border-b border-[#002B9A]/40 px-2 pb-0.5 text-xs font-bold leading-none">
