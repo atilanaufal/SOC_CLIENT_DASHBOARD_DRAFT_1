@@ -40,20 +40,25 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
   let dynamicFontSize = 'text-base sm:text-lg font-black';
 
   if (size >= 120) {
-    if (textLength <= 3) dynamicFontSize = 'text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-2xl sm:text-3xl xl:text-4xl font-black';
-    else dynamicFontSize = 'text-xl sm:text-2xl xl:text-3xl font-black';
+    if (textLength <= 2) dynamicFontSize = 'text-3xl sm:text-4xl font-black';
+    else if (textLength === 3) dynamicFontSize = 'text-2xl sm:text-3xl font-black';
+    else if (textLength === 4) dynamicFontSize = 'text-xl sm:text-2xl font-black';
+    else if (textLength === 5) dynamicFontSize = 'text-lg sm:text-xl xl:text-2xl font-black';
+    else dynamicFontSize = 'text-sm sm:text-base xl:text-lg font-black';
   } else if (size >= 80) {
-    if (textLength <= 3) dynamicFontSize = 'text-2xl sm:text-2xl xl:text-3xl font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-lg sm:text-xl xl:text-2xl font-black';
-    else dynamicFontSize = 'text-sm sm:text-base font-bold';
+    if (textLength <= 2) dynamicFontSize = 'text-xl sm:text-2xl font-black';
+    else if (textLength === 3) dynamicFontSize = 'text-lg sm:text-xl font-black';
+    else if (textLength === 4) dynamicFontSize = 'text-base sm:text-lg font-black';
+    else if (textLength === 5) dynamicFontSize = 'text-xs sm:text-sm font-black';
+    else dynamicFontSize = 'text-[11px] sm:text-xs font-bold';
   } else {
-    if (textLength <= 3) dynamicFontSize = 'text-base sm:text-lg font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-xs sm:text-sm font-bold';
-    else dynamicFontSize = 'text-[10px] sm:text-xs font-bold';
+    if (textLength <= 2) dynamicFontSize = 'text-sm sm:text-base font-black';
+    else if (textLength <= 4) dynamicFontSize = 'text-xs sm:text-sm font-bold';
+    else dynamicFontSize = 'text-[10px] font-bold';
   }
 
-  const fontSizeClass = customFontSizeClass || dynamicFontSize;
+  // Safety: If customFontSizeClass is huge but number has 4+ digits, prioritize dynamic scaling
+  const fontSizeClass = (customFontSizeClass && textLength <= 3) ? customFontSizeClass : dynamicFontSize;
 
   return (
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
@@ -94,9 +99,12 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
         })}
       </svg>
 
-      {/* Centered number scaled font size */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1">
-        <span className={`${fontSizeClass} text-gray-900 leading-none tracking-tight`}>
+      {/* Centered number scaled font size with max-width containment */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-1 pointer-events-none">
+        <span
+          className={`${fontSizeClass} text-gray-900 leading-none tracking-tight tabular-nums max-w-[76%] truncate`}
+          title={centerLabel}
+        >
           {centerLabel}
         </span>
       </div>

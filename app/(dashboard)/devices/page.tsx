@@ -599,13 +599,13 @@ function DevicesContent() {
                         </div>
 
                         {/* Tooltip on header hover only */}
-                        <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:flex flex-col items-end z-50 pointer-events-none w-80 sm:w-[350px] text-left font-normal normal-case">
+                        <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:flex flex-col items-end z-50 pointer-events-none w-96 sm:w-[420px] text-left font-normal normal-case">
                           <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 mr-6 z-10"></div>
-                          <div className="bg-white text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
-                            <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
+                          <div className="bg-white text-gray-800 text-xs rounded-xl p-4 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
+                            <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2.5 border-b border-gray-100 pb-1.5">
                               Agent Risk Score Formula
                             </div>
-                            <div className="bg-[#f4f7ff] py-2.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2.5 text-center font-mono text-[#002B9A]">
+                            <div className="bg-[#f4f7ff] py-2.5 px-3.5 rounded-lg border border-[#002B9A]/20 mb-2.5 text-center font-mono text-[#002B9A]">
                               <div className="font-bold text-xs whitespace-nowrap">
                                 AgentScore(e) = min(100, ∑ SeverityWeight)
                               </div>
