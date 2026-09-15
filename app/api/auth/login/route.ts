@@ -72,13 +72,18 @@ export async function POST(req: NextRequest) {
     const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
     const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
 
-    // Set fallback auth_session cookie
-    response.cookies.set('auth_session', JSON.stringify(masterUser), {
+    // Set fallback auth_session cookie with last_active timestamp
+    const sessionData = {
+      ...masterUser,
+      last_active: Date.now(),
+    };
+
+    // Set session cookie (tanpa maxAge agar otomatis logout saat web/browser ditutup)
+    response.cookies.set('auth_session', JSON.stringify(sessionData), {
       httpOnly: true,
       secure: isHttps,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
     });
 
     return response;

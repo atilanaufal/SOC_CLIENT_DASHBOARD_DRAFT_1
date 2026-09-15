@@ -26,6 +26,10 @@ export async function getTenantContext(request: Request): Promise<TenantContext 
     const match = cookieHeader.match(/auth_session=([^;]+)/);
     if (match && match[1]) {
       const user = JSON.parse(decodeURIComponent(match[1]));
+      const lastActive = Number(user.last_active);
+      if (lastActive && Date.now() - lastActive > 30 * 60 * 1000) {
+        return null;
+      }
       const databaseName = user.database_name || user.databaseName || '';
       const redisPrefix = user.redis_prefix || user.redisPrefix || databaseName;
       if (databaseName) {

@@ -44,11 +44,12 @@ export default function LoginPage() {
         return;
       }
 
-      // Save user session in localStorage and clear stale caches
+      // Save user session in sessionStorage (destroyed on browser close)
       if (data.user) {
-        localStorage.setItem('user_session', JSON.stringify(data.user));
+        sessionStorage.setItem('user_session', JSON.stringify(data.user));
       }
       try {
+        localStorage.removeItem('user_session');
         sessionStorage.removeItem('auth_me_cache');
       } catch {}
 

@@ -56,7 +56,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
   useEffect(() => {
     // Read session info from sessionStorage/localStorage first to avoid redundant network requests
     try {
-      const cached = sessionStorage.getItem('auth_me_cache') || localStorage.getItem('user_session');
+      const cached = sessionStorage.getItem('auth_me_cache') || sessionStorage.getItem('user_session');
       if (cached) {
         setUserSession(JSON.parse(cached));
         return;
@@ -72,7 +72,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
             sessionStorage.setItem('auth_me_cache', JSON.stringify(data.user));
           } catch {}
         } else {
-          const stored = localStorage.getItem('user_session');
+          const stored = sessionStorage.getItem('user_session');
           if (stored) {
             try {
               setUserSession(JSON.parse(stored));
@@ -81,7 +81,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
         }
       })
       .catch(() => {
-        const stored = localStorage.getItem('user_session');
+        const stored = sessionStorage.getItem('user_session');
         if (stored) {
           try {
             setUserSession(JSON.parse(stored));
@@ -105,16 +105,16 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
 
   const handleLogout = async () => {
     try {
+      sessionStorage.removeItem('user_session');
+      sessionStorage.removeItem('auth_me_cache');
+    } catch {}
+    try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
     try {
       const { authClient } = await import('@/lib/auth-client');
       await authClient.signOut();
     } catch {}
-    try {
-      sessionStorage.removeItem('auth_me_cache');
-    } catch {}
-    localStorage.removeItem('user_session');
     router.push('/login');
   };
 
