@@ -131,15 +131,15 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
             {/* Matching Font Size HTML Center Overlay - Number Only with Tooltip */}
             <div className="absolute inset-0 z-30 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center">
               <div className="group/score relative cursor-help inline-flex items-center justify-center pointer-events-auto">
-                <span className="text-2xl sm:text-3xl md:text-3xl xl:text-4xl font-black text-gray-900 leading-none tracking-tight hover:text-[#002B9A] transition-colors tabular-nums max-w-[85%] truncate">
+                <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight hover:text-[#002B9A] transition-colors">
                   {displayScore}
                 </span>
 
                 {/* Tooltip on hover score */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-96 sm:w-[400px] text-left">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-80 sm:w-[340px] text-left">
                   <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 z-10"></div>
-                  <div className="bg-white text-gray-800 text-xs rounded-xl p-4 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
-                    <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2.5 border-b border-gray-100 pb-1.5">
+                  <div className="bg-white text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
+                    <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
                       Tenant Risk Score Formula
                     </div>
                     <div className="bg-[#f4f7ff] py-2.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
