@@ -599,40 +599,51 @@ function DevicesContent() {
                         </div>
 
                         {/* Tooltip on header hover only */}
-                        <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:block z-50 pointer-events-none w-80 p-3.5 bg-white/95 backdrop-blur-xl text-gray-800 rounded-xl shadow-[0_12px_36px_rgba(0,43,154,0.18)] border border-blue-100 text-left font-normal normal-case">
-                          <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
-                            Rumus Agent Risk Score
+                        <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:flex flex-col items-end z-50 pointer-events-none w-80 sm:w-[350px] text-left font-normal normal-case">
+                          <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-100 rotate-45 -mb-1.5 mr-6 z-10"></div>
+                          <div className="bg-white/95 backdrop-blur-xl text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_12px_36px_rgba(0,43,154,0.18)] border border-blue-100 w-full">
+                            <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
+                              Agent Risk Score Formula
+                            </div>
+                            <div className="bg-[#002B9A]/5 py-2.5 px-3 rounded-lg border border-[#002B9A]/15 mb-2.5 text-center font-mono text-[#002B9A]">
+                              <div className="font-bold text-xs whitespace-nowrap">
+                                AgentScore(e) = min(100, ∑ SeverityWeight)
+                              </div>
+                              <div className="text-[10.5px] text-gray-500 mt-1 font-mono whitespace-nowrap">
+                                ∑ SeverityWeight = W₁ + W₂ + ... + Wₙ
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-600 mb-1.5 font-bold">Severity Weight Reference:</div>
+                            <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white">
+                              <thead className="bg-gray-50 text-gray-600 font-bold text-[11px]">
+                                <tr>
+                                  <th className="py-1.5 px-3 border-b border-gray-200">Rule Level</th>
+                                  <th className="py-1.5 px-3 border-b border-gray-200">Severity Bucket</th>
+                                  <th className="py-1.5 px-3 border-b border-gray-200 text-right">Weight</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-xs">
+                                <tr className="hover:bg-rose-50/40">
+                                  <td className="py-1 px-3 font-mono">15</td>
+                                  <td className="py-1 px-3 text-rose-600 font-bold">Critical</td>
+                                  <td className="py-1 px-3 text-right font-bold text-rose-600 font-mono">6</td>
+                                </tr>
+                                <tr className="hover:bg-orange-50/40">
+                                  <td className="py-1 px-3 font-mono">12 - 14</td>
+                                  <td className="py-1 px-3 text-orange-600 font-bold">High</td>
+                                  <td className="py-1 px-3 text-right font-bold text-orange-600 font-mono">3</td>
+                                </tr>
+                                <tr className="hover:bg-blue-50/40">
+                                  <td className="py-1 px-3 font-mono">7 - 11</td>
+                                  <td className="py-1 px-3 text-[#002B9A] font-bold">Medium</td>
+                                  <td className="py-1 px-3 text-right font-bold text-[#002B9A] font-mono">1</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <div className="text-[10.5px] text-gray-500 mt-2 font-medium leading-relaxed">
+                              Accumulated weight of detected alerts, capped at a maximum score of 100.
+                            </div>
                           </div>
-                          <div className="font-mono text-[11px] text-[#002B9A] font-bold bg-[#002B9A]/5 p-2 rounded-lg border border-[#002B9A]/15 mb-2.5 leading-relaxed text-center">
-                            AgentScore(e) = min(100, Σ SeverityWeight+SeverityWeight+...)
-                          </div>
-                          <div className="text-xs text-gray-600 mb-1.5 font-bold">Tabel Bobot Severity:</div>
-                          <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white">
-                            <thead className="bg-gray-50 text-gray-600 font-bold text-[11px]">
-                              <tr>
-                                <th className="py-1.5 px-3 border-b border-gray-200">rule.level</th>
-                                <th className="py-1.5 px-3 border-b border-gray-200">Bucket</th>
-                                <th className="py-1.5 px-3 border-b border-gray-200 text-right">Weight</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-xs">
-                              <tr className="hover:bg-rose-50/40">
-                                <td className="py-1 px-3 font-mono">15</td>
-                                <td className="py-1 px-3 text-rose-600 font-bold">Critical</td>
-                                <td className="py-1 px-3 text-right font-bold text-rose-600 font-mono">6</td>
-                              </tr>
-                              <tr className="hover:bg-orange-50/40">
-                                <td className="py-1 px-3 font-mono">12-14</td>
-                                <td className="py-1 px-3 text-orange-600 font-bold">High</td>
-                                <td className="py-1 px-3 text-right font-bold text-orange-600 font-mono">3</td>
-                              </tr>
-                              <tr className="hover:bg-blue-50/40">
-                                <td className="py-1 px-3 font-mono">7-11</td>
-                                <td className="py-1 px-3 text-[#002B9A] font-bold">Medium</td>
-                                <td className="py-1 px-3 text-right font-bold text-[#002B9A] font-mono">1</td>
-                              </tr>
-                            </tbody>
-                          </table>
                         </div>
                       </th>
                       <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">

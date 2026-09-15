@@ -136,17 +136,25 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
                 </span>
 
                 {/* Tooltip on hover score */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-80 text-left">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-80 sm:w-[340px] text-left">
                   <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-100 rotate-45 -mb-1.5 z-10"></div>
                   <div className="bg-white/95 backdrop-blur-xl text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_12px_36px_rgba(0,43,154,0.18)] border border-blue-100 w-full">
                     <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
-                      Rumus Tenant Risk Score
+                      Tenant Risk Score Formula
                     </div>
-                    <div className="font-mono text-xs text-[#002B9A] font-bold bg-[#002B9A]/5 p-2 rounded-lg border border-[#002B9A]/15 leading-relaxed mb-2 text-center">
-                      RiskScore = (AS1 + AS2 + Agent Score 3, dst) / Total Agent
+                    <div className="bg-[#002B9A]/5 py-2.5 px-3 rounded-lg border border-[#002B9A]/15 mb-2 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
+                      <span className="font-bold text-xs sm:text-sm">RiskScore =</span>
+                      <div className="inline-flex flex-col items-center">
+                        <span className="border-b border-[#002B9A]/40 px-2 pb-0.5 text-xs font-bold leading-none">
+                          AS₁ + AS₂ + ... + ASₙ
+                        </span>
+                        <span className="pt-1 text-[10.5px] font-semibold text-gray-600 leading-none">
+                          Total Agents
+                        </span>
+                      </div>
                     </div>
                     <div className="text-[11px] text-gray-600 leading-normal font-medium">
-                      Akumulasi seluruh <strong>Agent Score (AS)</strong> dibagi dengan <strong>Total Agent</strong> terdaftar.
+                      Sum of all <strong>Agent Scores (AS)</strong> divided by the <strong>Total Registered Agents</strong>.
                     </div>
                   </div>
                 </div>
