@@ -230,12 +230,25 @@ export async function GET(request: Request) {
             ? (r.recommended_action || r.recommendedAction || r.recommended_actions).join('\n').trim()
             : String(r.recommended_action || r.recommendedAction || r.recommended_actions || '').trim();
 
-          // For dashboard widget: take only first item/line of recommendation
+          // For dashboard widget: clean and extract first actual recommendation (supports lists and markdown tables)
           let firstAction = fullAction;
           const lines = fullAction.split('\n').map((l: string) => l.trim()).filter(Boolean);
-          if (lines.length > 0) {
-            // Strip leading 1.  if present so it reads cleanly: Team - Action
-            firstAction = lines[0].replace(/^[0-9]+[.)]\s*/, '');
+          for (const line of lines) {
+            if (line.startsWith('|')) {
+              // Skip table headers and separator rows
+              if (/no\.|tindakan|rekomendasi|action|-----|:---/i.test(line)) continue;
+              const cells = line.split('|').map((c: string) => c.trim()).filter(Boolean);
+              if (cells.length >= 2) {
+                firstAction = cells.slice(1).join(' - ');
+                break;
+              } else if (cells.length === 1) {
+                firstAction = cells[0];
+                break;
+              }
+            } else {
+              firstAction = line.replace(/^[0-9]+[.)]\s*/, '');
+              break;
+            }
           }
 
           const actionText = firstAction;
@@ -245,6 +258,8 @@ export async function GET(request: Request) {
           return {
             id: r._id.toString(),
             reportId: r._id.toString(),
+            reportName: r.report_name || `Report #${r.report_id || ''}`,
+            customerName: r.customer_name || r.customerName || r.client_name || tenant.campusName || 'N/A',
             action: actionText,
             severity: parseSeverity(r.severity),
             date: formatDate(rawDate),

@@ -100,6 +100,14 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
             <p className="text-base sm:text-lg font-black text-[#002B9A] break-words">{report.reportName}</p>
           </div>
 
+          {/* Customer Name */}
+          <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Customer Name</p>
+            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words">
+              {report.customerName || report.customer_name || report.client_name || report.tenant || 'N/A'}
+            </p>
+          </div>
+
           {/* Report UUID */}
           <div>
             <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Report UUID</p>

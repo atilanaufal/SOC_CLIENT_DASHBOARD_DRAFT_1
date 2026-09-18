@@ -84,6 +84,12 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-1">
+              <span className="text-gray-500 font-medium">Customer:</span>
+              <span className="text-[#002B9A] font-bold">
+                {report.customerName || report.customer_name || report.client_name || report.tenant || 'N/A'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
               <span className="text-gray-500 font-medium">Generated:</span>
               <span className="text-gray-900 font-bold">{report.dateGenerated}</span>
             </div>

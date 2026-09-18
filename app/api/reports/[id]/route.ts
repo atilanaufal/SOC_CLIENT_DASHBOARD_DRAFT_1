@@ -61,6 +61,8 @@ export async function GET(
       report_id: doc.report_id,
       report_uuid: doc.report_uuid,
       soc_id: doc.soc_id,
+      customerName: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
+      customer_name: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
       severity: doc.severity || 'Unspecified',
       dateGenerated: formatDate(doc.date_generated),
       date_generated: doc.date_generated ? (doc.date_generated instanceof Date ? doc.date_generated.toISOString() : String(doc.date_generated)) : undefined,

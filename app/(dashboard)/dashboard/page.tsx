@@ -183,12 +183,12 @@ export default function DashboardPage() {
         return text !== '' && text.toLowerCase() !== 'no recommended action specified.' && text.toLowerCase() !== 'n/a' && text.toLowerCase() !== '-';
       })
       .sort((a, b) => {
-        const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
-        const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
-        if (rankB !== rankA) return rankB - rankA;
         const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
         const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
-        return timeB - timeA;
+        if (timeB !== timeA) return timeB - timeA;
+        const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
+        const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
+        return rankB - rankA;
       });
   }, [rawRecs]);
 
@@ -521,19 +521,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom Row: Recommended Action - Latest */}
+      {/* Bottom Row: Recommended Action - All reports in active time filter */}
       <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex-shrink-0">
-        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-          Recommended Action
+        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <span>Recommended Action</span>
+          {recommendedActionsSource.length > 0 && (
+            <span className="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md">
+              {recommendedActionsSource.length} Actions
+            </span>
+          )}
         </div>
 
-        <div className="divide-y divide-gray-200/50">
+        <div className="divide-y divide-gray-200/50 max-h-[380px] overflow-y-auto">
           {isLoading ? (
             <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading recommended actions...</div>
           ) : recommendedActionsSource.length === 0 ? (
             <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No recommended actions found.</div>
           ) : (
-            recommendedActionsSource.slice(0, 1).map((act, idx) => (
+            recommendedActionsSource.map((act, idx) => (
               <div key={idx} className="p-3 sm:p-3.5 md:p-4 px-3.5 sm:px-4 md:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
                 <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                   <div className="flex-shrink-0 mt-0.5 sm:mt-0">
@@ -556,13 +561,24 @@ export default function DashboardPage() {
                         </p>
                       );
                     })()}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mt-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 font-semibold mt-1">
                       <span>{act.date}</span>
-                      {act.time && <span>{act.time}</span>}
+                      {act.customerName && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[#002B9A] font-bold">{act.customerName}</span>
+                        </>
+                      )}
+                      {act.reportName && (
+                        <>
+                          <span>•</span>
+                          <span className="text-gray-600 truncate max-w-[200px] sm:max-w-[300px]">{act.reportName}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-end sm:justify-auto">
+                <div className="flex justify-end sm:justify-auto flex-shrink-0">
                   <button
                     onClick={() => handleRecommendedActionView(act.id || act.reportId)}
                     className="w-full sm:w-auto bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2 rounded-lg transition flex items-center justify-center gap-1.5 flex-shrink-0 shadow-[0_2px_8px_rgba(0,43,154,0.2)] cursor-pointer"

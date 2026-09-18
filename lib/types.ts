@@ -9,6 +9,8 @@ export interface Device {
   ram?: string;
   university?: string;
   tenant?: string;
+  customerName?: string;
+  customer_name?: string;
   agentVersion?: string;
   ipAddress?: string;
   detectedIssues?: string[];
@@ -25,6 +27,9 @@ export interface Incident {
   _id?: string;
   sample_id?: string;
   incidentName: string;
+  customerName?: string;
+  customer_name?: string;
+  client_name?: string;
   incident_type?: string | string[];
   severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
   agent: string;
@@ -81,6 +86,9 @@ export interface Vulnerability {
   classification?: string;
   package?: string;
   ip?: string;
+  customerName?: string;
+  customer_name?: string;
+  tenant?: string;
 }
 
 export interface SecurityReport {
@@ -91,6 +99,10 @@ export interface SecurityReport {
   report_id?: number;
   report_uuid?: string;
   soc_id?: string;
+  customerName?: string;
+  customer_name?: string;
+  client_name?: string;
+  tenant?: string;
   type?: string;
   dateGenerated: string;
   date_generated?: string;

@@ -127,6 +127,8 @@ export async function GET(request: Request) {
         report_id: doc.report_id,
         report_uuid: doc.report_uuid,
         soc_id: doc.soc_id,
+        customerName: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
+        customer_name: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
         severity: doc.severity || 'Unspecified',
         dateGenerated: formatDate(rawDate),
         date_generated: rawDate ? (rawDate instanceof Date ? rawDate.toISOString() : String(rawDate)) : undefined,

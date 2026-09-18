@@ -111,6 +111,8 @@ export async function GET(
       full_logs: logs,
       full_log: logs,
       tenant: tenant.campusName,
+      customerName: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
+      customer_name: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
     };
 
     return NextResponse.json({ success: true, data: incident });
