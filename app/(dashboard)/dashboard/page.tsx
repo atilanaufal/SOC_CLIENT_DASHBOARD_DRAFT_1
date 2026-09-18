@@ -189,7 +189,8 @@ export default function DashboardPage() {
         const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
         const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
         return rankB - rankA;
-      });
+      })
+      .slice(0, 3);
   }, [rawRecs]);
 
   const renderSeverityBadge = (sev: string) => {
@@ -521,7 +522,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom Row: Recommended Action - All reports in active time filter */}
+      {/* Bottom Row: Recommended Action - Top 3 */}
       <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex-shrink-0">
         <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
           <span>Recommended Action</span>
@@ -538,7 +539,7 @@ export default function DashboardPage() {
           ) : recommendedActionsSource.length === 0 ? (
             <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No recommended actions found.</div>
           ) : (
-            recommendedActionsSource.map((act, idx) => (
+            recommendedActionsSource.slice(0, 3).map((act, idx) => (
               <div key={idx} className="p-3 sm:p-3.5 md:p-4 px-3.5 sm:px-4 md:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
                 <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                   <div className="flex-shrink-0 mt-0.5 sm:mt-0">
