@@ -36,21 +36,39 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
   let currentOffset = 0;
 
   // Scale center label font size cleanly so numbers never overlap chart stroke
-  const textLength = String(centerLabel || '').length;
+  const textLength = String(centerLabel || '').trim().length;
   let dynamicFontSize = 'text-base sm:text-lg font-black';
 
   if (size >= 120) {
-    if (textLength <= 3) dynamicFontSize = 'text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-2xl sm:text-3xl xl:text-4xl font-black';
-    else dynamicFontSize = 'text-xl sm:text-2xl xl:text-3xl font-black';
+    if (textLength <= 2) {
+      dynamicFontSize = 'text-3xl sm:text-4xl xl:text-4xl 2xl:text-5xl font-black';
+    } else if (textLength === 3) {
+      dynamicFontSize = 'text-2xl sm:text-3xl xl:text-3xl 2xl:text-4xl font-black';
+    } else if (textLength <= 5) {
+      dynamicFontSize = 'text-xl sm:text-2xl xl:text-2xl 2xl:text-3xl font-black';
+    } else if (textLength <= 7) {
+      dynamicFontSize = 'text-lg sm:text-xl xl:text-xl 2xl:text-2xl font-black';
+    } else {
+      dynamicFontSize = 'text-sm sm:text-base xl:text-lg font-black';
+    }
   } else if (size >= 80) {
-    if (textLength <= 3) dynamicFontSize = 'text-2xl sm:text-2xl xl:text-3xl font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-lg sm:text-xl xl:text-2xl font-black';
-    else dynamicFontSize = 'text-sm sm:text-base font-bold';
+    if (textLength <= 2) {
+      dynamicFontSize = 'text-xl sm:text-2xl xl:text-3xl font-black';
+    } else if (textLength <= 4) {
+      dynamicFontSize = 'text-lg sm:text-xl xl:text-2xl font-black';
+    } else if (textLength <= 6) {
+      dynamicFontSize = 'text-sm sm:text-base xl:text-lg font-bold';
+    } else {
+      dynamicFontSize = 'text-xs sm:text-sm font-bold';
+    }
   } else {
-    if (textLength <= 3) dynamicFontSize = 'text-base sm:text-lg font-black';
-    else if (textLength <= 5) dynamicFontSize = 'text-xs sm:text-sm font-bold';
-    else dynamicFontSize = 'text-[10px] sm:text-xs font-bold';
+    if (textLength <= 3) {
+      dynamicFontSize = 'text-sm sm:text-base font-black';
+    } else if (textLength <= 5) {
+      dynamicFontSize = 'text-xs sm:text-sm font-bold';
+    } else {
+      dynamicFontSize = 'text-[10px] sm:text-xs font-bold';
+    }
   }
 
   const fontSizeClass = customFontSizeClass || dynamicFontSize;

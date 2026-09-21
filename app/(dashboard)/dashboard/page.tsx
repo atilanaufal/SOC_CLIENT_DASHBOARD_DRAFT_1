@@ -261,10 +261,9 @@ export default function DashboardPage() {
             <div className="flex flex-row items-center justify-around gap-2 py-1">
               <BestDonutChart
                 segments={donutSegments}
-                centerLabel={totalSeverity.toString()}
+                centerLabel={totalSeverity.toLocaleString()}
                 size={135}
                 strokeWidth={13}
-                customFontSizeClass="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black"
               />
               <div className="text-center bg-white/75 backdrop-blur-md px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(0,0,0,0.02)] flex flex-col items-center gap-1 min-w-[105px] sm:min-w-[120px] xl:min-w-[135px]">
                 <p className="text-xs sm:text-xs xl:text-sm font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
@@ -359,7 +358,7 @@ export default function DashboardPage() {
         </div>
 
         {/* 3. Top Incident */}
-        <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col justify-between relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+        <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
           <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
             <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top Incident</span>
             <div className="relative z-30">
@@ -398,14 +397,14 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Item Container - Responsive layout on mobile and desktop */}
-          <div className="divide-y divide-gray-100/80 flex-1 flex flex-col justify-start px-1 overflow-hidden rounded-b-xl relative z-10">
+          {/* Item Container - Responsive layout on mobile and desktop with internal scroll */}
+          <div className="divide-y divide-gray-100/80 flex-1 min-h-0 flex flex-col justify-start px-1 overflow-y-auto max-h-[380px] sm:max-h-[400px] lg:max-h-[425px] xl:max-h-[445px] 2xl:max-h-[465px] rounded-b-xl relative z-10">
             {isLoading ? (
               <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading top incidents...</div>
             ) : filteredIncidents.length === 0 ? (
               <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No {severityFilter} incidents found.</div>
             ) : (
-              filteredIncidents.slice(0, 5).map((inc) => (
+              filteredIncidents.map((inc) => (
                 <div
                   key={inc.id}
                   className="p-3 sm:p-2.5 md:p-3 xl:p-3.5 px-3 sm:px-4 hover:bg-blue-50/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0"
