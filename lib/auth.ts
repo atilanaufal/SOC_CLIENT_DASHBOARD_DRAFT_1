@@ -65,7 +65,7 @@ export const auth = betterAuth({
     useSecureCookies: process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false,
   },
   session: {
-    expiresIn: 60 * 30, // 30 minutes in seconds
+    expiresIn: 60 * 15, // 15 minutes in seconds
     updateAge: 60 * 5,  // update session if active
   },
   emailAndPassword: {

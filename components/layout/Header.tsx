@@ -36,6 +36,33 @@ export const Header: React.FC = () => {
   useEffect(() => {
     setMounted(true);
     initClientSession();
+
+    // Auto logout 15 menit jika pengguna tidak ada aktivitas (mouse/keyboard/touch/scroll)
+    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+    let timer: NodeJS.Timeout;
+
+    const performAutoLogout = async () => {
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('user_session');
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {}
+      window.location.href = '/login?expired=1';
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(performAutoLogout, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
   }, []);
 
   const updateTimePosition = () => {

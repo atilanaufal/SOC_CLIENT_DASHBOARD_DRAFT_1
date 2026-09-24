@@ -52,6 +52,19 @@ export async function POST(req: NextRequest) {
 
 
     const masterUser = syncRes.user;
+    const role = (masterUser.role || '').toLowerCase();
+    const dbName = masterUser.database_name || '';
+
+    // Validasi ketat: dashboard ini khusus Tenant
+    if (role === 'admin' || role === 'superadmin' || !dbName || dbName === '-') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Akses ditolak. Dashboard ini khusus untuk akun Tenant. Akun Administrator silakan masuk melalui Admin Panel.',
+        },
+        { status: 403 }
+      );
+    }
 
     const response = NextResponse.json({
       success: true,
@@ -78,13 +91,16 @@ export async function POST(req: NextRequest) {
       last_active: Date.now(),
     };
 
-    // Set session cookie (tanpa maxAge agar otomatis logout saat web/browser ditutup)
-    response.cookies.set('auth_session', JSON.stringify(sessionData), {
+    // Set session cookie dengan batas waktu 15 menit
+    const cookieOpts = {
       httpOnly: true,
       secure: isHttps,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       path: '/',
-    });
+      maxAge: 15 * 60, // 15 menit
+    };
+    response.cookies.set('asoc_client_session', JSON.stringify(sessionData), cookieOpts);
+    response.cookies.set('auth_session', JSON.stringify(sessionData), cookieOpts);
 
     return response;
   } catch (err: any) {

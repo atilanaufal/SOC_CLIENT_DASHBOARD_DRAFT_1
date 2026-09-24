@@ -249,6 +249,14 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
     return 'N/A';
   }, [incident]);
 
+  const incidentTypesList = useMemo(() => {
+    if (!incidentTypeDisplay || incidentTypeDisplay === 'N/A') return [];
+    return incidentTypeDisplay
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }, [incidentTypeDisplay]);
+
   const handleCopyLog = () => {
     navigator.clipboard.writeText(displayedLog);
     setCopied(true);
@@ -316,25 +324,38 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Customer Name */}
+          {/* Agent IP */}
           <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
-            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Customer Name</p>
-            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words">
-              {incident.customerName || incident.customer_name || incident.client_name || incident.tenant || 'N/A'}
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent IP</p>
+            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words font-mono">
+              {incident.agent_ip || incident.sourceIp || incident.ip_source || 'N/A'}
             </p>
           </div>
 
           {/* Rule ID & Incident Type */}
-          <div className="grid grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200">
             <div>
               <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Rule ID</p>
               <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{ruleIdDisplay}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">
                 Incident Type
               </p>
-              <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{incidentTypeDisplay}</p>
+              {incidentTypesList.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {incidentTypesList.map((type, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-block bg-slate-100 text-slate-800 text-xs px-2 py-0.5 rounded-md font-semibold border border-slate-200/80 break-all leading-tight shadow-2xs"
+                    >
+                      {type}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">N/A</p>
+              )}
             </div>
           </div>
 

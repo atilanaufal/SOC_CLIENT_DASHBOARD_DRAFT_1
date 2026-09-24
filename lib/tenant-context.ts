@@ -20,17 +20,28 @@ export interface TenantContext {
  * Does NOT provide hardcoded fallback tenant names.
  */
 export async function getTenantContext(request: Request): Promise<TenantContext | null> {
-  // Resolve tenant session via auth_session cookie
+  // Resolve tenant session via asoc_client_session or auth_session cookie
   try {
     const cookieHeader = request.headers.get('cookie') || '';
-    const match = cookieHeader.match(/auth_session=([^;]+)/);
+    const match =
+      cookieHeader.match(/asoc_client_session=([^;]+)/) ||
+      cookieHeader.match(/auth_session=([^;]+)/);
+
     if (match && match[1]) {
       const user = JSON.parse(decodeURIComponent(match[1]));
-      const lastActive = Number(user.last_active);
-      if (lastActive && Date.now() - lastActive > 30 * 60 * 1000) {
+      const role = (user.role || '').toLowerCase();
+      const databaseName = user.database_name || user.databaseName || '';
+
+      // Tolak akun Admin Panel ("ASOC Central Management")
+      if (role === 'admin' || role === 'superadmin' || !databaseName || databaseName === '-') {
         return null;
       }
-      const databaseName = user.database_name || user.databaseName || '';
+
+      const lastActive = Number(user.last_active);
+      if (lastActive && Date.now() - lastActive > 15 * 60 * 1000) {
+        return null;
+      }
+
       const redisPrefix = user.redis_prefix || user.redisPrefix || databaseName;
       if (databaseName) {
         return {

@@ -11,7 +11,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isExpiredNotice, setIsExpiredNotice] = useState(false);
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('expired') === '1') {
+        setIsExpiredNotice(true);
+      }
+    }
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +103,13 @@ export default function LoginPage() {
 
         {/* Login Frosted Glass Card - 80% Opacity & rounded-lg */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-lg border border-white/80 p-6 sm:p-7 text-left space-y-4">
+          {isExpiredNotice && (
+            <div className="bg-amber-50/90 backdrop-blur-md border border-amber-300 text-amber-800 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <span className="font-bold flex-shrink-0">⏱️</span>
+              <span>Sesi Anda telah berakhir demi keamanan karena tidak ada aktivitas selama 15 menit. Silakan login kembali.</span>
+            </div>
+          )}
+
           {errorMessage && (
             <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
               <span className="font-bold flex-shrink-0">⚠️</span>

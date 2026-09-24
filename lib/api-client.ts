@@ -1,5 +1,19 @@
 import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
 
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401 && typeof window !== 'undefined') {
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem('user_session');
+    } catch {}
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login?expired=1';
+    }
+  }
+  return res;
+}
+
 export interface FetchIncidentsResponse {
   data: Incident[];
   total: number;
@@ -63,7 +77,7 @@ export async function fetchIncidents(filters?: {
   if (filters?.sortBy) params.set('sortBy', filters.sortBy);
   if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
 
-  const res = await fetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch incidents: ${res.statusText}`);
   }
@@ -109,7 +123,7 @@ export async function fetchIncidentDetail(
     params.set('sampleId', options.sampleId);
   }
   const queryString = params.toString() ? `?${params.toString()}` : '';
-  const res = await fetch(`/api/incidents/${encodeURIComponent(id)}${queryString}`, {
+  const res = await apiFetch(`/api/incidents/${encodeURIComponent(id)}${queryString}`, {
     cache: 'no-store',
   });
   if (!res.ok) {
@@ -181,7 +195,7 @@ export async function fetchVulnerabilities(filters?: {
   if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
   if (typeof filters?.offset === 'number') params.set('offset', String(filters.offset));
 
-  const res = await fetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch vulnerabilities: ${res.statusText}`);
   }
@@ -222,7 +236,7 @@ export async function fetchReports(filters?: {
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
 
-  const res = await fetch(`/api/reports?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/reports?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch reports: ${res.statusText}`);
   }
@@ -239,7 +253,7 @@ export async function fetchDashboardStats(
   if (customRange?.startDate) params.set('startDate', customRange.startDate);
   if (customRange?.endDate) params.set('endDate', customRange.endDate);
 
-  const res = await fetch(`/api/dashboard/stats?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/dashboard/stats?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch dashboard stats: ${res.statusText}`);
   }
@@ -248,7 +262,7 @@ export async function fetchDashboardStats(
 }
 
 export async function fetchDevices(): Promise<{ data: Device[]; meta?: any }> {
-  const res = await fetch('/api/devices', { cache: 'no-store' });
+  const res = await apiFetch('/api/devices', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch devices: ${res.statusText}`);
   }
@@ -269,7 +283,7 @@ export async function fetchDeviceRiskScores(
   if (customRange?.startDate) params.set('startDate', customRange.startDate);
   if (customRange?.endDate) params.set('endDate', customRange.endDate);
 
-  const res = await fetch(`/api/devices/risk-scores?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/devices/risk-scores?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     return {
       mongoDbAvailable: false,
@@ -291,7 +305,7 @@ export async function fetchDeviceHardware(agentId: string): Promise<{
   ramTotal: string;
 }> {
   try {
-    const res = await fetch(`/api/devices/${agentId}/hardware`, { cache: 'no-store' });
+    const res = await apiFetch(`/api/devices/${agentId}/hardware`, { cache: 'no-store' });
     if (!res.ok) return { cpuName: 'N/A', cores: 'N/A', ramTotal: 'N/A' };
     const json = await res.json();
     return json.data || { cpuName: 'N/A', cores: 'N/A', ramTotal: 'N/A' };
@@ -301,7 +315,7 @@ export async function fetchDeviceHardware(agentId: string): Promise<{
 }
 
 export async function fetchDevicesSummary() {
-  const res = await fetch('/api/devices/summary', { cache: 'no-store' });
+  const res = await apiFetch('/api/devices/summary', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch devices summary: ${res.statusText}`);
   }

@@ -9,10 +9,11 @@ export async function POST(req: NextRequest) {
 
     // 2. Clear all session cookies
     const cookieNames = [
+      'asoc_client_session',
+      'auth_session',
       'better-auth.session_token',
       '__Secure-better-auth.session_token',
       'better-auth.session_data',
-      'auth_session',
     ];
 
     const isHttps = process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false;
