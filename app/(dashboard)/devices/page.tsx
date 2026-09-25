@@ -654,7 +654,7 @@ function DevicesContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs sm:text-sm font-normal">
+                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
                     {paginatedDevices.map((dev) => {
                       const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
                       const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
@@ -681,7 +681,7 @@ function DevicesContent() {
                           <td className="py-3 px-3.5 xl:px-4 text-gray-800 font-medium">{dev.os}</td>
                           <td className="py-3 px-3.5 xl:px-4 font-bold">
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
                                 dev.status === 'Online'
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                   : 'bg-red-100 text-red-800 border border-red-300'
@@ -691,7 +691,7 @@ function DevicesContent() {
                             </span>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-bold">
-                            <div className="flex items-center gap-1.5 text-xs">
+                            <div className="flex items-center gap-1.5 text-xs xl:text-sm">
                               {dev.criticalCount ? (
                                 <span className="bg-[#FDE8E8] text-[#B8251B] px-2 py-0.5 rounded border border-[#F8B4B4] font-bold">
                                   Critical: {dev.criticalCount}
@@ -707,10 +707,10 @@ function DevicesContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex items-center gap-2 font-bold">
-                              <span className="text-xs sm:text-sm text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
+                              <span className="text-xs xl:text-sm 2xl:text-base text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
                               <span
                                 style={{ backgroundColor: cat.color }}
-                                className="text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 w-16 text-center"
+                                className="text-white text-xs xl:text-sm font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 min-w-16 text-center"
                                 title={cat.meaning}
                               >
                                 {cat.label}
@@ -719,8 +719,8 @@ function DevicesContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 text-gray-900 font-medium">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-xs sm:text-sm">{dateTime}</span>
-                              {timeAgo && <span className="text-xs text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
+                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>

@@ -574,7 +574,7 @@ function VulnerabilitiesContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs sm:text-sm font-normal">
+                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
                     {vulnerabilities.map((vuln) => {
                       const vulnId = vuln.id || vuln.cveId || vuln.name;
                       const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
@@ -596,7 +596,7 @@ function VulnerabilitiesContent() {
                             </div>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
-                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
                               vuln.severity === 'Critical'
                                 ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                                 : vuln.severity === 'High'
@@ -608,7 +608,7 @@ function VulnerabilitiesContent() {
                           </td>
 
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
-                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
                               vuln.status === 'Solved' || vuln.status === 'Patched'
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-red-100 text-red-800 border border-red-300'
@@ -621,8 +621,8 @@ function VulnerabilitiesContent() {
                           <td className="py-3 px-3.5 xl:px-4 text-[#002B9A] font-semibold">{vuln.cveId}</td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs sm:text-sm">{dateTime}</span>
-                              {timeAgo && <span className="text-xs text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
+                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>

@@ -643,7 +643,7 @@ function IncidentsContent() {
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs sm:text-sm font-normal">
+                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
                     {paginatedIncidents.map((inc) => {
                       const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
                       const selectedId = selectedIncident?.id || selectedIncident?._id;
@@ -667,7 +667,7 @@ function IncidentsContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
                                 inc.severity === 'Critical'
                                   ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                                   : inc.severity === 'High'
@@ -686,15 +686,15 @@ function IncidentsContent() {
                           )}
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs sm:text-sm">{dateTime}</span>
-                              {timeAgo && <span className="text-xs text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
+                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                           {groupByMode === 'incidents' && (
                             <td className="py-3 px-3.5 xl:px-4">
                               <div className="flex flex-col leading-tight">
-                                <span className="font-semibold text-gray-900 text-xs sm:text-sm">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
-                                {lastFormatted?.timeAgo && <span className="text-xs text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
+                                <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
+                                {lastFormatted?.timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
                               </div>
                             </td>
                           )}

@@ -404,7 +404,7 @@ function ReportsContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs sm:text-sm font-normal">
+                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
                     {paginatedReports.map((report) => {
                       const isSelected = Boolean(isDrawerOpen && selectedReport?.id === report.id);
                       const { dateTime, timeAgo } = formatDateTimeAndAgo(report.dateGenerated);
@@ -428,8 +428,8 @@ function ReportsContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs sm:text-sm">{dateTime}</span>
-                              {timeAgo && <span className="text-xs text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
+                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>
