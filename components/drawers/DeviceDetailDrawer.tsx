@@ -72,23 +72,26 @@ export const DeviceDetailDrawer: React.FC<DeviceDetailDrawerProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 xl:p-6 space-y-4 xl:space-y-5 text-gray-900">
-          {/* Agent Name & Agent ID side-by-side */}
+          {/* Agent Information */}
           <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
-            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent Information</p>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-base sm:text-lg xl:text-xl font-black text-[#002B9A] break-all">{device.agent}</span>
-              <span className="bg-[#002B9A] text-white text-xs xl:text-sm font-bold px-2.5 xl:px-3 py-1 rounded-lg flex-shrink-0">
-                ID: {device.id}
-              </span>
-            </div>
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent Name</p>
+            <p className="text-base sm:text-lg xl:text-xl font-black text-[#002B9A] break-all">{device.agent}</p>
           </div>
 
-          {/* Customer Name */}
-          <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
-            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Customer Name</p>
-            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words">
-              {device.customerName || device.tenant || device.university || 'N/A'}
-            </p>
+          {/* Agent ID & Agent IP */}
+          <div className="grid grid-cols-2 gap-2 bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
+            <div>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent ID</p>
+              <p className="text-sm sm:text-base font-extrabold text-gray-900 break-all font-mono">
+                {device.id || 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent IP</p>
+              <p className="text-sm sm:text-base font-extrabold text-[#002B9A] break-all font-mono">
+                {device.ipAddress || device.ip || 'N/A'}
+              </p>
+            </div>
           </div>
 
           {/* Status & Last Seen Aligned Side-by-Side */}

@@ -13,6 +13,7 @@ export interface Device {
   customer_name?: string;
   agentVersion?: string;
   ipAddress?: string;
+  ip?: string;
   detectedIssues?: string[];
   risk?: string;
   score?: number; // 0-100
@@ -70,6 +71,9 @@ export interface Vulnerability {
   vulnerability?: string;
   severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
   agent: string;
+  agent_id?: string;
+  agentId?: string;
+  agent_ip?: string;
   cveId: string;
   cve?: string;
   detectionDate: string;

@@ -174,7 +174,10 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
   const vulnTitle = h.title || h.vulnerability || h.name || pkgName || cve || 'CVE Vulnerability';
   const detectDate = h.detected_at || h.detectionDate || h.last_seen || h.first_seen || h.created_at || new Date().toISOString();
   const rawAgent = h.host || h.agent || h.agent_name || (h.agent_id ? `Agent ${h.agent_id}` : '');
-  const agentName = String(rawAgent).replace(/-agent$/i, '').trim();
+  const agentName = String(typeof rawAgent === 'object' ? (rawAgent.name || rawAgent.id || '') : rawAgent).replace(/-agent$/i, '').trim();
+  const rawAgentId = h.agent_id || h.agentId || (h.agent && typeof h.agent === 'object' ? h.agent.id : undefined);
+  const agentId = rawAgentId ? String(rawAgentId) : '';
+  const agentIp = h.ip || h.agent_ip || (h.agent && typeof h.agent === 'object' ? h.agent.ip : '') || '';
   const pkgVersion = h.version || h.currentVersion || h.package_version || 'N/A';
 
   const baseId = h._id ? String(h._id) : (h.id ? String(h.id) : (cve ? `${cve}_${agentName}_${pkgName}` : fallbackId));
@@ -194,6 +197,9 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
     vulnerability: vulnTitle,
     severity: sev as any,
     agent: agentName || 'Unknown Agent',
+    agent_id: agentId,
+    agentId: agentId,
+    agent_ip: agentIp,
     cveId: cve || 'N/A',
     cve: cve || 'N/A',
     detectionDate: formatDateReadable(detectDate),
@@ -216,7 +222,7 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
     category: h.category || 'Packages',
     classification: h.category || 'Packages',
     package: pkgName || vulnTitle || '',
-    ip: h.ip || h.agent_ip || 'N/A',
+    ip: agentIp || 'N/A',
   };
 }
 

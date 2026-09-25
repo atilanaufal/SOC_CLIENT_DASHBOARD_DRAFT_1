@@ -324,12 +324,20 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Agent IP */}
-          <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
-            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent IP</p>
-            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words font-mono">
-              {incident.agent_ip || incident.sourceIp || incident.ip_source || 'N/A'}
-            </p>
+          {/* Agent ID & Agent IP */}
+          <div className="grid grid-cols-2 gap-2 bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
+            <div>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent ID</p>
+              <p className="text-sm sm:text-base font-extrabold text-gray-900 break-all font-mono">
+                {incident.agent_id || (incident as any).agent?.id || 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent IP</p>
+              <p className="text-sm sm:text-base font-extrabold text-[#002B9A] break-all font-mono">
+                {incident.agent_ip || incident.sourceIp || incident.ip_source || 'N/A'}
+              </p>
+            </div>
           </div>
 
           {/* Rule ID & Incident Type */}
