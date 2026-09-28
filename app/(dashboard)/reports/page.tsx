@@ -229,7 +229,7 @@ function ReportsContent() {
 
         {/* Total Reports KPI */}
         <div className="max-w-md bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2 flex-shrink-0">
-          <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
+          <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
             Total Reports
           </p>
           <div className="flex items-center gap-3.5">
@@ -277,13 +277,13 @@ function ReportsContent() {
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
-            <span className="text-[11px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
-                <span className="text-gray-500">Severity:</span>
-                <strong className="text-amber-800 font-bold">{activeFilters.severity}</strong>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Severity:</span>
+                <strong className="text-amber-800 font-black">{activeFilters.severity}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -301,9 +301,9 @@ function ReportsContent() {
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
-                <span className="text-gray-500">Search:</span>
-                <strong className="text-gray-900 font-bold">&quot;{searchTerm}&quot;</strong>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Search:</span>
+                <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong>
                 <button
                   onClick={() => {
                     setSearchTerm('');
@@ -322,7 +322,7 @@ function ReportsContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

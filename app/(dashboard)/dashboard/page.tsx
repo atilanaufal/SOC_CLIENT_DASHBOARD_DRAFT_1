@@ -367,17 +367,17 @@ export default function DashboardPage() {
               <button
                 ref={severityButtonRef}
                 onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[28px]"
+                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs sm:text-sm font-bold px-3 py-1 sm:py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[30px]"
               >
                 <span>{severityFilter}</span>
-                <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                <HiOutlineChevronDown className="w-4 h-4 text-gray-700" />
               </button>
 
               {isSeverityDropdownOpen && mounted && severityCoords && createPortal(
                 <div
                   ref={severityDropdownRef}
                   style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
-                  className="w-36 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1 z-50 text-gray-800 text-xs font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
+                  className="w-40 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1 z-50 text-gray-800 text-xs sm:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
                 >
                   {['All Severity', 'Critical', 'High', 'Medium'].map((sev) => (
                     <button
@@ -386,7 +386,7 @@ export default function DashboardPage() {
                         setSeverityFilter(sev as 'All Severity' | 'Critical' | 'High' | 'Medium');
                         setIsSeverityDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition cursor-pointer ${
                         severityFilter === sev ? 'bg-blue-50/90 text-[#002B9A] font-black' : 'text-gray-700 hover:bg-blue-50/80'
                       }`}
                     >
