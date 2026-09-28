@@ -186,7 +186,7 @@ function VulnerabilitiesContent() {
 
   // Adaptive Filter Sections dynamically populated from MongoDB facet options
   const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = ['Critical', 'High', 'Medium', 'Low'];
+    const severities = ['Critical', 'High', 'Medium'];
     const statuses = ['Active', 'Solved'];
     const agents = filterOptions.agents || [];
     const names = filterOptions.vulnerabilities || [];
@@ -243,30 +243,30 @@ function VulnerabilitiesContent() {
       {/* Container: KPI Cards + Search Bar + Table */}
       <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
 
-        {/* Top KPI Cards (3 columns: 5, 4, 3 span) */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
+        {/* Top KPI Cards (3 equal columns, matching devices layout) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
-          <div className="md:col-span-5 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
             <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
               Total Vulnerability
             </p>
-            <div className="flex items-center justify-around gap-3 flex-1">
+            <div className="flex items-center justify-center gap-5 sm:gap-6 flex-1">
               <BestDonutChart
                 segments={totalVulnSegments}
                 centerLabel={formatNumber(totalVulnsCount)}
                 size={85}
                 strokeWidth={11}
               />
-              <div className="space-y-1 text-xs sm:text-xs xl:text-sm font-bold flex-1">
-                <div className="flex items-center justify-between gap-3 sm:gap-4 text-red-700 font-bold">
+              <div className="space-y-1.5 text-xs sm:text-xs xl:text-sm font-bold w-32 sm:w-36">
+                <div className="flex items-center justify-between gap-2 text-red-700 font-bold">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B8251B]"></span>Critical</span>
                   <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.critical)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-3 sm:gap-4 text-orange-600 font-bold">
+                <div className="flex items-center justify-between gap-2 text-orange-600 font-bold">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]"></span>High</span>
                   <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.high)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-3 sm:gap-4 text-[#0066B1] font-bold">
+                <div className="flex items-center justify-between gap-2 text-[#0066B1] font-bold">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#5B9BD5]"></span>Medium</span>
                   <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.medium)}</span>
                 </div>
@@ -275,7 +275,7 @@ function VulnerabilitiesContent() {
           </div>
 
           {/* Vuln Distribution Widget */}
-          <div className="md:col-span-4 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
             <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
               Vuln Distribution
             </p>
@@ -306,7 +306,7 @@ function VulnerabilitiesContent() {
           </div>
 
           {/* Vuln Status (Replaces Solved Vuln, shows Solved and Not Patched) */}
-          <div className="md:col-span-3 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
             <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
               Vuln Status
             </p>

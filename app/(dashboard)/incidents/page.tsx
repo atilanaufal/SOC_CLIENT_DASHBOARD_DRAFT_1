@@ -210,9 +210,10 @@ function IncidentsContent() {
         key: 'severity',
         label: 'Severity Level',
         type: 'buttons',
-        options: filterOptions.severities && filterOptions.severities.length > 0
+        options: (filterOptions.severities && filterOptions.severities.length > 0
           ? filterOptions.severities
-          : ['Critical', 'High', 'Medium', 'Low'],
+          : ['Critical', 'High', 'Medium']
+        ).filter((s) => s.toLowerCase() !== 'low'),
       },
       {
         key: 'incidentName',

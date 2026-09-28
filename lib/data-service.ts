@@ -731,7 +731,7 @@ export async function queryDashboardIncidentStats(
                 lastObserved: { $max: '$first_observed' },
               },
             },
-            { $sort: { lastObserved: -1 } },
+            { $sort: { count: -1, lastObserved: -1 } },
             { $limit: 10 },
           ],
           topIncidentsHigh: [
@@ -757,7 +757,7 @@ export async function queryDashboardIncidentStats(
                 lastObserved: { $max: '$first_observed' },
               },
             },
-            { $sort: { lastObserved: -1 } },
+            { $sort: { count: -1, lastObserved: -1 } },
             { $limit: 10 },
           ],
           topIncidentsMedium: [
@@ -783,7 +783,7 @@ export async function queryDashboardIncidentStats(
                 lastObserved: { $max: '$first_observed' },
               },
             },
-            { $sort: { lastObserved: -1 } },
+            { $sort: { count: -1, lastObserved: -1 } },
             { $limit: 10 },
           ],
         },
@@ -1789,11 +1789,11 @@ export async function queryServerSideVulnerabilities(
       {
         $facet: {
           severityStats: [
-            { $match: baseDateFilter },
+            { $match: searchAndFilter },
             { $group: { _id: '$severity', count: { $sum: 1 } } },
           ],
           statusStats: [
-            { $match: baseDateFilter },
+            { $match: searchAndFilter },
             { $group: { _id: '$status', count: { $sum: 1 } } },
           ],
           uniqueAgents: [

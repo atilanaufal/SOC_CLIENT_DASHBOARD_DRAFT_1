@@ -156,20 +156,21 @@ export default function DashboardPage() {
   const topIncidentsSource: any[] = useMemo(() => statsData?.topIncidents || [], [statsData]);
   const filteredIncidents = useMemo(() => {
     if (severityFilter === 'All Severity') {
-      const criticalList = topIncidentsSource.filter(
-        (inc) => String(inc.severity || '').trim().toLowerCase() === 'critical'
-      );
-      const highList = topIncidentsSource.filter(
-        (inc) => String(inc.severity || '').trim().toLowerCase() === 'high'
-      );
-      const mediumList = topIncidentsSource.filter(
-        (inc) => String(inc.severity || '').trim().toLowerCase() === 'medium'
-      );
+      const criticalList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'critical')
+        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+      const highList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'high')
+        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+      const mediumList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'medium')
+        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
       return [...criticalList, ...highList, ...mediumList].slice(0, 5);
     }
     const targetSev = (severityFilter || '').trim().toLowerCase();
     return topIncidentsSource
       .filter((inc) => String(inc.severity || '').trim().toLowerCase() === targetSev)
+      .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
       .slice(0, 5);
   }, [topIncidentsSource, severityFilter]);
 

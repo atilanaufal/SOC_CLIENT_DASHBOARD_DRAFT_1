@@ -8,6 +8,7 @@ import {
   HiOutlineServerStack,
   HiOutlineShieldExclamation,
   HiOutlineLightBulb,
+  HiOutlineArrowDownTray,
 } from 'react-icons/hi2';
 import { SecurityReport } from '@/lib/types';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
@@ -33,6 +34,153 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
   const socIdDisplay = report.soc_id || 'N/A';
   const uuidDisplay = report.report_uuid || report.id;
+
+  const handleDownloadPDF = () => {
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    document.body.appendChild(printIframe);
+
+    const doc = printIframe.contentWindow?.document;
+    if (!doc) return;
+
+    const customer = report.customerName || report.customer_name || report.client_name || report.tenant || 'Tenant';
+    const cleanSummary = (report.summary || 'No detailed summary available.')
+      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '')
+      .replace(/\r\n/g, '\n');
+
+    const devicesHtml = (report.affectedDevices || []).length > 0
+      ? `
+        <div class="section">
+          <div class="section-title">Impacted Assets (${report.affectedDevices!.length})</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Agent / Hostname</th>
+                <th>IP Address</th>
+                <th>Operating System</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${report.affectedDevices!.map((dev: any) => `
+                <tr>
+                  <td><strong>${dev.agent || dev.hostname || '-'}</strong></td>
+                  <td>${dev.ip || '-'}</td>
+                  <td>${dev.os || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `
+      : '';
+
+    const recActionHtml = (report.recommendedAction || report.recommended_action)
+      ? `
+        <div class="section">
+          <div class="section-title">Recommended Action</div>
+          <div class="card" style="background:#f0fdf4; border-color:#bbf7d0;">
+            <div style="font-size:12px; color:#166534; font-weight:600;">
+              ${report.recommendedAction || report.recommended_action}
+            </div>
+          </div>
+        </div>
+      `
+      : '';
+
+    const sevColor = report.severity === 'Critical' ? '#B8251B' : report.severity === 'High' ? '#C2410C' : '#1E429F';
+    const sevBg = report.severity === 'Critical' ? '#FDE8E8' : report.severity === 'High' ? '#FFEDD5' : '#EBF5FF';
+    const sevBorder = report.severity === 'Critical' ? '#F8B4B4' : report.severity === 'High' ? '#FDBA74' : '#BFDBFE';
+
+    const contentHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${report.reportName}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 12px; line-height: 1.6; }
+            .header { border-bottom: 2px solid #002B9A; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+            .title { font-size: 18px; font-weight: 800; color: #002B9A; margin: 0 0 4px 0; }
+            .meta { font-size: 11px; color: #64748b; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 11px; text-transform: uppercase; background: ${sevBg}; color: ${sevColor}; border: 1px solid ${sevBorder}; }
+            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+            .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; }
+            .card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+            .card-value { font-size: 12px; font-weight: 700; color: #0f172a; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #002B9A; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
+            .summary-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px; color: #334155; white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+            table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+            th { background: #002B9A; color: #ffffff; text-align: left; padding: 6px 10px; font-weight: 700; font-size: 11px; }
+            td { border: 1px solid #e2e8f0; padding: 6px 10px; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">${report.reportName}</div>
+              <div class="meta">SOC ID: ${socIdDisplay} | UUID: ${uuidDisplay}</div>
+            </div>
+            <div style="text-align: right;">
+              <span class="badge">${report.severity}</span>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="card-label">Customer / Tenant</div>
+              <div class="card-value">${customer}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Date Generated</div>
+              <div class="card-value">${report.dateGenerated}</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Last Updated</div>
+              <div class="card-value">${report.synced_at ? report.synced_at.split('T')[0] : report.lastUpdated}</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Executive Summary</div>
+            <div class="summary-box">${cleanSummary}</div>
+          </div>
+
+          ${recActionHtml}
+
+          ${devicesHtml}
+
+          <div class="footer">
+            <span>ASOC Client Dashboard - Confidential Security Assessment</span>
+            <span>Generated: ${new Date().toLocaleString('id-ID')}</span>
+          </div>
+        </body>
+      </html>
+    `;
+
+    doc.open();
+    doc.write(contentHtml);
+    doc.close();
+
+    setTimeout(() => {
+      printIframe.contentWindow?.focus();
+      printIframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(printIframe)) {
+          document.body.removeChild(printIframe);
+        }
+      }, 2000);
+    }, 400);
+  };
   
   return createPortal(
     <div
@@ -53,13 +201,23 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               <p className="text-xs text-blue-200 font-medium truncate">SOC ID: {socIdDisplay} | UUID: {uuidDisplay.substring(0, 18)}...</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-gray-300 font-bold p-1.5 rounded-lg transition cursor-pointer flex-shrink-0"
-            aria-label="Close modal"
-          >
-            <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleDownloadPDF}
+              className="bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-white/20 shadow-sm"
+              title="Download report to PDF"
+            >
+              <HiOutlineArrowDownTray className="w-4 h-4 text-blue-200" />
+              <span>Download PDF</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-300 font-bold p-1.5 rounded-lg transition cursor-pointer"
+              aria-label="Close modal"
+            >
+              <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Info Toolbar */}
@@ -136,7 +294,14 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-white/90 backdrop-blur-md border-t border-gray-200/60 px-6 py-3 flex justify-end flex-shrink-0">
+        <div className="bg-white/90 backdrop-blur-md border-t border-gray-200/60 px-6 py-3 flex items-center justify-between flex-shrink-0">
+          <button
+            onClick={handleDownloadPDF}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <HiOutlineArrowDownTray className="w-4 h-4" />
+            <span>Download PDF</span>
+          </button>
           <button
             onClick={onClose}
             className="bg-[#002B9A] hover:bg-[#002175] text-white px-5 py-2 rounded-lg text-xs font-bold transition cursor-pointer shadow-[0_4px_12px_rgba(0,43,154,0.3)]"
