@@ -246,70 +246,78 @@ function VulnerabilitiesContent() {
         {/* Top KPI Cards (3 columns: 5, 4, 3 span) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
-          <div className="md:col-span-5 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-around gap-3">
-            <BestDonutChart
-              segments={totalVulnSegments}
-              centerLabel={formatNumber(totalVulnsCount)}
-              size={95}
-              strokeWidth={11}
-            />
-            <div className="space-y-1 text-xs sm:text-xs xl:text-sm font-bold">
-              <h4 className="text-xs font-bold uppercase text-gray-500 tracking-wider border-b border-gray-200/50 pb-0.5">
-                Total Vulnerability
-              </h4>
-              <div className="flex items-center justify-between gap-3 sm:gap-4 text-red-700 font-bold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B8251B]"></span>Critical</span>
-                <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.critical)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:gap-4 text-orange-600 font-bold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]"></span>High</span>
-                <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.high)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:gap-4 text-[#0066B1] font-bold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#5B9BD5]"></span>Medium</span>
-                <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.medium)}</span>
+          <div className="md:col-span-5 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+              Total Vulnerability
+            </p>
+            <div className="flex items-center justify-around gap-3 flex-1">
+              <BestDonutChart
+                segments={totalVulnSegments}
+                centerLabel={formatNumber(totalVulnsCount)}
+                size={85}
+                strokeWidth={11}
+              />
+              <div className="space-y-1 text-xs sm:text-xs xl:text-sm font-bold flex-1">
+                <div className="flex items-center justify-between gap-3 sm:gap-4 text-red-700 font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B8251B]"></span>Critical</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.critical)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:gap-4 text-orange-600 font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]"></span>High</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.high)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:gap-4 text-[#0066B1] font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#5B9BD5]"></span>Medium</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.medium)}</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Vuln Distribution Widget */}
-          <div className="md:col-span-4 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3">
-            <BestDonutChart
-              segments={vulnDistSegments}
-              centerLabel=""
-              size={90}
-              strokeWidth={11}
-            />
-            <div className="flex-1 text-xs sm:text-xs xl:text-sm min-w-0">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-gray-500 mb-1 border-b border-gray-200/50 pb-0.5">
-                Vuln Distribution
-              </h4>
-              {vulnDistSegments.length === 0 ? (
-                <div className="text-xs text-gray-400 font-semibold italic py-2">
-                  No vulnerabilities detected
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs max-h-20 overflow-y-auto pr-1">
-                  {vulnDistSegments.map((seg, idx) => (
-                    <span key={idx} className="flex items-center gap-1 truncate" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
-                      <span className="truncate">{seg.label} ({formatNumber(seg.value)})</span>
-                    </span>
-                  ))}
-                </div>
-              )}
+          <div className="md:col-span-4 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+              Vuln Distribution
+            </p>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <BestDonutChart
+                segments={vulnDistSegments}
+                centerLabel=""
+                size={80}
+                strokeWidth={11}
+              />
+              <div className="flex-1 text-xs sm:text-xs xl:text-sm min-w-0">
+                {vulnDistSegments.length === 0 ? (
+                  <div className="text-xs text-gray-400 font-semibold italic py-2">
+                    No vulnerabilities detected
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs max-h-20 overflow-y-auto pr-1">
+                    {vulnDistSegments.map((seg, idx) => (
+                      <span key={idx} className="flex items-center gap-1 truncate" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
+                        <span className="truncate">{seg.label} ({formatNumber(seg.value)})</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Solved Vuln */}
-          <div className="md:col-span-3 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3">
-            <div className="w-12 h-12 xl:w-14 xl:h-14 rounded-xl bg-emerald-50/90 backdrop-blur-sm border border-emerald-300 flex-shrink-0 flex items-center justify-center text-emerald-600 shadow-sm">
-              <HiOutlineCheckCircle className="w-7 h-7 xl:w-8 xl:h-8" />
-            </div>
-            <div>
-              <h4 className="font-bold text-xs uppercase tracking-wider text-gray-500">Solved Vuln</h4>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-3xl sm:text-3xl xl:text-4xl font-black text-emerald-700">{formatNumber(stats.solved)}</span>
+          {/* Vuln Status (Replaces Solved Vuln, shows Solved and Not Patched) */}
+          <div className="md:col-span-3 bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+              Vuln Status
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 items-center">
+              <div className="text-center bg-emerald-50/90 backdrop-blur-sm p-2 rounded-lg border border-emerald-300 shadow-sm flex flex-col justify-center h-full">
+                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Solved</span>
+                <span className="text-emerald-700 text-base sm:text-lg font-black">{formatNumber(stats.solved)}</span>
+              </div>
+              <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center h-full">
+                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Not Patched</span>
+                <span className="text-[#B8251B] text-base sm:text-lg font-black">{formatNumber(Math.max(0, totalVulnsCount - (stats.solved || 0)))}</span>
               </div>
             </div>
           </div>
@@ -535,7 +543,7 @@ function VulnerabilitiesContent() {
               <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
                 <table className="w-full text-left border-collapse min-w-[750px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
-                    <tr className="bg-[#002B9A] text-white text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                       <th onClick={() => handleSort('name')} className="bg-[#002B9A] w-[30%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
                         <div className="flex items-center text-white">
                           <span>Vulnerability</span>
@@ -574,7 +582,7 @@ function VulnerabilitiesContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
                     {vulnerabilities.map((vuln) => {
                       const vulnId = vuln.id || vuln.cveId || vuln.name;
                       const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
@@ -596,7 +604,7 @@ function VulnerabilitiesContent() {
                             </div>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
-                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
                               vuln.severity === 'Critical'
                                 ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                                 : vuln.severity === 'High'
@@ -608,7 +616,7 @@ function VulnerabilitiesContent() {
                           </td>
 
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
-                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
                               vuln.status === 'Solved' || vuln.status === 'Patched'
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-red-100 text-red-800 border border-red-300'
@@ -621,8 +629,8 @@ function VulnerabilitiesContent() {
                           <td className="py-3 px-3.5 xl:px-4 text-[#002B9A] font-semibold">{vuln.cveId}</td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
-                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>
@@ -635,7 +643,7 @@ function VulnerabilitiesContent() {
           )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div className="flex flex-wrap items-center gap-2">
               <span>
                 Showing {filteredTotal === 0 ? 0 : formatNumber(startIndex + 1)}-{formatNumber(Math.min(startIndex + pageSize, filteredTotal))} of {formatNumber(filteredTotal)} Vulnerabilities

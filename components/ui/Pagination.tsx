@@ -65,13 +65,13 @@ export const Pagination: React.FC<PaginationProps> = ({
   const paginationRange = getPaginationRange(currentPage, totalPages, siblingCount);
 
   return (
-    <div className={`flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm select-none ${className}`}>
+    <div className={`flex items-center gap-1 sm:gap-1.5 text-sm xl:text-base 2xl:text-lg select-none ${className}`}>
       {/* Previous Button */}
       <button
         type="button"
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage <= 1}
-        className="min-w-[32px] h-8 px-2.5 rounded-lg text-gray-700 font-black hover:bg-gray-100 hover:text-[#002B9A] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-700 transition flex items-center justify-center cursor-pointer"
+        className="min-w-[34px] h-8.5 px-2.5 rounded-lg text-sm xl:text-base text-gray-700 font-black hover:bg-gray-100 hover:text-[#002B9A] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-700 transition flex items-center justify-center cursor-pointer"
         aria-label="Previous page"
       >
         ◄
@@ -97,7 +97,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             key={pageNumber}
             type="button"
             onClick={() => onPageChange(pageNumber as number)}
-            className={`min-w-[32px] h-8 px-2.5 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center cursor-pointer ${
+            className={`min-w-[34px] h-8.5 px-2.5 rounded-lg text-sm xl:text-base 2xl:text-lg font-bold transition flex items-center justify-center cursor-pointer ${
               isCurrent
                 ? 'bg-[#002B9A] text-white shadow-sm font-black'
                 : 'text-gray-700 hover:bg-gray-100 hover:text-[#002B9A]'
@@ -114,7 +114,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         type="button"
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage >= totalPages}
-        className="min-w-[32px] h-8 px-2.5 rounded-lg text-gray-700 font-black hover:bg-gray-100 hover:text-[#002B9A] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-700 transition flex items-center justify-center cursor-pointer"
+        className="min-w-[34px] h-8.5 px-2.5 rounded-lg text-sm xl:text-base text-gray-700 font-black hover:bg-gray-100 hover:text-[#002B9A] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-700 transition flex items-center justify-center cursor-pointer"
         aria-label="Next page"
       >
         ►

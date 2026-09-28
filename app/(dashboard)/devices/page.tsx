@@ -328,18 +328,18 @@ function DevicesContent() {
           </div>
 
           {/* Top OS Distribution */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3">
-            <BestDonutChart
-              segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
-              centerLabel=""
-              size={75}
-              strokeWidth={10}
-            />
-            <div className="flex-1 text-xs sm:text-xs xl:text-sm space-y-1 overflow-hidden">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 border-b border-gray-200/50 pb-0.5">
-                Top OS Distribution
-              </p>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs">
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
+            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+              Top OS Distribution
+            </p>
+            <div className="flex items-center gap-3 flex-1">
+              <BestDonutChart
+                segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
+                centerLabel=""
+                size={75}
+                strokeWidth={10}
+              />
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs flex-1">
                 {osChartSegments.slice(0, 4).map((seg) => (
                   <span key={seg.label} className="flex items-center gap-1 truncate" title={`${seg.label}: ${seg.value}`}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
@@ -568,7 +568,7 @@ function DevicesContent() {
               <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
-                    <tr className="bg-[#002B9A] text-white text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                       <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[20%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
                         <div className="flex items-center text-white">
                           <span>Agent Name</span>
@@ -654,7 +654,7 @@ function DevicesContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
                     {paginatedDevices.map((dev) => {
                       const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
                       const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
@@ -681,7 +681,7 @@ function DevicesContent() {
                           <td className="py-3 px-3.5 xl:px-4 text-gray-800 font-medium">{dev.os}</td>
                           <td className="py-3 px-3.5 xl:px-4 font-bold">
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
                                 dev.status === 'Online'
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                   : 'bg-red-100 text-red-800 border border-red-300'
@@ -691,7 +691,7 @@ function DevicesContent() {
                             </span>
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-bold">
-                            <div className="flex items-center gap-1.5 text-xs xl:text-sm">
+                            <div className="flex items-center gap-1.5 text-xs xl:text-sm 2xl:text-base">
                               {dev.criticalCount ? (
                                 <span className="bg-[#FDE8E8] text-[#B8251B] px-2 py-0.5 rounded border border-[#F8B4B4] font-bold">
                                   Critical: {dev.criticalCount}
@@ -707,10 +707,10 @@ function DevicesContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex items-center gap-2 font-bold">
-                              <span className="text-xs xl:text-sm 2xl:text-base text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
+                              <span className="text-sm xl:text-base 2xl:text-lg text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
                               <span
                                 style={{ backgroundColor: cat.color }}
-                                className="text-white text-xs xl:text-sm font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 min-w-16 text-center"
+                                className="text-white text-xs xl:text-sm 2xl:text-base font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 min-w-16 text-center"
                                 title={cat.meaning}
                               >
                                 {cat.label}
@@ -719,8 +719,8 @@ function DevicesContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 text-gray-900 font-medium">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
-                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>
@@ -733,7 +733,7 @@ function DevicesContent() {
           )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {filteredDevices.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredDevices.length)} of {filteredDevices.length} Devices
             </div>

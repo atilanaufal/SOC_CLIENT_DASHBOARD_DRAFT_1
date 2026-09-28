@@ -600,7 +600,7 @@ function IncidentsContent() {
               <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
-                    <tr className="bg-[#002B9A] text-white text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                       <th onClick={() => handleSort('incidentName')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[32%]' : 'w-[42%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
                         <div className="flex items-center text-white">
                           <span>{groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name'}</span>
@@ -643,7 +643,7 @@ function IncidentsContent() {
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
                     {paginatedIncidents.map((inc) => {
                       const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
                       const selectedId = selectedIncident?.id || selectedIncident?._id;
@@ -667,7 +667,7 @@ function IncidentsContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4 font-medium">
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm font-bold ${
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
                                 inc.severity === 'Critical'
                                   ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                                   : inc.severity === 'High'
@@ -686,15 +686,15 @@ function IncidentsContent() {
                           )}
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
-                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                           {groupByMode === 'incidents' && (
                             <td className="py-3 px-3.5 xl:px-4">
                               <div className="flex flex-col leading-tight">
-                                <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
-                                {lastFormatted?.timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
+                                <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
+                                {lastFormatted?.timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
                               </div>
                             </td>
                           )}
@@ -708,7 +708,7 @@ function IncidentsContent() {
           )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {total === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, total)} of {formatNumber(total)} {groupByMode === 'incidents' ? 'Incidents' : 'Alerts'}
             </div>

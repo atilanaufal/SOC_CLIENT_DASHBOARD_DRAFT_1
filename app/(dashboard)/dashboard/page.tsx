@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Top Incident Severity Filter Dropdown state
-  const [severityFilter, setSeverityFilter] = useState<'Critical' | 'High' | 'Medium'>('Critical');
+  const [severityFilter, setSeverityFilter] = useState<'All Severity' | 'Critical' | 'High' | 'Medium'>('All Severity');
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
   const [severityCoords, setSeverityCoords] = useState<{ top: number; right: number } | null>(null);
   const severityButtonRef = useRef<HTMLButtonElement>(null);
@@ -103,18 +103,6 @@ export default function DashboardPage() {
         const data = await fetchDashboardStats(timeFilter, customRange);
         setStatsData(data);
         setClientCache(cacheKey, data);
-
-        // Auto fallback if no critical incidents exist
-        if (data?.topIncidents?.length) {
-          const hasCritical = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'critical');
-          const hasHigh = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'high');
-          const hasMedium = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'medium');
-          if (!hasCritical && hasHigh) {
-            setSeverityFilter('High');
-          } else if (!hasCritical && !hasHigh && hasMedium) {
-            setSeverityFilter('Medium');
-          }
-        }
       } catch (err) {
         console.error('Failed to load dashboard stats from DB:', err);
       } finally {
@@ -167,6 +155,18 @@ export default function DashboardPage() {
   // Top Incidents (Real DB)
   const topIncidentsSource: any[] = useMemo(() => statsData?.topIncidents || [], [statsData]);
   const filteredIncidents = useMemo(() => {
+    if (severityFilter === 'All Severity') {
+      const criticalList = topIncidentsSource.filter(
+        (inc) => String(inc.severity || '').trim().toLowerCase() === 'critical'
+      );
+      const highList = topIncidentsSource.filter(
+        (inc) => String(inc.severity || '').trim().toLowerCase() === 'high'
+      );
+      const mediumList = topIncidentsSource.filter(
+        (inc) => String(inc.severity || '').trim().toLowerCase() === 'medium'
+      );
+      return [...criticalList, ...highList, ...mediumList].slice(0, 5);
+    }
     const targetSev = (severityFilter || '').trim().toLowerCase();
     return topIncidentsSource
       .filter((inc) => String(inc.severity || '').trim().toLowerCase() === targetSev)
@@ -357,10 +357,10 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* 3. Top Incident */}
+        {/* 3. Top 5 Incidents */}
         <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
           <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-            <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top Incident</span>
+            <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top 5 Incidents</span>
             <div className="relative z-30">
               <button
                 ref={severityButtonRef}
@@ -375,13 +375,13 @@ export default function DashboardPage() {
                 <div
                   ref={severityDropdownRef}
                   style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
-                  className="w-36 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
+                  className="w-40 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
                 >
-                  {['Critical', 'High', 'Medium'].map((sev) => (
+                  {['All Severity', 'Critical', 'High', 'Medium'].map((sev) => (
                     <button
                       key={sev}
                       onClick={() => {
-                        setSeverityFilter(sev as 'Critical' | 'High' | 'Medium');
+                        setSeverityFilter(sev as 'All Severity' | 'Critical' | 'High' | 'Medium');
                         setIsSeverityDropdownOpen(false);
                       }}
                       className={`w-full text-left px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
@@ -402,7 +402,9 @@ export default function DashboardPage() {
             {isLoading ? (
               <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading top incidents...</div>
             ) : filteredIncidents.length === 0 ? (
-              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No {severityFilter} incidents found.</div>
+              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">
+                {severityFilter === 'All Severity' ? 'No incidents found.' : `No ${severityFilter} incidents found.`}
+              </div>
             ) : (
               filteredIncidents.map((inc) => (
                 <div

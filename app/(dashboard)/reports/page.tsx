@@ -227,13 +227,15 @@ function ReportsContent() {
       {/* Container: KPI Card + Search Bar + Table */}
       <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
 
-        {/* KPI */}
-        <div className="max-w-md bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center gap-3.5 flex-shrink-0">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center font-bold text-xs border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)]">
-            <HiOutlineDocumentText className="w-6 h-6 text-blue-300" />
-          </div>
-          <div>
-            <h4 className="font-bold text-xs sm:text-sm text-gray-900">Total Reports</h4>
+        {/* Total Reports KPI */}
+        <div className="max-w-md bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2 flex-shrink-0">
+          <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            Total Reports
+          </p>
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center font-bold text-xs border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)] flex-shrink-0">
+              <HiOutlineDocumentText className="w-6 h-6 text-blue-300" />
+            </div>
             <p className="text-2xl sm:text-3xl font-black text-[#002B9A]">
               {filteredReports.length} <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Available</span>
             </p>
@@ -383,7 +385,7 @@ function ReportsContent() {
               <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
-                    <tr className="bg-[#002B9A] text-white text-xs xl:text-sm 2xl:text-base font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
                       <th onClick={() => handleSort('reportName')} className="bg-[#002B9A] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
                         <div className="flex items-center text-white">
                           <span>Report Name</span>
@@ -404,7 +406,7 @@ function ReportsContent() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 text-xs xl:text-sm 2xl:text-base font-normal">
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
                     {paginatedReports.map((report) => {
                       const isSelected = Boolean(isDrawerOpen && selectedReport?.id === report.id);
                       const { dateTime, timeAgo } = formatDateTimeAndAgo(report.dateGenerated);
@@ -428,8 +430,8 @@ function ReportsContent() {
                           </td>
                           <td className="py-3 px-3.5 xl:px-4">
                             <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-gray-900 text-xs xl:text-sm 2xl:text-base">{dateTime}</span>
-                              {timeAgo && <span className="text-[11px] xl:text-xs 2xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
                             </div>
                           </td>
                         </tr>
@@ -442,7 +444,7 @@ function ReportsContent() {
           )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-xs sm:text-sm font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {filteredReports.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredReports.length)} of {filteredReports.length} Reports
             </div>
