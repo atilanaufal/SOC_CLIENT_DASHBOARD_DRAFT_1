@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     if (!usernameInput || !passwordInput) {
       return NextResponse.json(
-        { success: false, error: 'Username/Email dan Password wajib diisi.' },
+        { success: false, error: 'Username dan Password wajib diisi.' },
         { status: 400 }
       );
     }

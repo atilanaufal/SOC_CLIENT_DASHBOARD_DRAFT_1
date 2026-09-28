@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +27,8 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!email || !password) {
-      setErrorMessage('Silakan isi Email/Username dan Password.');
+    if (!username || !password) {
+      setErrorMessage('Silakan isi Username dan Password.');
       return;
     }
 
@@ -41,7 +41,7 @@ export default function LoginPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: email,
+          username: username,
           password: password,
         }),
       });
@@ -119,15 +119,15 @@ export default function LoginPage() {
 
           <form onSubmit={handleSignIn} className="space-y-3.5">
             <div>
-              <label htmlFor="email-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
-                Username / Email
+              <label htmlFor="username-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
+                Username
               </label>
               <input
-                id="email-input"
+                id="username-input"
                 type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your username or email"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
                 className="w-full bg-white/60 hover:bg-white/80 focus:bg-white/95 backdrop-blur-md border border-white/80 rounded-md px-3.5 py-2.5 text-xs text-gray-900 font-semibold placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#002B9A] focus:border-[#002B9A] transition"
                 required
                 disabled={isLoading}

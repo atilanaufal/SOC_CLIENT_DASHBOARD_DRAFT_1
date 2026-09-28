@@ -43,6 +43,53 @@ export async function hashPasswordBcrypt(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }
 
+function parseBase64NoPadding(b64: string): Buffer {
+  const padLen = (4 - (b64.length % 4)) % 4;
+  return Buffer.from(b64 + '='.repeat(padLen), 'base64');
+}
+
+export async function verifyArgon2(password: string, hashStr: string): Promise<boolean> {
+  if (!hashStr || !hashStr.startsWith('$argon2')) return false;
+  try {
+    const { argon2id, argon2d, argon2i } = await import('@noble/hashes/argon2.js');
+    const parts = hashStr.split('$');
+    const type = parts[1];
+    let version = 0x13;
+    let paramsIndex = 2;
+    if (parts[2]?.startsWith('v=')) {
+      version = parseInt(parts[2].replace('v=', ''), 10);
+      paramsIndex = 3;
+    }
+    const rawParams = (parts[paramsIndex] || '').split(',');
+    const saltB64 = parts[paramsIndex + 1];
+    const hashB64 = parts[paramsIndex + 2];
+    if (!saltB64 || !hashB64) return false;
+
+    const params: Record<string, number> = {};
+    for (const p of rawParams) {
+      const [k, v] = p.split('=');
+      if (k && v) params[k] = parseInt(v, 10);
+    }
+
+    const salt = parseBase64NoPadding(saltB64);
+    const expectedHash = parseBase64NoPadding(hashB64);
+
+    const hasher = type === 'argon2d' ? argon2d : (type === 'argon2i' ? argon2i : argon2id);
+    const derived = hasher(password, salt, {
+      t: params.t || 3,
+      m: params.m || 65536,
+      p: params.p || 4,
+      dkLen: expectedHash.length,
+      version: version,
+    });
+
+    return Buffer.from(derived).equals(expectedHash);
+  } catch (err) {
+    console.error('Argon2 verification error:', err);
+    return false;
+  }
+}
+
 
 export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
   const primaryHost = getMysqlHost();
@@ -118,25 +165,34 @@ export async function verifyUserCredentials(
     const passwordCol = colSet.has('password_hash') ? 'u.password_hash' : 'u.password';
     const hasRole = colSet.has('role');
 
+    const hasEmail = colSet.has('email');
+    const selectEmail = hasEmail ? 'u.email' : 'NULL AS email';
+    const whereClause = hasEmail
+      ? `WHERE ${usernameCol} = ? OR u.email = ?`
+      : `WHERE ${usernameCol} = ?`;
+    const queryParams = hasEmail
+      ? [usernameOrEmailInput, usernameOrEmailInput]
+      : [usernameOrEmailInput];
+
     const [rows]: any = await conn.execute(
       `SELECT 
         u.id, 
         u.tenant_id, 
         ${usernameCol} AS username, 
         ${passwordCol} AS password_hash, 
-        u.email${hasRole ? ', u.role' : ''},
+        ${selectEmail}${hasRole ? ', u.role' : ''},
         t.tenant_code, 
         t.campus_name, 
         t.database_name, 
         t.redis_prefix
        FROM users u
        LEFT JOIN tenants t ON u.tenant_id = t.id
-       WHERE ${usernameCol} = ? OR u.email = ?`,
-      [usernameOrEmailInput, usernameOrEmailInput]
+       ${whereClause}`,
+      queryParams
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {
-      return { success: false, error: 'Username atau email tidak terdaftar.' };
+      return { success: false, error: 'Username tidak terdaftar.' };
     }
 
     const user = rows[0];
@@ -145,8 +201,13 @@ export async function verifyUserCredentials(
 
     let isMatch = false;
 
-    // 1. Bcrypt verification ($2a$, $2b$, $2y$)
-    if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$') || storedHash.startsWith('$2y$')) {
+    // 1. Argon2 verification ($argon2id, $argon2i, $argon2d)
+    if (storedHash.startsWith('$argon2')) {
+      isMatch = await verifyArgon2(passwordInput, storedHash);
+    }
+
+    // 2. Bcrypt verification ($2a$, $2b$, $2y$)
+    if (!isMatch && (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$') || storedHash.startsWith('$2y$'))) {
       try {
         isMatch = await bcrypt.compare(passwordInput, storedHash);
       } catch {
@@ -154,7 +215,7 @@ export async function verifyUserCredentials(
       }
     }
 
-    // 2. Cryptographic hash fallbacks (Salted SHA-256 / SHA-512)
+    // 3. Cryptographic hash fallbacks (Salted SHA-256 / SHA-512)
     if (!isMatch) {
       const computedSha256SaltPrimary = hashPasswordSHA256Salted(passwordInput, MYSQL_SALT);
       const computedSha256SaltDoc = hashPasswordSHA256Salted(passwordInput, 'tguard_secure_salt_2026');
