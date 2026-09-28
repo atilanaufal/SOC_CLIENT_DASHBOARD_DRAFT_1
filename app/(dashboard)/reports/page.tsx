@@ -229,7 +229,7 @@ function ReportsContent() {
 
         {/* Total Reports KPI */}
         <div className="max-w-md bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2 flex-shrink-0">
-          <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+          <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
             Total Reports
           </p>
           <div className="flex items-center gap-3.5">
@@ -277,11 +277,11 @@ function ReportsContent() {
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
           <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">
+            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
                 <span>Severity: <strong className="text-amber-800 font-black">{activeFilters.severity}</strong></span>
                 <button
                   onClick={() => {
@@ -300,7 +300,7 @@ function ReportsContent() {
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                 <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
                 <button
                   onClick={() => {
@@ -320,7 +320,7 @@ function ReportsContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

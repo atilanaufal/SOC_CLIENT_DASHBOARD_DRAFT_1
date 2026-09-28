@@ -247,10 +247,10 @@ function VulnerabilitiesContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
               Total Vulnerability
             </p>
-            <div className="flex items-center justify-center gap-5 sm:gap-6 flex-1">
+            <div className="flex items-center justify-start gap-4 sm:gap-6 flex-1 pl-1">
               <BestDonutChart
                 segments={totalVulnSegments}
                 centerLabel={formatNumber(totalVulnsCount)}
@@ -276,7 +276,7 @@ function VulnerabilitiesContent() {
 
           {/* Vuln Distribution Widget */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
               Vuln Distribution
             </p>
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -286,13 +286,13 @@ function VulnerabilitiesContent() {
                 size={80}
                 strokeWidth={11}
               />
-              <div className="flex-1 text-xs sm:text-xs xl:text-sm min-w-0">
+              <div className="flex-1 text-xs sm:text-sm xl:text-base min-w-0">
                 {vulnDistSegments.length === 0 ? (
                   <div className="text-xs text-gray-400 font-semibold italic py-2">
                     No vulnerabilities detected
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs max-h-20 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-sm xl:text-base max-h-24 overflow-y-auto pr-1">
                     {vulnDistSegments.map((seg, idx) => (
                       <span key={idx} className="flex items-center gap-1 truncate" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
@@ -307,16 +307,16 @@ function VulnerabilitiesContent() {
 
           {/* Vuln Status (Replaces Solved Vuln, shows Solved and Not Patched) */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
               Vuln Status
             </p>
             <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 items-center">
               <div className="text-center bg-emerald-50/90 backdrop-blur-sm p-2 rounded-lg border border-emerald-300 shadow-sm flex flex-col justify-center h-full">
-                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Solved</span>
+                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Solved</span>
                 <span className="text-emerald-700 text-base sm:text-lg font-black">{formatNumber(stats.solved)}</span>
               </div>
               <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center h-full">
-                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Not Patched</span>
+                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Not Patched</span>
                 <span className="text-[#B8251B] text-base sm:text-lg font-black">{formatNumber(Math.max(0, totalVulnsCount - (stats.solved || 0)))}</span>
               </div>
             </div>
@@ -360,11 +360,11 @@ function VulnerabilitiesContent() {
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
           <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">
+            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
                 <span>Severity: <strong className="text-amber-800 font-black">{activeFilters.severity}</strong></span>
                 <button
                   onClick={() => {
@@ -382,7 +382,7 @@ function VulnerabilitiesContent() {
               </span>
             )}
             {activeFilters.status && activeFilters.status !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
                 <span>Status: <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong></span>
                 <button
                   onClick={() => {
@@ -400,7 +400,7 @@ function VulnerabilitiesContent() {
               </span>
             )}
             {activeFilters.agent && activeFilters.agent !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
                 <span>Agent: <strong className="text-[#0066B1] font-black">{activeFilters.agent}</strong></span>
                 <button
                   onClick={() => {
@@ -418,7 +418,7 @@ function VulnerabilitiesContent() {
               </span>
             )}
             {activeFilters.vulnerability && activeFilters.vulnerability !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-indigo-800 border-2 border-indigo-500/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(99,102,241,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-indigo-800 border-2 border-indigo-500/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(99,102,241,0.12)]">
                 <span>Name: <strong className="text-indigo-800 font-black">{activeFilters.vulnerability}</strong></span>
                 <button
                   onClick={() => {
@@ -436,7 +436,7 @@ function VulnerabilitiesContent() {
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                 <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
                 <button
                   onClick={() => setSearchTerm('')}
@@ -452,7 +452,7 @@ function VulnerabilitiesContent() {
                 setActiveFilters({});
                 setSearchTerm('');
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

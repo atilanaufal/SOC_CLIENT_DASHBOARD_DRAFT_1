@@ -366,17 +366,17 @@ export default function DashboardPage() {
               <button
                 ref={severityButtonRef}
                 onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[32px]"
+                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs sm:text-sm md:text-sm xl:text-base font-bold px-3 py-1 sm:py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[32px]"
               >
                 <span>{severityFilter}</span>
-                <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                <HiOutlineChevronDown className="w-4 h-4" />
               </button>
 
               {isSeverityDropdownOpen && mounted && severityCoords && createPortal(
                 <div
                   ref={severityDropdownRef}
                   style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
-                  className="w-40 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1.5 z-50 text-gray-800 text-xs xl:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
+                  className="w-44 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1.5 z-50 text-gray-800 text-xs sm:text-sm md:text-sm xl:text-base font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
                 >
                   {['All Severity', 'Critical', 'High', 'Medium'].map((sev) => (
                     <button

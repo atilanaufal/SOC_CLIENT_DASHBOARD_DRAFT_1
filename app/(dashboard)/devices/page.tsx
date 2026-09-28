@@ -258,25 +258,19 @@ function DevicesContent() {
   const osChartSegments = useMemo(() => {
     const counts: Record<string, number> = {};
     devices.forEach((d) => {
-      if (d.os) {
-        let label = d.os;
-        if (label.toLowerCase().includes('ubuntu')) label = 'Ubuntu';
-        else if (label.toLowerCase().includes('windows')) label = 'Windows';
-        else if (label.toLowerCase().includes('fedora')) label = 'Fedora';
-        else if (label.toLowerCase().includes('freebsd')) label = 'FreeBSD';
-        else if (label.toLowerCase().includes('debian')) label = 'Debian';
-        else if (label.toLowerCase().includes('arch')) label = 'Arch Linux';
-        else if (label.toLowerCase().includes('amazon')) label = 'Amazon Linux';
-        else if (label.toLowerCase().includes('centos')) label = 'CentOS';
+      const label = (d.os || '').trim();
+      if (label) {
         counts[label] = (counts[label] || 0) + 1;
       }
     });
-    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
-    return Object.entries(counts).map(([label, value], i) => ({
-      label,
-      value,
-      color: colors[i % colors.length],
-    }));
+    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1', '#EC4899', '#14B8A6'];
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({
+        label,
+        value,
+        color: colors[i % colors.length],
+      }));
   }, [devices]);
 
   const renderSortIndicator = (key: SortKey) => {
@@ -310,7 +304,7 @@ function DevicesContent() {
           {/* Total Devices Card */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
             <div className="flex flex-col justify-between h-full gap-2">
-              <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
                 Total Devices
               </p>
               <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-xs xl:text-sm font-bold">
@@ -329,7 +323,7 @@ function DevicesContent() {
 
           {/* Top OS Distribution */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
               Top OS Distribution
             </p>
             <div className="flex items-center gap-3 flex-1">
@@ -339,10 +333,10 @@ function DevicesContent() {
                 size={75}
                 strokeWidth={10}
               />
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs sm:text-sm xl:text-base flex-1">
                 {osChartSegments.slice(0, 4).map((seg) => (
-                  <span key={seg.label} className="flex items-center gap-1 truncate" title={`${seg.label}: ${seg.value}`}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
+                  <span key={seg.label} className="flex items-center gap-1.5 truncate" title={`${seg.label}: ${seg.value}`}>
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
                     <span className="truncate">{seg.label}</span> ({seg.value})
                   </span>
                 ))}
@@ -353,7 +347,7 @@ function DevicesContent() {
 
           {/* Devices At Risk ! */}
           <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-bold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
               Devices At Risk !
             </p>
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-xs font-bold">
@@ -411,11 +405,11 @@ function DevicesContent() {
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
           <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">
+            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.status && activeFilters.status !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
                 <span>Status: <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong></span>
                 <button
                   onClick={() => {
@@ -434,7 +428,7 @@ function DevicesContent() {
               </span>
             )}
             {activeFilters.os && activeFilters.os !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
                 <span>OS: <strong className="text-[#0066B1] font-black">{activeFilters.os}</strong></span>
                 <button
                   onClick={() => {
@@ -453,7 +447,7 @@ function DevicesContent() {
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                 <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
                 <button
                   onClick={() => {
@@ -473,7 +467,7 @@ function DevicesContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

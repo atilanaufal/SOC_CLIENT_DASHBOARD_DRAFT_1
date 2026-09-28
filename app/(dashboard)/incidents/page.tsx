@@ -427,11 +427,11 @@ function IncidentsContent() {
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
           <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-xs font-black text-gray-700 uppercase tracking-wider">
+            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.incidentName && activeFilters.incidentName !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
                 <span>Incident: <strong className="text-[#002B9A] font-black">{activeFilters.incidentName}</strong></span>
                 <button
                   onClick={() => {
@@ -450,7 +450,7 @@ function IncidentsContent() {
               </span>
             )}
             {activeFilters.agent && activeFilters.agent !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
                 <span>Agent: <strong className="text-[#0066B1] font-black">{activeFilters.agent}</strong></span>
                 <button
                   onClick={() => {
@@ -469,7 +469,7 @@ function IncidentsContent() {
               </span>
             )}
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
                 <span>Severity: <strong className="text-amber-800 font-black">{activeFilters.severity}</strong></span>
                 <button
                   onClick={() => {
@@ -488,7 +488,7 @@ function IncidentsContent() {
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3 py-1 rounded-lg text-xs font-black shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                 <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
                 <button
                   onClick={() => {
@@ -508,7 +508,7 @@ function IncidentsContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

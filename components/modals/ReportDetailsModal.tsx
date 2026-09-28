@@ -25,6 +25,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   onClose,
 }) => {
   const [mounted, setMounted] = useState(false);
+  const summaryRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -49,9 +50,11 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
     if (!doc) return;
 
     const customer = report.customerName || report.customer_name || report.client_name || report.tenant || 'Tenant';
-    const cleanSummary = (report.summary || 'No detailed summary available.')
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '')
-      .replace(/\r\n/g, '\n');
+    
+    // Extract rendered markdown HTML from the modal to retain formatted tables, headers, and lists
+    const renderedSummaryHtml = summaryRef.current
+      ? summaryRef.current.innerHTML
+      : (report.summary || 'No detailed summary available.').replace(/\r\n/g, '<br/>').replace(/\n/g, '<br/>');
 
     const devicesHtml = (report.affectedDevices || []).length > 0
       ? `
@@ -103,25 +106,37 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
           <meta charset="utf-8" />
           <title>${report.reportName}</title>
           <style>
-            @page { size: A4 portrait; margin: 15mm; }
+            @page { size: A4 portrait; margin: 12mm 15mm; }
             * { box-sizing: border-box; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 12px; line-height: 1.6; }
-            .header { border-bottom: 2px solid #002B9A; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; font-size: 11.5px; line-height: 1.5; }
+            .header { border-bottom: 2.5px solid #002B9A; padding-bottom: 10px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; }
             .title { font-size: 18px; font-weight: 800; color: #002B9A; margin: 0 0 4px 0; }
             .meta { font-size: 11px; color: #64748b; }
             .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 11px; text-transform: uppercase; background: ${sevBg}; color: ${sevColor}; border: 1px solid ${sevBorder}; }
-            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+            .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
             .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; }
             .card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
             .card-value { font-size: 12px; font-weight: 700; color: #0f172a; }
-            .section { margin-bottom: 20px; }
+            .section { margin-bottom: 18px; page-break-inside: auto; }
             .section-title { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #002B9A; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
-            .summary-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px; color: #334155; white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
-            table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
-            th { background: #002B9A; color: #ffffff; text-align: left; padding: 6px 10px; font-weight: 700; font-size: 11px; }
-            td { border: 1px solid #e2e8f0; padding: 6px 10px; }
+            .summary-box { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px; font-size: 11.5px; color: #1e293b; line-height: 1.6; }
+            .summary-box h1 { font-size: 16px; font-weight: 800; color: #002B9A; margin: 14px 0 6px 0; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 4px; }
+            .summary-box h2 { font-size: 14px; font-weight: 800; color: #0f172a; margin: 12px 0 4px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+            .summary-box h3 { font-size: 12.5px; font-weight: 700; color: #1e293b; margin: 10px 0 3px 0; }
+            .summary-box h4 { font-size: 11.5px; font-weight: 700; color: #334155; margin: 8px 0 2px 0; }
+            .summary-box p { margin: 6px 0; font-size: 11.5px; }
+            .summary-box ul, .summary-box ol { margin: 6px 0; padding-left: 20px; }
+            .summary-box li { margin-bottom: 3px; }
+            .summary-box code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #f1f5f9; color: #002B9A; padding: 1.5px 4px; border-radius: 4px; font-size: 10.5px; }
+            .summary-box pre { background: #0f172a; color: #38bdf8; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 10.5px; }
+            .summary-box blockquote { border-left: 3px solid #002B9A; background: #f0f7ff; padding: 6px 12px; margin: 8px 0; font-style: italic; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px; font-size: 11px; page-break-inside: avoid; }
+            th { background: #002B9A; color: #ffffff; text-align: left; padding: 7px 10px; font-weight: 700; font-size: 11px; border: 1px solid #002B9A; }
+            td { border: 1px solid #cbd5e1; padding: 6px 10px; color: #1e293b; vertical-align: top; }
             tr:nth-child(even) { background: #f8fafc; }
-            .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+            tr { page-break-inside: avoid; }
+            img { max-width: 100%; height: auto; margin: 8px 0; border-radius: 4px; }
+            .footer { margin-top: 20px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 9.5px; color: #94a3b8; display: flex; justify-content: space-between; }
           </style>
         </head>
         <body>
@@ -152,7 +167,7 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
           <div class="section">
             <div class="section-title">Executive Summary</div>
-            <div class="summary-box">${cleanSummary}</div>
+            <div class="summary-box">${renderedSummaryHtml}</div>
           </div>
 
           ${recActionHtml}
@@ -201,23 +216,13 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               <p className="text-xs text-blue-200 font-medium truncate">SOC ID: {socIdDisplay} | UUID: {uuidDisplay.substring(0, 18)}...</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleDownloadPDF}
-              className="bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-white/20 shadow-sm"
-              title="Download report to PDF"
-            >
-              <HiOutlineArrowDownTray className="w-4 h-4 text-blue-200" />
-              <span>Download PDF</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-300 font-bold p-1.5 rounded-lg transition cursor-pointer"
-              aria-label="Close modal"
-            >
-              <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:text-gray-300 font-bold p-1.5 rounded-lg transition cursor-pointer"
+            aria-label="Close modal"
+          >
+            <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
         </div>
 
         {/* Info Toolbar */}
@@ -266,7 +271,9 @@ export const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               <HiOutlineShieldExclamation className="w-5 h-5 text-[#002B9A]" />
               <h4 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">Summary</h4>
             </div>
-            <MarkdownRenderer content={report.summary || 'No detailed summary available.'} />
+            <div ref={summaryRef}>
+              <MarkdownRenderer content={report.summary || 'No detailed summary available.'} />
+            </div>
           </section>
 
 
