@@ -14,7 +14,6 @@ import {
 } from 'react-icons/hi2';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { RiskScoreWidget } from '@/components/widgets/RiskScoreWidget';
-import { MoreAgentsModal } from '@/components/modals/MoreAgentsModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { fetchDashboardStats } from '@/lib/api-client';
 import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
@@ -34,10 +33,6 @@ export default function DashboardPage() {
   const severityButtonRef = useRef<HTMLButtonElement>(null);
   const severityDropdownRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
-
-  // More Agents Modal State
-  const [isMoreAgentsOpen, setIsMoreAgentsOpen] = useState(false);
-  const [selectedMoreAgentsIncident, setSelectedMoreAgentsIncident] = useState<any | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -427,30 +422,19 @@ export default function DashboardPage() {
                       >
                         {inc.severity}
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            setSelectedMoreAgentsIncident(inc);
-                            setIsMoreAgentsOpen(true);
-                          }}
-                          className="bg-black/90 hover:bg-black text-white font-bold text-xs px-2.5 py-1 rounded-md transition shadow-sm cursor-pointer"
-                        >
-                          Agent
-                        </button>
-                        <button
-                          onClick={() => {
-                            const agentParam = inc.agent || inc.host || '';
-                            const incName = inc.incidentName || inc.incident_type || '';
-                            const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
-                              agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
-                            }&groupBy=incidents`;
-                            router.push(targetUrl);
-                          }}
-                          className="bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-xs px-3 py-1 rounded-md transition shadow-sm cursor-pointer"
-                        >
-                          View
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          const agentParam = inc.agent || inc.host || '';
+                          const incName = inc.incidentName || inc.incident_type || '';
+                          const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
+                            agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
+                          }&groupBy=incidents`;
+                          router.push(targetUrl);
+                        }}
+                        className="bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-xs px-3 py-1 rounded-md transition shadow-sm cursor-pointer"
+                      >
+                        View
+                      </button>
                     </div>
 
                     <p className="text-xs sm:text-sm xl:text-base font-extrabold text-gray-900 leading-snug">
@@ -495,15 +479,6 @@ export default function DashboardPage() {
 
                   {/* Desktop Action Buttons */}
                   <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => {
-                        setSelectedMoreAgentsIncident(inc);
-                        setIsMoreAgentsOpen(true);
-                      }}
-                      className="bg-black/90 backdrop-blur-sm hover:bg-black text-white font-bold text-xs sm:text-xs xl:text-sm px-3 py-1.5 rounded-lg transition shadow-[0_2px_6px_rgba(0,0,0,0.15)] cursor-pointer"
-                    >
-                      Agent
-                    </button>
                     <button
                       onClick={() => {
                         const agentParam = inc.agent || inc.host || '';
@@ -596,20 +571,6 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-
-      {/* More Agents Modal */}
-      <MoreAgentsModal
-        isOpen={isMoreAgentsOpen}
-        onClose={() => {
-          setIsMoreAgentsOpen(false);
-          setSelectedMoreAgentsIncident(null);
-        }}
-        agents={
-          selectedMoreAgentsIncident?.agentsList ||
-          (selectedMoreAgentsIncident ? [selectedMoreAgentsIncident.agent] : [])
-        }
-        incidentName={selectedMoreAgentsIncident?.incidentName}
-      />
     </div>
   );
 }
