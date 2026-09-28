@@ -302,9 +302,9 @@ function DevicesContent() {
         {/* Top KPI Cards (3 columns) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Devices Card */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
-            <div className="flex flex-col justify-between h-full gap-2">
-              <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <div className="flex flex-col justify-between h-full gap-1.5 sm:gap-2">
+              <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
                 Total Devices
               </p>
               <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-xs xl:text-sm font-bold">
@@ -316,28 +316,29 @@ function DevicesContent() {
                 </span>
               </div>
             </div>
-            <p className="text-3xl sm:text-4xl md:text-4xl xl:text-5xl font-black text-gray-900 tracking-tight leading-none">
+            <p className="text-3xl sm:text-4xl xl:text-4xl font-black text-gray-900 tracking-tight leading-none">
               {filteredDevices.length}
             </p>
           </div>
 
           {/* Top OS Distribution */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
               Top OS Distribution
             </p>
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <BestDonutChart
                 segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
                 centerLabel=""
-                size={75}
-                strokeWidth={10}
+                size={70}
+                strokeWidth={9}
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs sm:text-sm xl:text-base flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-xs xl:text-sm flex-1 min-w-0">
                 {osChartSegments.slice(0, 4).map((seg) => (
-                  <span key={seg.label} className="flex items-center gap-1.5 truncate" title={`${seg.label}: ${seg.value}`}>
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
-                    <span className="truncate">{seg.label}</span> ({seg.value})
+                  <span key={seg.label} className="flex items-center gap-1.5 min-w-0 overflow-hidden" title={`${seg.label}: ${seg.value}`}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
+                    <span className="truncate min-w-0">{seg.label}</span>
+                    <span className="flex-shrink-0 font-black text-gray-900">({seg.value})</span>
                   </span>
                 ))}
                 {osChartSegments.length === 0 && <span className="text-gray-400 font-normal">No OS data available</span>}
@@ -346,21 +347,21 @@ function DevicesContent() {
           </div>
 
           {/* Devices At Risk ! */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
               Devices At Risk !
             </p>
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-xs font-bold">
               <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center">
-                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Critical</span>
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">Critical</span>
                 <span className="text-[#B8251B] text-base sm:text-lg font-black">{totalCritical}</span>
               </div>
               <div className="text-center bg-[#FFEDD5]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#FDBA74] shadow-sm flex flex-col justify-center">
-                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">High</span>
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">High</span>
                 <span className="text-[#C2410C] text-base sm:text-lg font-black">{totalHigh}</span>
               </div>
               <div className="text-center bg-[#EBF5FF]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#BFDBFE] shadow-sm flex flex-col justify-center">
-                <span className="block text-[10px] sm:text-xs text-gray-500 font-semibold uppercase tracking-wide">Medium</span>
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">Medium</span>
                 <span className="text-[#1E429F] text-base sm:text-lg font-black">{totalMedium}</span>
               </div>
             </div>
@@ -404,13 +405,14 @@ function DevicesContent() {
 
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
-          <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-[11px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.status && activeFilters.status !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
-                <span>Status: <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Status:</span>
+                <strong className="text-[#002B9A] font-bold">{activeFilters.status}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -420,16 +422,17 @@ function DevicesContent() {
                     });
                     setCurrentPage(1);
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove status filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {activeFilters.os && activeFilters.os !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
-                <span>OS: <strong className="text-[#0066B1] font-black">{activeFilters.os}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-sky-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">OS:</span>
+                <strong className="text-[#0066B1] font-bold">{activeFilters.os}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -439,25 +442,26 @@ function DevicesContent() {
                     });
                     setCurrentPage(1);
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove OS filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-                <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Search:</span>
+                <strong className="text-gray-900 font-bold">&quot;{searchTerm}&quot;</strong>
                 <button
                   onClick={() => {
                     setSearchTerm('');
                     setCurrentPage(1);
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Clear search"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
@@ -467,7 +471,7 @@ function DevicesContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

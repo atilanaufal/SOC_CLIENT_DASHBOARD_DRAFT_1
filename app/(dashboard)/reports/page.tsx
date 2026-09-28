@@ -228,8 +228,8 @@ function ReportsContent() {
       <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
 
         {/* Total Reports KPI */}
-        <div className="max-w-md bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2 flex-shrink-0">
-          <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+        <div className="max-w-md bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2 flex-shrink-0">
+          <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
             Total Reports
           </p>
           <div className="flex items-center gap-3.5">
@@ -276,13 +276,14 @@ function ReportsContent() {
 
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
-          <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-[11px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
-                <span>Severity: <strong className="text-amber-800 font-black">{activeFilters.severity}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Severity:</span>
+                <strong className="text-amber-800 font-bold">{activeFilters.severity}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -292,25 +293,26 @@ function ReportsContent() {
                     });
                     setCurrentPage(1);
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove severity filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-                <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Search:</span>
+                <strong className="text-gray-900 font-bold">&quot;{searchTerm}&quot;</strong>
                 <button
                   onClick={() => {
                     setSearchTerm('');
                     setCurrentPage(1);
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Clear search"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
@@ -320,7 +322,7 @@ function ReportsContent() {
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>

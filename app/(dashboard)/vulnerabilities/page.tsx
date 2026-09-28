@@ -246,18 +246,18 @@ function VulnerabilitiesContent() {
         {/* Top KPI Cards (3 equal columns, matching devices layout) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
               Total Vulnerability
             </p>
-            <div className="flex items-center justify-start gap-4 sm:gap-6 flex-1 pl-1">
+            <div className="flex items-center justify-start gap-3 sm:gap-5 flex-1 pl-1">
               <BestDonutChart
                 segments={totalVulnSegments}
                 centerLabel={formatNumber(totalVulnsCount)}
-                size={85}
-                strokeWidth={11}
+                size={72}
+                strokeWidth={9}
               />
-              <div className="space-y-1.5 text-xs sm:text-xs xl:text-sm font-bold w-32 sm:w-36">
+              <div className="space-y-1 text-xs sm:text-xs xl:text-sm font-bold w-32 sm:w-36">
                 <div className="flex items-center justify-between gap-2 text-red-700 font-bold">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B8251B]"></span>Critical</span>
                   <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.critical)}</span>
@@ -275,28 +275,29 @@ function VulnerabilitiesContent() {
           </div>
 
           {/* Vuln Distribution Widget */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
               Vuln Distribution
             </p>
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <BestDonutChart
                 segments={vulnDistSegments}
                 centerLabel=""
-                size={80}
-                strokeWidth={11}
+                size={70}
+                strokeWidth={9}
               />
-              <div className="flex-1 text-xs sm:text-sm xl:text-base min-w-0">
+              <div className="flex-1 text-xs sm:text-xs xl:text-sm min-w-0">
                 {vulnDistSegments.length === 0 ? (
                   <div className="text-xs text-gray-400 font-semibold italic py-2">
                     No vulnerabilities detected
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-sm xl:text-base max-h-24 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-xs xl:text-sm max-h-24 overflow-y-auto pr-1">
                     {vulnDistSegments.map((seg, idx) => (
-                      <span key={idx} className="flex items-center gap-1 truncate" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
+                      <span key={idx} className="flex items-center gap-1 min-w-0 overflow-hidden" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
-                        <span className="truncate">{seg.label} ({formatNumber(seg.value)})</span>
+                        <span className="truncate min-w-0">{seg.label}</span>
+                        <span className="flex-shrink-0 font-black text-gray-900">({formatNumber(seg.value)})</span>
                       </span>
                     ))}
                   </div>
@@ -306,8 +307,8 @@ function VulnerabilitiesContent() {
           </div>
 
           {/* Vuln Status (Replaces Solved Vuln, shows Solved and Not Patched) */}
-          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-2">
-            <p className="text-xs sm:text-xs xl:text-sm font-extrabold text-gray-500 uppercase tracking-wider">
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-extrabold text-gray-600 uppercase tracking-wider">
               Vuln Status
             </p>
             <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 items-center">
@@ -359,13 +360,14 @@ function VulnerabilitiesContent() {
 
         {/* Active Filter Badges */}
         {(activeCount > 0 || searchTerm.trim()) && (
-          <div className="flex flex-wrap items-center gap-2 px-1 flex-shrink-0">
-            <span className="text-sm xl:text-base font-black text-gray-800 uppercase tracking-wider">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-[11px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
               Active Filters:
             </span>
             {activeFilters.severity && activeFilters.severity !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-amber-800 border-2 border-amber-500/70 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(217,119,6,0.12)]">
-                <span>Severity: <strong className="text-amber-800 font-black">{activeFilters.severity}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Severity:</span>
+                <strong className="text-amber-800 font-bold">{activeFilters.severity}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -374,16 +376,17 @@ function VulnerabilitiesContent() {
                       return next;
                     });
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove severity filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {activeFilters.status && activeFilters.status !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#002B9A] border-2 border-[#002B9A]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,43,154,0.12)]">
-                <span>Status: <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Status:</span>
+                <strong className="text-[#002B9A] font-bold">{activeFilters.status}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -392,16 +395,17 @@ function VulnerabilitiesContent() {
                       return next;
                     });
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove status filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {activeFilters.agent && activeFilters.agent !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-[#0066B1] border-2 border-[#0066B1]/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,102,177,0.12)]">
-                <span>Agent: <strong className="text-[#0066B1] font-black">{activeFilters.agent}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-sky-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Agent:</span>
+                <strong className="text-[#0066B1] font-bold">{activeFilters.agent}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -410,16 +414,17 @@ function VulnerabilitiesContent() {
                       return next;
                     });
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove agent filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {activeFilters.vulnerability && activeFilters.vulnerability !== 'All' && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-indigo-800 border-2 border-indigo-500/60 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(99,102,241,0.12)]">
-                <span>Name: <strong className="text-indigo-800 font-black">{activeFilters.vulnerability}</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Name:</span>
+                <strong className="text-indigo-800 font-bold">{activeFilters.vulnerability}</strong>
                 <button
                   onClick={() => {
                     setActiveFilters((prev) => {
@@ -428,22 +433,23 @@ function VulnerabilitiesContent() {
                       return next;
                     });
                   }}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove vulnerability filter"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {searchTerm.trim() && (
-              <span className="inline-flex items-center gap-1.5 bg-white text-gray-900 border-2 border-gray-300 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm xl:text-base font-bold shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-                <span>Search: <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong></span>
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">
+                <span className="text-gray-500">Search:</span>
+                <strong className="text-gray-900 font-bold">&quot;{searchTerm}&quot;</strong>
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full p-0.5 transition cursor-pointer ml-0.5"
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Clear search"
                 >
-                  <HiOutlineXMark className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
@@ -452,7 +458,7 @@ function VulnerabilitiesContent() {
                 setActiveFilters({});
                 setSearchTerm('');
               }}
-              className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-black transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
             >
               Clear all
             </button>
