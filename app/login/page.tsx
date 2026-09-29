@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
+import { HiOutlineEye, HiOutlineEyeSlash, HiOutlineExclamationTriangle } from 'react-icons/hi2';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -93,7 +93,7 @@ export default function LoginPage() {
           
           <div>
             <h1 className="text-xl font-black text-[#002B9A] tracking-tight">
-              SOC LAB Dashboard
+              ASOC Dashboard
             </h1>
             <p className="text-xs font-bold text-gray-600 mt-1">
               Sign in to manage and monitor your security posture
@@ -104,15 +104,15 @@ export default function LoginPage() {
         {/* Login Frosted Glass Card - 80% Opacity & rounded-lg */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-lg border border-white/80 p-6 sm:p-7 text-left space-y-4">
           {isExpiredNotice && (
-            <div className="bg-amber-50/90 backdrop-blur-md border border-amber-300 text-amber-800 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
-              <span className="font-bold flex-shrink-0">⏱️</span>
-              <span>Sesi Anda telah berakhir demi keamanan karena tidak ada aktivitas selama 15 menit. Silakan login kembali.</span>
+            <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <span>Your session has expired for security reasons due to 15 minutes of inactivity. Please sign in again.</span>
             </div>
           )}
 
           {errorMessage && (
             <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
-              <span className="font-bold flex-shrink-0">⚠️</span>
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
           )}
