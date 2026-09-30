@@ -276,3 +276,93 @@ export async function verifyUserCredentials(
     }
   }
 }
+
+// In-memory cache for authoritative user-tenant resolution (TTL: 60 seconds)
+const tenantResolutionCache = new Map<string, { data: any; expiresAt: number }>();
+
+/**
+ * Resolves authoritative tenant binding directly from master MySQL database.
+ * Strictly verifies user existence, tenant assignment, and database routing.
+ * Rejects admin/superadmin accounts from client dashboard.
+ */
+export async function getAuthoritativeTenantByUserId(userId: number | string): Promise<any | null> {
+  if (!userId) return null;
+
+  const cacheKey = String(userId);
+  const now = Date.now();
+  const cached = tenantResolutionCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+
+  let conn: mysql.PoolConnection | null = null;
+  try {
+    conn = await getMysqlConnection();
+
+    const [cols]: any = await conn.query('DESCRIBE users');
+    const colSet = new Set((cols || []).map((c: any) => c.Field.toLowerCase()));
+
+    const usernameCol = colSet.has('username') ? 'u.username' : 'u.name';
+    const hasRole = colSet.has('role');
+    const hasEmail = colSet.has('email');
+    const selectEmail = hasEmail ? 'u.email' : 'NULL AS email';
+
+    const [rows]: any = await conn.execute(
+      `SELECT 
+        u.id, 
+        u.tenant_id, 
+        ${usernameCol} AS username, 
+        ${selectEmail}${hasRole ? ', u.role' : ''},
+        t.tenant_code, 
+        t.campus_name, 
+        t.database_name, 
+        t.redis_prefix
+       FROM users u
+       INNER JOIN tenants t ON u.tenant_id = t.id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return null;
+    }
+
+    const row = rows[0];
+    const role = (row.role || 'tenant').toLowerCase();
+    const databaseName = (row.database_name || '').trim();
+
+    // Deny admin or non-tenant accounts from accessing tenant dashboard
+    if (role === 'admin' || role === 'superadmin' || !databaseName || databaseName === '-') {
+      return null;
+    }
+
+    const tenantContext = {
+      userId: row.id,
+      username: row.username,
+      email: row.email || null,
+      tenantId: Number(row.tenant_id) || 0,
+      tenantCode: row.tenant_code || '',
+      campusName: row.campus_name || '',
+      databaseName: databaseName,
+      redisPrefix: row.redis_prefix || databaseName,
+      role: row.role || 'tenant',
+    };
+
+    tenantResolutionCache.set(cacheKey, {
+      data: tenantContext,
+      expiresAt: now + 60 * 1000, // 60 seconds TTL
+    });
+
+    return tenantContext;
+  } catch (err: any) {
+    console.error(`[MySQL] Error resolving tenant for userId ${userId}:`, err.message);
+    return null;
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch {}
+    }
+  }
+}

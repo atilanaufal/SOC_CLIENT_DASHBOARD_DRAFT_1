@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { syncMasterUserToBetterAuth } from '@/lib/auth';
-
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
-
+import { signSessionToken, SESSION_COOKIE_NAME, LEGACY_COOKIE_NAMES } from '@/lib/session';
+import { createServerSession } from '@/lib/session-store';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,10 +18,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-
-    // Rate Limiting: Max 5 failed attempts per 15 minutes per IP & Identifier
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    // Rate Limiting: Trust X-Real-IP set by Nginx reverse proxy to prevent X-Forwarded-For spoofing
+    const clientIp =
       req.headers.get('x-real-ip') ||
+      req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       '127.0.0.1';
     const rateLimitKey = `login:${clientIp}:${usernameInput.toLowerCase()}`;
 
@@ -36,20 +37,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Sync & verify user credentials with master database & Better Auth
+    // 1. Sync & verify user credentials with master database (MySQL Argon2id / bcrypt)
     const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
     if (!syncRes.success || !syncRes.user) {
       return NextResponse.json(
-
         { success: false, error: syncRes.error || 'Login gagal. Periksa username dan password Anda.' },
         { status: 401 }
       );
     }
 
-
     // Reset rate limit on successful verification
     await resetRateLimit(rateLimitKey);
-
 
     const masterUser = syncRes.user;
     const role = (masterUser.role || '').toLowerCase();
@@ -66,6 +64,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const now = Date.now();
+    const sessionId = crypto.randomUUID();
+
+    // 2. Create authoritative server-side session in Redis with 15-minute inactivity TTL
+    await createServerSession(
+      sessionId,
+      {
+        sessionId,
+        userId: masterUser.id,
+        username: masterUser.username,
+        role: masterUser.role || 'tenant',
+        createdAt: now,
+        lastActive: now,
+      },
+      15 * 60 // 15 minutes TTL
+    );
+
+    // 3. Issue cryptographically signed session token (HMAC-SHA256)
+    const signedToken = await signSessionToken({
+      sessionId,
+      userId: masterUser.id,
+      username: masterUser.username,
+      role: masterUser.role || 'tenant',
+      issuedAt: now,
+      lastActive: now,
+    });
+
+    // 4. Return sanitized user presentation DTO (ASOC-F3: NO database_name or redis_prefix)
     const response = NextResponse.json({
       success: true,
       message: 'Login berhasil',
@@ -74,33 +100,29 @@ export async function POST(req: NextRequest) {
         tenant_id: masterUser.tenant_id,
         username: masterUser.username,
         email: masterUser.email,
-        role: masterUser.role,
+        role: masterUser.role || 'tenant',
         tenant_code: masterUser.tenant_code || '',
         campus_name: masterUser.campus_name || '',
-        database_name: masterUser.database_name || '',
-        redis_prefix: masterUser.redis_prefix || masterUser.database_name || '',
       },
     });
 
     const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
     const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
 
-    // Set fallback auth_session cookie with last_active timestamp
-    const sessionData = {
-      ...masterUser,
-      last_active: Date.now(),
-    };
-
-    // Set session cookie dengan batas waktu 15 menit
+    // Session-only cookie (cleared when browser closes) with strict security flags
     const cookieOpts = {
       httpOnly: true,
       secure: isHttps,
       sameSite: 'lax' as const,
       path: '/',
-      maxAge: 15 * 60, // 15 menit
     };
-    response.cookies.set('asoc_client_session', JSON.stringify(sessionData), cookieOpts);
-    response.cookies.set('auth_session', JSON.stringify(sessionData), cookieOpts);
+
+    response.cookies.set(SESSION_COOKIE_NAME, signedToken, cookieOpts);
+
+    // Also set signed token in legacy cookies for backward compatibility, avoiding raw JSON
+    for (const legacyName of LEGACY_COOKIE_NAMES) {
+      response.cookies.set(legacyName, signedToken, cookieOpts);
+    }
 
     return response;
   } catch (err: any) {

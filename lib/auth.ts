@@ -17,7 +17,7 @@ const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'auth_db';
 
 // Ensure secret is securely provided
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ||
-  (process.env.NODE_ENV === 'production'
+  (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build'
     ? (() => { throw new Error('CRITICAL: BETTER_AUTH_SECRET environment variable is missing.'); })()
     : 'dev_default_secret_please_set_in_production_32_chars_long');
 

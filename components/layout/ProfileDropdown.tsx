@@ -105,6 +105,10 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
 
   const handleLogout = async () => {
     try {
+      const { invalidateClientCache } = await import('@/lib/client-cache');
+      await invalidateClientCache();
+    } catch {}
+    try {
       sessionStorage.removeItem('user_session');
       sessionStorage.removeItem('auth_me_cache');
     } catch {}

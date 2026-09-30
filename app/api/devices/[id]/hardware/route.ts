@@ -31,7 +31,6 @@ export async function GET(
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
-      dataSource: source,
       data: hardware,
     });
   } catch (error: any) {

@@ -1,92 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTenantContext } from '@/lib/tenant-context';
+import { signSessionToken, SESSION_COOKIE_NAME, LEGACY_COOKIE_NAMES } from '@/lib/session';
 
 export async function GET(req: NextRequest) {
   try {
+    // 1. Authoritative server-side tenant and cryptographic session validation
+    const tenant = await getTenantContext(req);
 
-    // Check session via asoc_client_session or auth_session cookie
-    const sessionCookie =
-      req.cookies.get('asoc_client_session')?.value ||
-      req.cookies.get('auth_session')?.value;
+    const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
+    const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
 
-    if (sessionCookie) {
-      try {
-        const user = JSON.parse(decodeURIComponent(sessionCookie));
-        const role = (user.role || '').toLowerCase();
-        const dbName = user.database_name || user.databaseName || '';
-
-        // BLOKIR JIKA INI BUKAN AKUN TENANT (e.g. akun "ASOC Central Management" dari Admin Panel)
-        if (role === 'admin' || role === 'superadmin' || !dbName || dbName === '-') {
-          const res = NextResponse.json(
-            { success: false, authenticated: false, message: 'Bukan akun tenant yang valid.' },
-            { status: 401 }
-          );
-          res.cookies.set('asoc_client_session', '', { path: '/', maxAge: 0 });
-          res.cookies.set('auth_session', '', { path: '/', maxAge: 0 });
-          return res;
-        }
-
-        const lastActive = Number(user.last_active);
-        if (lastActive && Date.now() - lastActive > 15 * 60 * 1000) {
-          const res = NextResponse.json(
-            { success: false, authenticated: false, message: 'Sesi telah berakhir karena tidak ada aktivitas selama 15 menit.' },
-            { status: 401 }
-          );
-          res.cookies.set('asoc_client_session', '', { path: '/', maxAge: 0 });
-          res.cookies.set('auth_session', '', { path: '/', maxAge: 0 });
-          return res;
-        }
-
-        user.last_active = Date.now();
-        const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
-        const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
-
-        const response = NextResponse.json({
-          success: true,
-          authenticated: true,
-          user: {
-            id: user.id,
-            tenant_id: user.tenant_id || user.tenantId || 0,
-            username: user.username || user.name || '',
-            email: user.email || null,
-            role: user.role || 'tenant',
-            tenant_code: user.tenant_code || user.tenantCode || '',
-            campus_name: user.campus_name || user.campusName || '',
-            database_name: user.database_name || user.databaseName || '',
-            redis_prefix: user.redis_prefix || user.redisPrefix || user.database_name || '',
-          },
-        });
-
-        // Rolling session: perpanjang cookie 15 menit jika aktif
-        const cookieOpts = {
+    const clearCookies = (res: NextResponse) => {
+      [SESSION_COOKIE_NAME, ...LEGACY_COOKIE_NAMES].forEach((name) => {
+        res.cookies.set(name, '', {
           httpOnly: true,
           secure: isHttps,
-          sameSite: 'lax' as const,
+          sameSite: 'lax',
           path: '/',
-          maxAge: 15 * 60, // 15 menit
-        };
-        response.cookies.set('asoc_client_session', JSON.stringify(user), cookieOpts);
-        response.cookies.set('auth_session', JSON.stringify(user), cookieOpts);
+          maxAge: 0,
+        });
+      });
+    };
 
-        return response;
-      } catch {}
+    if (!tenant) {
+      const res = NextResponse.json(
+        { success: false, authenticated: false, message: 'Sesi tidak valid atau telah berakhir.' },
+        { status: 401 }
+      );
+      clearCookies(res);
+      return res;
     }
 
-    return NextResponse.json(
-      { success: false, authenticated: false, message: 'Tidak ada sesi terautentikasi.' },
-      { status: 401 }
-    );
+    // 2. Return sanitized user presentation DTO (ASOC-F3: NO database_name or redis_prefix)
+    const response = NextResponse.json({
+      success: true,
+      authenticated: true,
+      user: {
+        id: tenant.userId,
+        tenant_id: tenant.tenantId,
+        username: tenant.username,
+        email: tenant.email,
+        role: tenant.role || 'tenant',
+        tenant_code: tenant.tenantCode,
+        campus_name: tenant.campusName,
+      },
+    });
+
+    // 3. Rolling session refresh with newly signed token
+    if (tenant.sessionId) {
+      const updatedToken = await signSessionToken({
+        sessionId: tenant.sessionId,
+        userId: tenant.userId,
+        username: tenant.username,
+        role: tenant.role || 'tenant',
+        issuedAt: Date.now(),
+        lastActive: Date.now(),
+      });
+
+      const cookieOpts = {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: 'lax' as const,
+        path: '/',
+      };
+
+      response.cookies.set(SESSION_COOKIE_NAME, updatedToken, cookieOpts);
+      for (const legacyName of LEGACY_COOKIE_NAMES) {
+        response.cookies.set(legacyName, updatedToken, cookieOpts);
+      }
+    }
+
+    return response;
   } catch (err: any) {
     return NextResponse.json(
       {
         success: false,
         authenticated: false,
-        message: process.env.NODE_ENV === 'production'
-          ? 'Sesi tidak valid.'
-          : `Sesi tidak valid: ${err.message}`,
+        message: 'Sesi tidak valid.',
       },
       { status: 401 }
     );
-
-
   }
 }

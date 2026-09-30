@@ -155,8 +155,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
-      database: tenant.databaseName,
-      dataSource: source,
       total: devices.length,
       data: devices,
     });

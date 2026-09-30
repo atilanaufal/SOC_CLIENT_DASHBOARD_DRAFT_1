@@ -121,8 +121,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       tenant: tenant.campusName,
-      database: tenant.databaseName,
-      dataSource: source,
       data: {
         totalDevices: summaryData.total_devices || 0,
         onlineDevices: summaryData.online_devices || 0,
@@ -133,10 +131,6 @@ export async function GET(request: Request) {
           high: totalHigh,
           medium: totalMedium,
         },
-      },
-      meta: {
-        dataSource: source,
-        mongoDbAvailable,
       },
     });
   } catch (error: any) {

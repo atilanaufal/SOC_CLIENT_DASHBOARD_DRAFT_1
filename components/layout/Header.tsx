@@ -43,6 +43,10 @@ export const Header: React.FC = () => {
 
     const performAutoLogout = async () => {
       try {
+        const { invalidateClientCache } = await import('@/lib/client-cache');
+        await invalidateClientCache();
+      } catch {}
+      try {
         sessionStorage.clear();
         localStorage.removeItem('user_session');
         await fetch('/api/auth/logout', { method: 'POST' });

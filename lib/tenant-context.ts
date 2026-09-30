@@ -1,4 +1,6 @@
-
+import { verifySessionToken, SESSION_COOKIE_NAME, LEGACY_COOKIE_NAMES } from './session';
+import { getServerSession, touchServerSession } from './session-store';
+import { getAuthoritativeTenantByUserId } from './mysql';
 
 export interface TenantContext {
   userId: number | string;
@@ -10,58 +12,84 @@ export interface TenantContext {
   databaseName: string;
   redisPrefix: string;
   role?: string;
+  sessionId?: string;
 }
 
-
 /**
- * Server-side validated tenant context resolution.
- * Verifies session cryptographically against Better Auth session store.
- * Returns null if no valid session is present (Strict Multi-Tenancy Isolation).
- * Does NOT provide hardcoded fallback tenant names.
+ * Server-side authoritative tenant context resolution.
+ * - Extracts and cryptographically verifies signed session token (HMAC-SHA256).
+ * - Verifies session liveness in server-side session registry (Redis).
+ * - Enforces strict server-side idle timeout (15 minutes).
+ * - Resolves tenant assignment, database name, and Redis prefix EXCLUSIVELY from master MySQL database.
+ * - Completely ignores and rejects any client-supplied tenant_id or database_name (blocks BOLA/IDOR).
+ * - Returns null if unauthenticated, tampered, expired, or unauthorized.
  */
 export async function getTenantContext(request: Request): Promise<TenantContext | null> {
-  // Resolve tenant session via asoc_client_session or auth_session cookie
   try {
     const cookieHeader = request.headers.get('cookie') || '';
-    const match =
-      cookieHeader.match(/asoc_client_session=([^;]+)/) ||
-      cookieHeader.match(/auth_session=([^;]+)/);
+    if (!cookieHeader) return null;
 
-    if (match && match[1]) {
-      const user = JSON.parse(decodeURIComponent(match[1]));
-      const role = (user.role || '').toLowerCase();
-      const databaseName = user.database_name || user.databaseName || '';
+    // Search for authoritative signed session token
+    let token: string | null = null;
 
-      // Tolak akun Admin Panel ("ASOC Central Management")
-      if (role === 'admin' || role === 'superadmin' || !databaseName || databaseName === '-') {
-        return null;
-      }
+    // 1. Check primary asoc_session cookie
+    const primaryMatch = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`));
+    if (primaryMatch && primaryMatch[1]) {
+      token = decodeURIComponent(primaryMatch[1]);
+    }
 
-      const lastActive = Number(user.last_active);
-      if (lastActive && Date.now() - lastActive > 15 * 60 * 1000) {
-        return null;
-      }
-
-      const redisPrefix = user.redis_prefix || user.redisPrefix || databaseName;
-      if (databaseName) {
-        return {
-          userId: user.id,
-          username: user.username || user.name || '',
-          email: user.email || null,
-          tenantId: Number(user.tenant_id || user.tenantId) || 0,
-          tenantCode: user.tenant_code || user.tenantCode || '',
-          campusName: user.campus_name || user.campusName || '',
-          databaseName: databaseName,
-          redisPrefix: redisPrefix,
-          role: user.role || 'tenant',
-        };
+    // 2. Check legacy cookies if they contain signed tokens
+    if (!token) {
+      for (const name of LEGACY_COOKIE_NAMES) {
+        const legacyMatch = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+        if (legacyMatch && legacyMatch[1]) {
+          const val = decodeURIComponent(legacyMatch[1]);
+          if (val.includes('.')) {
+            token = val;
+            break;
+          }
+        }
       }
     }
+
+    if (!token) return null;
+
+    // 3. Verify cryptographic integrity & timeout via HMAC-SHA256
+    const payload = await verifySessionToken(token);
+    if (!payload || !payload.userId || !payload.sessionId) {
+      return null;
+    }
+
+    // 4. Verify session liveness in server-side registry (Redis)
+    const serverSession = await getServerSession(payload.sessionId);
+    if (!serverSession) {
+      // Session has been revoked or expired on server
+      return null;
+    }
+
+    // Refresh server-side session activity timestamp
+    touchServerSession(payload.sessionId).catch(() => {});
+
+    // 5. Query authoritative tenant assignment from master MySQL database
+    const authoritativeTenant = await getAuthoritativeTenantByUserId(payload.userId);
+    if (!authoritativeTenant) {
+      return null;
+    }
+
+    return {
+      userId: authoritativeTenant.userId,
+      username: authoritativeTenant.username,
+      email: authoritativeTenant.email,
+      tenantId: authoritativeTenant.tenantId,
+      tenantCode: authoritativeTenant.tenantCode,
+      campusName: authoritativeTenant.campusName,
+      databaseName: authoritativeTenant.databaseName,
+      redisPrefix: authoritativeTenant.redisPrefix,
+      role: authoritativeTenant.role,
+      sessionId: payload.sessionId,
+    };
   } catch (err: any) {
-    console.error('[TenantContext] auth_session parse error:', err.message);
+    console.error('[TenantContext] Resolution error:', err.message);
+    return null;
   }
-
-  // Strictly return null if unauthenticated or tenant is unassigned (NO hardcoded fallback)
-  return null;
-
 }
