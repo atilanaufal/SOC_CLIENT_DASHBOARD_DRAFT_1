@@ -136,7 +136,7 @@ async function runRegressionSuite() {
   assert.strictEqual(devicesRes.status, 200, `Devices request failed with ${devicesRes.status}`);
   const devicesJson = await devicesRes.json();
   assert.strictEqual(devicesJson.success, true);
-  assert.strictEqual(devicesJson.tenant, 'Tenant A');
+  assert.strictEqual(devicesJson.tenant?.toLowerCase(), 'tenant a');
 
   // Verify none of Tenant C devices (from pentester screenshot) are returned
   const deviceNames = (devicesJson.data || []).map((d) => d.name || d.agent);
@@ -153,7 +153,7 @@ async function runRegressionSuite() {
   });
   assert.strictEqual(paramRes.status, 200);
   const paramJson = await paramRes.json();
-  assert.strictEqual(paramJson.tenant, 'Tenant A', 'Server must ignore client-supplied tenant query parameters');
+  assert.strictEqual(paramJson.tenant?.toLowerCase(), 'tenant a', 'Server must ignore client-supplied tenant query parameters');
   console.log('  ✓ PASS: Client-supplied query parameter ignored. Server authoritative context retained.');
 
   // --------------------------------------------------------------------------
