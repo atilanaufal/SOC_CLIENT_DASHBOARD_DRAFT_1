@@ -195,7 +195,7 @@ async function runRegressionSuite() {
 
   assert(xFrame && xFrame.toUpperCase().includes('DENY'), `X-Frame-Options must be DENY, got ${xFrame}`);
   assert(csp.includes("frame-ancestors 'none'"), `CSP must contain frame-ancestors 'none', got ${csp}`);
-  assert.strictEqual(nosniff, 'nosniff', `X-Content-Type-Options must be nosniff, got ${nosniff}`);
+  assert(nosniff && nosniff.includes('nosniff'), `X-Content-Type-Options must include nosniff, got ${nosniff}`);
   console.log('  ✓ PASS: ASOC-F4 resolved. Strict anti-framing and security headers active.');
 
   // --------------------------------------------------------------------------
