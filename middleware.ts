@@ -49,6 +49,18 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.protocol === 'https:' ||
     (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
 
+  // Retrieve origin from reverse proxy headers to prevent internal host/port redirection (e.g. localhost:3005)
+  const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  let baseUrl: string;
+  if (forwardedHost && !forwardedHost.includes('localhost') && !forwardedHost.includes('127.0.0.1') && !forwardedHost.includes(':3005')) {
+    const proto = request.headers.get('x-forwarded-proto') || (isHttps ? 'https' : 'http');
+    baseUrl = `${proto}://${forwardedHost}`;
+  } else if (process.env.NEXT_PUBLIC_APP_URL) {
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  } else {
+    baseUrl = request.url;
+  }
+
   const clearSessionCookies = (res: NextResponse) => {
     const allCookieNames = [
       SESSION_COOKIE_NAME,
@@ -97,9 +109,9 @@ export async function middleware(request: NextRequest) {
   // 1. Root path `/`
   if (pathname === '/') {
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/dashboard', baseUrl));
     } else {
-      const res = NextResponse.redirect(new URL('/login', request.url));
+      const res = NextResponse.redirect(new URL('/login', baseUrl));
       if (token && !isAuthenticated) clearSessionCookies(res);
       return res;
     }
@@ -108,7 +120,7 @@ export async function middleware(request: NextRequest) {
   // 2. `/login` page
   if (pathname === '/login') {
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/dashboard', baseUrl));
     }
     const res = NextResponse.next();
     if (token && !isAuthenticated) clearSessionCookies(res);
@@ -125,7 +137,7 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPage) {
     if (!isAuthenticated) {
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = new URL('/login', baseUrl);
       loginUrl.searchParams.set('from', pathname);
       if (token) {
         loginUrl.searchParams.set('expired', '1');
