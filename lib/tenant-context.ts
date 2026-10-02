@@ -13,6 +13,7 @@ export interface TenantContext {
   redisPrefix: string;
   role?: string;
   sessionId?: string;
+  expiresAt?: number;
 }
 
 /**
@@ -87,6 +88,7 @@ export async function getTenantContext(request: Request): Promise<TenantContext 
       redisPrefix: authoritativeTenant.redisPrefix,
       role: authoritativeTenant.role,
       sessionId: payload.sessionId,
+      expiresAt: payload.expiresAt || (payload.issuedAt ? payload.issuedAt + 12 * 60 * 60 * 1000 : undefined),
     };
   } catch (err: any) {
     console.error('[TenantContext] Resolution error:', err.message);

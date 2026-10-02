@@ -191,11 +191,24 @@ export async function verifyUserCredentials(
       queryParams
     );
 
+    // Static dummy hash for constant-time mitigation when username is not found
+    const DUMMY_HASH = '$argon2id$v=19$m=65536,t=3,p=4$4SBYL6abGQALpGBfkInxmw$ee5rkiAWk+dtq448O0F3VimcfzfwrkVfQ+uGSmeR7HI';
+
     if (!Array.isArray(rows) || rows.length === 0) {
-      return { success: false, error: 'Username tidak terdaftar.' };
+      // Execute dummy verification to prevent username enumeration timing attack
+      await verifyArgon2(passwordInput, DUMMY_HASH);
+      return { success: false, error: 'Username atau password tidak valid.' };
     }
 
     const user = rows[0];
+    const roleLower = String(user.role || '').trim().toLowerCase();
+    const dbName = String(user.database_name || '').trim();
+
+    // Block admin/superadmin accounts from tenant portal with generic 401 (prevents admin password verification via tenant portal)
+    if (roleLower === 'admin' || roleLower === 'superadmin' || !dbName || dbName === '-') {
+      await verifyArgon2(passwordInput, DUMMY_HASH);
+      return { success: false, error: 'Username atau password tidak valid.' };
+    }
 
     const storedHash = user.password_hash || '';
 
@@ -235,10 +248,6 @@ export async function verifyUserCredentials(
     }
 
     if (isMatch) {
-      const usernameLower = (user.username || '').toLowerCase();
-      const detectedRole = usernameLower.includes('admin') ? 'admin' : (user.role || 'tenant');
-
-
       return {
         success: true,
         user: {
@@ -246,17 +255,15 @@ export async function verifyUserCredentials(
           tenant_id: user.tenant_id,
           username: user.username,
           email: user.email,
-          role: detectedRole,
-
+          role: user.role || 'tenant',
           tenant_code: user.tenant_code || '',
           campus_name: user.campus_name || '',
           database_name: user.database_name || '',
           redis_prefix: user.redis_prefix || user.database_name || '',
-
         },
       };
     } else {
-      return { success: false, error: 'Password yang Anda masukkan tidak sesuai.' };
+      return { success: false, error: 'Username atau password tidak valid.' };
     }
   } catch (err: any) {
     console.error('MySQL Database Connection Error:', err.message);

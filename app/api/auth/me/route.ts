@@ -7,14 +7,13 @@ export async function GET(req: NextRequest) {
     // 1. Authoritative server-side tenant and cryptographic session validation
     const tenant = await getTenantContext(req);
 
-    const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol || '';
-    const isHttps = proto.includes('https') || (process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false);
+    const isProduction = process.env.NODE_ENV === 'production';
 
     const clearCookies = (res: NextResponse) => {
       [SESSION_COOKIE_NAME, ...LEGACY_COOKIE_NAMES].forEach((name) => {
         res.cookies.set(name, '', {
           httpOnly: true,
-          secure: isHttps,
+          secure: isProduction,
           sameSite: 'lax',
           path: '/',
           maxAge: 0,
@@ -46,27 +45,30 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // 3. Rolling session refresh with newly signed token
+    // 3. Rolling session refresh with newly signed token (bounded by 12h absolute ceiling)
     if (tenant.sessionId) {
+      const now = Date.now();
+      const expiresAt = tenant.expiresAt || (now + 12 * 60 * 60 * 1000);
       const updatedToken = await signSessionToken({
         sessionId: tenant.sessionId,
         userId: tenant.userId,
         username: tenant.username,
         role: tenant.role || 'tenant',
-        issuedAt: Date.now(),
-        lastActive: Date.now(),
+        issuedAt: now,
+        lastActive: now,
+        expiresAt: expiresAt,
       });
 
       const cookieOpts = {
         httpOnly: true,
-        secure: isHttps,
+        secure: isProduction,
         sameSite: 'lax' as const,
         path: '/',
       };
 
       response.cookies.set(SESSION_COOKIE_NAME, updatedToken, cookieOpts);
       for (const legacyName of LEGACY_COOKIE_NAMES) {
-        response.cookies.set(legacyName, updatedToken, cookieOpts);
+        response.cookies.set(legacyName, '', { path: '/', maxAge: 0 });
       }
     }
 

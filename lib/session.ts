@@ -1,13 +1,15 @@
 export interface SessionPayload {
   sessionId: string;
   userId: number | string;
-  username: string;
-  role: string;
+  username?: string;
+  role?: string;
   issuedAt: number;
   lastActive: number;
+  expiresAt: number; // 12-hour absolute lifetime ceiling
 }
 
 export const SESSION_MAX_IDLE_MS = 15 * 60 * 1000; // 15 minutes inactivity timeout
+export const SESSION_MAX_ABSOLUTE_MS = 12 * 60 * 60 * 1000; // 12 hours absolute maximum lifetime
 export const SESSION_COOKIE_NAME = 'asoc_session';
 export const LEGACY_COOKIE_NAMES = ['asoc_client_session', 'auth_session'];
 
@@ -104,7 +106,8 @@ export async function signSessionToken(payload: SessionPayload): Promise<string>
  * Verifies a cryptographically signed session token.
  * - Uses native constant-time Web Crypto verification (subtle.verify).
  * - Enforces strict server-side idle timeout (15 minutes).
- * - Validates schema and required attributes (sessionId, userId, lastActive).
+ * - Enforces absolute session expiration ceiling (12 hours).
+ * - Validates schema and required attributes (sessionId, userId, lastActive, expiresAt).
  * - Fails closed immediately if invalid, tampered, or expired.
  */
 export async function verifySessionToken(
@@ -159,8 +162,14 @@ export async function verifySessionToken(
     }
 
     const now = Date.now();
-    // Enforce 15-minute inactivity timeout based on server clock
+    // 1. Enforce 15-minute inactivity timeout based on server clock
     if (now - lastActive > maxIdleMs || lastActive > now + 60000) {
+      return null;
+    }
+
+    // 2. Enforce 12-hour absolute lifetime ceiling (if present)
+    const expiresAt = Number(payload.expiresAt);
+    if (Number.isFinite(expiresAt) && now > expiresAt) {
       return null;
     }
 
