@@ -115,10 +115,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
-    try {
-      const { authClient } = await import('@/lib/auth-client');
-      await authClient.signOut();
-    } catch {}
     router.push('/login');
   };
 

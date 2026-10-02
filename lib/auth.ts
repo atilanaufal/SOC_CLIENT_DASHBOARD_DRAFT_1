@@ -42,36 +42,35 @@ export const auth = betterAuth({
   secret: BETTER_AUTH_SECRET,
 
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
-  trustedOrigins: async (request) => {
-    const origins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ];
+  trustedOrigins: async () => {
+    const isProd = process.env.NODE_ENV === 'production';
+    const origins: string[] = [];
+
+    if (!isProd) {
+      origins.push('http://localhost:3000', 'http://127.0.0.1:3000');
+    }
+
+    if (process.env.BETTER_AUTH_URL) {
+      origins.push(process.env.BETTER_AUTH_URL);
+    }
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      origins.push(process.env.NEXT_PUBLIC_APP_URL);
+    }
     if (process.env.BETTER_AUTH_TRUSTED_ORIGINS) {
       origins.push(...process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(',').map((s) => s.trim()));
     }
-    if (request) {
-      const origin = request.headers.get('origin');
-      if (origin) origins.push(origin);
-      const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
-      if (host) {
-        origins.push(`http://${host}`);
-        origins.push(`https://${host}`);
-      }
-    }
+
     return Array.from(new Set(origins.filter(Boolean)));
   },
   advanced: {
-    useSecureCookies: process.env.BETTER_AUTH_URL?.startsWith('https://') ?? false,
+    useSecureCookies: process.env.NODE_ENV === 'production',
   },
   session: {
     expiresIn: 60 * 15, // 15 minutes in seconds
     updateAge: 60 * 5,  // update session if active
   },
   emailAndPassword: {
-    enabled: true,
-    autoSignIn: true,
-    minPasswordLength: 4,
+    enabled: false, // Disabled: all authentication must go through custom hardened login route
   },
   user: {
     modelName: 'users',
