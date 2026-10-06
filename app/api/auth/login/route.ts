@@ -184,15 +184,12 @@ export async function POST(req: NextRequest) {
       expiresAt: expiresAt,
     });
 
-    // 8. Return sanitized user presentation DTO (ASOC-F3: NO database_name or redis_prefix)
+    // 8. Return sanitized user presentation DTO (Minimal exposure: no internal IDs or unused fields)
     const response = NextResponse.json({
       success: true,
       message: 'Login berhasil',
       user: {
-        id: masterUser.id,
-        tenant_id: masterUser.tenant_id,
         username: masterUser.username,
-        email: masterUser.email,
         role: masterUser.role || 'tenant',
         tenant_code: masterUser.tenant_code || '',
         campus_name: masterUser.campus_name || '',

@@ -30,15 +30,12 @@ export async function GET(req: NextRequest) {
       return res;
     }
 
-    // 2. Return sanitized user presentation DTO (ASOC-F3: NO database_name or redis_prefix)
+    // 2. Return sanitized user presentation DTO (Minimal exposure: no internal IDs or unused fields)
     const response = NextResponse.json({
       success: true,
       authenticated: true,
       user: {
-        id: tenant.userId,
-        tenant_id: tenant.tenantId,
         username: tenant.username,
-        email: tenant.email,
         role: tenant.role || 'tenant',
         tenant_code: tenant.tenantCode,
         campus_name: tenant.campusName,
