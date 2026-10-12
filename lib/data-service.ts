@@ -103,13 +103,25 @@ function parseRawIncident(h: any, fallbackId: string): Incident {
 
   let fullLogsString = '';
   if (typeof h.full_logs === 'string' && h.full_logs.trim()) {
-    fullLogsString = h.full_logs;
+    const trimmed = h.full_logs.trim();
+    if (trimmed !== '[object Object]') fullLogsString = trimmed;
   } else if (typeof h.full_log === 'string' && h.full_log.trim()) {
-    fullLogsString = h.full_log;
+    const trimmed = h.full_log.trim();
+    if (trimmed !== '[object Object]') fullLogsString = trimmed;
   } else if (Array.isArray(h.full_logs)) {
-    fullLogsString = h.full_logs.join('\n');
+    fullLogsString = h.full_logs
+      .map((item: any) => (typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)))
+      .filter((s: string) => Boolean(s) && s !== '[object Object]')
+      .join('\n');
+  } else if (Array.isArray(h.full_log)) {
+    fullLogsString = h.full_log
+      .map((item: any) => (typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)))
+      .filter((s: string) => Boolean(s) && s !== '[object Object]')
+      .join('\n');
   } else if (h.full_logs && typeof h.full_logs === 'object') {
     fullLogsString = JSON.stringify(h.full_logs, null, 2);
+  } else if (h.full_log && typeof h.full_log === 'object') {
+    fullLogsString = JSON.stringify(h.full_log, null, 2);
   }
 
   const hostName = h.host || h.agent || h.agent_name || (h.agent_id ? `Agent ${h.agent_id}` : '');

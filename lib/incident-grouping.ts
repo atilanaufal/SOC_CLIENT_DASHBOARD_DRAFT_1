@@ -53,10 +53,12 @@ export function getAlertGroupKey(doc: any): string {
  */
 export function extractFullLogs(doc: any): string {
   if (typeof doc.full_logs === 'string' && doc.full_logs.trim()) {
-    return doc.full_logs;
+    const trimmed = doc.full_logs.trim();
+    if (trimmed !== '[object Object]') return trimmed;
   }
   if (typeof doc.full_log === 'string' && doc.full_log.trim()) {
-    return doc.full_log;
+    const trimmed = doc.full_log.trim();
+    if (trimmed !== '[object Object]') return trimmed;
   }
   if (typeof doc.raw_log === 'string' && doc.raw_log.trim()) {
     return doc.raw_log;
@@ -65,10 +67,22 @@ export function extractFullLogs(doc: any): string {
     return doc.log;
   }
   if (Array.isArray(doc.full_logs)) {
-    return doc.full_logs.join('\n');
+    return doc.full_logs
+      .map((item: any) => (typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)))
+      .filter((s: string) => Boolean(s) && s !== '[object Object]')
+      .join('\n');
+  }
+  if (Array.isArray(doc.full_log)) {
+    return doc.full_log
+      .map((item: any) => (typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)))
+      .filter((s: string) => Boolean(s) && s !== '[object Object]')
+      .join('\n');
   }
   if (doc.full_logs && typeof doc.full_logs === 'object') {
     return JSON.stringify(doc.full_logs, null, 2);
+  }
+  if (doc.full_log && typeof doc.full_log === 'object') {
+    return JSON.stringify(doc.full_log, null, 2);
   }
   if (doc.data && typeof doc.data === 'object') {
     return JSON.stringify(doc.data, null, 2);

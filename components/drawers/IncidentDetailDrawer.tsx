@@ -85,6 +85,46 @@ function renderHighlightedJson(jsonString: string): React.ReactNode {
   return parts;
 }
 
+/**
+ * Safely normalizes raw log payloads (strings, arrays, objects) without [object Object]
+ */
+function normalizeRawLog(val: any): string {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed === '[object Object]') return '';
+    return trimmed;
+  }
+  if (Array.isArray(val)) {
+    return val
+      .map((item) => {
+        if (!item) return '';
+        if (typeof item === 'string') {
+          const t = item.trim();
+          return t === '[object Object]' ? '' : t;
+        }
+        if (typeof item === 'object') {
+          try {
+            return JSON.stringify(item, null, 2);
+          } catch {
+            return '';
+          }
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (typeof val === 'object') {
+    try {
+      return JSON.stringify(val, null, 2);
+    } catch {
+      return '';
+    }
+  }
+  return String(val);
+}
+
 export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   incident,
   isOpen,
@@ -127,13 +167,15 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
         if (!isMounted) return;
         if (res && (res.full_logs || res.full_log)) {
           const logVal = res.full_logs || res.full_log;
-          setFetchedFullLog(typeof logVal === 'object' ? JSON.stringify(logVal, null, 2) : String(logVal));
+          const normalized = normalizeRawLog(logVal);
+          setFetchedFullLog(normalized || null);
         } else {
           setFetchedFullLog(null);
         }
       } catch (err: any) {
         if (!isMounted) return;
-        setLogError(err.message || 'Gagal memuat raw log.');
+        // Keep fallback data visible, avoid blocking user with hard error
+        console.warn('[IncidentDetailDrawer] Could not fetch raw log details:', err.message);
       } finally {
         if (isMounted) setIsLoadingLog(false);
       }
@@ -149,79 +191,92 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   // Format full JSON log representation for debugging / SIEM export
   const fullLogText = useMemo(() => {
     if (!incident) return '';
-    if (fetchedFullLog) {
-      if (typeof fetchedFullLog === 'object') {
-        return JSON.stringify(fetchedFullLog, null, 2);
-      }
+
+    // Extract best raw content available
+    const rawContent =
+      normalizeRawLog(fetchedFullLog) ||
+      normalizeRawLog(incident.full_logs) ||
+      normalizeRawLog(incident.full_log);
+
+    // If raw content is ALREADY a valid, complete JSON object (e.g. contains rule/agent/timestamp)
+    if (rawContent && (rawContent.startsWith('{') || rawContent.startsWith('['))) {
       try {
-        const parsed = JSON.parse(fetchedFullLog);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return fetchedFullLog;
-      }
+        const parsed = JSON.parse(rawContent);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.timestamp || parsed.rule || parsed.agent || parsed._id || parsed.id) {
+            return JSON.stringify(parsed, null, 2);
+          }
+        }
+      } catch {}
     }
-    if (incident.full_logs && incident.full_logs.trim()) {
-      try {
-        const parsed = JSON.parse(incident.full_logs);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return incident.full_logs;
-      }
-    }
-    if (incident.full_log) {
-      if (typeof incident.full_log === 'object') {
-        return JSON.stringify(incident.full_log, null, 2);
-      }
-      try {
-        const parsed = JSON.parse(incident.full_log);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return incident.full_log;
-      }
-    }
-    // Fallback constructed standard Wazuh alert structure
-    const fallbackObj = {
+
+    // Always construct clean, standard Wazuh / SIEM JSON event document, embedding raw syslog/access log
+    const ruleLevel =
+      incident.severity === 'Critical' ? 12 : incident.severity === 'High' ? 10 : incident.severity === 'Medium' ? 7 : 4;
+
+    const alertRawLog =
+      rawContent ||
+      `${incident.firstObserved || new Date().toISOString()} ${incident.host || incident.agent || 'Agent'} ossec: Alert [${incident.rule_id || incident.ruleId || 'N/A'}] (${incident.severity || 'Medium'}): ${incident.description || incident.incidentName}`;
+
+    const structuredObj = {
       timestamp: incident.firstObserved || new Date().toISOString(),
       rule: {
         id: incident.rule_id || incident.ruleId || 'N/A',
-        level: incident.rule_level || 7,
-        description: incident.description || incident.incidentName,
+        level: incident.rule_level || ruleLevel,
+        description: incident.description || incident.incidentName || 'Security Alert',
         mitre: incident.mitre ? { id: [incident.mitre], technique: [incident.mitre] } : undefined,
       },
       agent: {
-        id: incident.agent || 'N/A',
+        id: incident.agent_id || incident.agent || 'N/A',
         name: incident.host || incident.agent || 'Agent',
-        ip: incident.agent_ip || incident.sourceIp || 'N/A',
+        ip: incident.agent_ip || 'N/A',
       },
       manager: {
         name: 'wazuh.manager',
       },
       location: incident.affected_file || 'N/A',
       data: {
-        srcip: incident.sourceIp || incident.agent_ip || 'N/A',
+        srcip: incident.sourceIp || incident.ip_source || 'N/A',
         dstip: incident.destIp || incident.ip_destination || 'N/A',
         count: incident.count || 1,
-        incident_type: Array.isArray(incident.incident_type) ? incident.incident_type.join(', ') : (incident.incident_type || 'N/A'),
+        incident_type: Array.isArray(incident.incident_type)
+          ? incident.incident_type.join(', ')
+          : (incident.incident_type || 'N/A'),
         affected_file: incident.affected_file || null,
       },
-      raw_log: `${incident.firstObserved || new Date().toISOString()} ${incident.host || 'Agent'} ossec: Alert [${incident.rule_id || incident.ruleId || 'N/A'}] (${incident.severity || 'Medium'}): ${incident.description || incident.incidentName}`,
+      full_log: alertRawLog,
+      raw_log: alertRawLog,
     };
-    return JSON.stringify(fallbackObj, null, 2);
-  }, [incident]);
+
+    return JSON.stringify(structuredObj, null, 2);
+  }, [incident, fetchedFullLog]);
 
   // Pretty raw syslog single-line format
   const rawSyslogText = useMemo(() => {
     if (!incident) return '';
-    try {
-      const parsed = JSON.parse(fullLogText);
-      if (parsed.full_log || parsed.raw_log) {
-        return parsed.full_log || parsed.raw_log;
+
+    const rawContent =
+      normalizeRawLog(fetchedFullLog) ||
+      normalizeRawLog(incident.full_logs) ||
+      normalizeRawLog(incident.full_log);
+
+    if (rawContent) {
+      try {
+        const parsed = JSON.parse(rawContent);
+        if (parsed.full_log || parsed.raw_log) {
+          return String(parsed.full_log || parsed.raw_log);
+        }
+      } catch {
+        // Plain raw syslog text (e.g. Apache log line or file modification)
+        return rawContent;
       }
-      return `${parsed.timestamp || incident.firstObserved} ${parsed.agent?.name || incident.host} ossec: Alert [Rule ${parsed.rule?.id || incident.rule_id}] (${parsed.rule?.severity || incident.severity}): ${parsed.rule?.description || incident.description} [srcip: ${parsed.data?.srcip || incident.sourceIp}]`;
-    } catch {
-      return fullLogText;
     }
-  }, [incident, fullLogText]);
+
+    const srcipPart = (incident.sourceIp || incident.ip_source)
+      ? ` [srcip: ${incident.sourceIp || incident.ip_source}]`
+      : '';
+    return `${incident.firstObserved || new Date().toISOString()} ${incident.host || incident.agent || 'Agent'} ossec: Alert [Rule ${incident.rule_id || incident.ruleId || 'N/A'}] (${incident.severity}): ${incident.description || incident.incidentName}${srcipPart}`;
+  }, [incident, fetchedFullLog]);
 
   // Active displayed log text
   const displayedLog = viewMode === 'structured' ? fullLogText : rawSyslogText;
@@ -583,13 +638,13 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
 
             {/* Code Log Content - Clean Light Theme */}
             <div className="p-4 sm:p-5 overflow-y-auto flex-1 bg-slate-50/90 font-mono text-xs sm:text-xs xl:text-sm select-text leading-relaxed border-t border-slate-200/70">
-              {isLoadingLog ? (
+              {isLoadingLog && !displayedLog ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center select-none">
                   <HiOutlineArrowPath className="w-8 h-8 text-[#002B9A] animate-spin mb-3" />
                   <p className="text-sm font-bold text-gray-800">Fetching complete raw log from cluster...</p>
                   <p className="text-xs text-gray-500 mt-1">On-demand payload extraction in progress</p>
                 </div>
-              ) : logError ? (
+              ) : logError && !displayedLog ? (
                 <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center">
                   <p className="text-xs sm:text-sm text-rose-700 font-semibold mb-2">{logError}</p>
                   <button

@@ -54,18 +54,35 @@ export async function GET(
     // 3. Try parsing group ID if starts with inc_grp_
     if (!doc && id.startsWith('inc_grp_')) {
       const clean = id.replace(/^inc_grp_/, '');
-      const parts = clean.split(':::');
-      if (parts.length >= 2) {
-        const query: any = {};
-        if (parts[0]) query.rule_id = parts[0];
-        if (parts[1]) query.host = new RegExp(`^${parts[1]}$`, 'i');
+      const parts = clean.includes(':::') ? clean.split(':::') : clean.split('_');
+      if (parts.length >= 1 && parts[0]) {
+        const query: any = { rule_id: parts[0] };
+        if (parts[1]) {
+          query.host = new RegExp(`^${parts[1]}$`, 'i');
+        }
         doc = await collection.findOne(query, { sort: { first_observed: -1 } });
       }
     }
 
     // 4. Try matching rule_id
     if (!doc) {
-      doc = await collection.findOne({ rule_id: id });
+      doc = await collection.findOne({ rule_id: id }, { sort: { first_observed: -1 } });
+    }
+
+    // 5. Try matching numeric rule_id
+    if (!doc) {
+      const numericRule = id.replace(/\D/g, '');
+      if (numericRule) {
+        doc = await collection.findOne({ rule_id: numericRule }, { sort: { first_observed: -1 } });
+      }
+    }
+
+    // 6. Try matching by host/agent
+    if (!doc) {
+      doc = await collection.findOne(
+        { $or: [{ host: id }, { agent_id: id }, { agent: id }] },
+        { sort: { first_observed: -1 } }
+      );
     }
 
     if (!doc) {
