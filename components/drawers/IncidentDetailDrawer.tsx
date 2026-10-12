@@ -286,6 +286,15 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
   const lastDate = lastParts.slice(0, 3).join(' ');
   const lastTime = lastParts.slice(3).join(' ');
 
+  const sourceIpValue = (incident.sourceIp || incident.ip_source || '').trim();
+  const hasSourceIp = Boolean(
+    sourceIpValue &&
+    sourceIpValue !== '-' &&
+    sourceIpValue.toLowerCase() !== 'n/a' &&
+    sourceIpValue.toLowerCase() !== 'null' &&
+    sourceIpValue.toLowerCase() !== 'undefined'
+  );
+
   return (
     <>
       {/* Mobile Backdrop (< lg) */}
@@ -335,7 +344,7 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             <div>
               <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Agent IP</p>
               <p className="text-sm sm:text-base font-extrabold text-[#002B9A] break-all font-mono">
-                {incident.agent_ip || incident.sourceIp || incident.ip_source || 'N/A'}
+                {incident.agent_ip || 'N/A'}
               </p>
             </div>
           </div>
@@ -367,9 +376,9 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Count & Severity (Count only visible in Grouped Incident mode) */}
+          {/* Count & Severity (& IP Source if available) */}
           {isGrouped ? (
-            <div className="grid grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200">
+            <div className={`grid ${hasSourceIp ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'} gap-3 pt-3 xl:pt-4 border-t border-gray-200`}>
               <div>
                 <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Count</p>
                 <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900">{countDisplay}</p>
@@ -390,23 +399,41 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
                   {incident.severity}
                 </span>
               </div>
+              {hasSourceIp && (
+                <div>
+                  <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">IP Source</p>
+                  <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900 font-mono break-all">
+                    {sourceIpValue}
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="pt-3 xl:pt-4 border-t border-gray-200">
-              <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
-              <span
-                className={`font-bold text-sm xl:text-base 2xl:text-lg ${
-                  incident.severity === 'Critical'
-                    ? 'text-[#B8251B]'
-                    : incident.severity === 'High'
-                    ? 'text-[#EA580C]'
-                    : incident.severity === 'Medium'
-                    ? 'text-[#5B9BD5]'
-                    : 'text-blue-600'
-                }`}
-              >
-                {incident.severity}
-              </span>
+            <div className={`${hasSourceIp ? 'grid grid-cols-2 gap-3' : ''} pt-3 xl:pt-4 border-t border-gray-200`}>
+              <div>
+                <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
+                <span
+                  className={`font-bold text-sm xl:text-base 2xl:text-lg ${
+                    incident.severity === 'Critical'
+                      ? 'text-[#B8251B]'
+                      : incident.severity === 'High'
+                      ? 'text-[#EA580C]'
+                      : incident.severity === 'Medium'
+                      ? 'text-[#5B9BD5]'
+                      : 'text-blue-600'
+                  }`}
+                >
+                  {incident.severity}
+                </span>
+              </div>
+              {hasSourceIp && (
+                <div>
+                  <p className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-500 uppercase tracking-wider mb-0.5">IP Source</p>
+                  <p className="font-bold text-sm xl:text-base 2xl:text-lg text-gray-900 font-mono break-all">
+                    {sourceIpValue}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
