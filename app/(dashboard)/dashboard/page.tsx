@@ -180,12 +180,12 @@ export default function DashboardPage() {
         return text !== '' && text.toLowerCase() !== 'no recommended action specified.' && text.toLowerCase() !== 'n/a' && text.toLowerCase() !== '-';
       })
       .sort((a, b) => {
-        const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
-        const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
-        if (timeB !== timeA) return timeB - timeA;
         const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
         const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
-        return rankB - rankA;
+        if (rankB !== rankA) return rankB - rankA;
+        const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
+        const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
+        return timeB - timeA;
       })
       .slice(0, 3);
   }, [rawRecs]);
