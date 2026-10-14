@@ -205,7 +205,7 @@ function IncidentsContent() {
   };
 
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
-    const groups: FilterGroup[] = [
+    const groups: FilterSection[] = [
       {
         key: 'severity',
         label: 'Severity Level',
