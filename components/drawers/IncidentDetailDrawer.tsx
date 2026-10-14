@@ -245,7 +245,6 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
         affected_file: incident.affected_file || null,
       },
       full_log: alertRawLog,
-      raw_log: alertRawLog,
     };
 
     return JSON.stringify(structuredObj, null, 2);
