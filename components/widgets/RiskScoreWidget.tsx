@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
-import { HiOutlineArrowUp, HiOutlineArrowDown, HiOutlineMinus } from 'react-icons/hi2';
+import React, { useState } from 'react';
+import { HiOutlineArrowUp, HiOutlineArrowDown, HiOutlineMinus, HiOutlineInformationCircle } from 'react-icons/hi2';
 import { getRiskCategory, RISK_CATEGORIES } from '@/lib/risk-score';
+import { RiskScoreFormulaModal } from '@/components/modals/RiskScoreFormulaModal';
 
 interface RiskScoreWidgetProps {
   score?: number;
@@ -65,6 +66,7 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
   lastMonthScore = 0,
   periodLabel = 'YESTERDAY',
 }) => {
+  const [isFormulaModalOpen, setIsFormulaModalOpen] = useState(false);
   const numScore = Number(Number(score || 0).toFixed(1));
   const numLastMonthScore = Number(Number(lastMonthScore || 0).toFixed(1));
 
@@ -88,8 +90,17 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
   return (
     <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex flex-col h-full justify-between">
       {/* Top Navy Header - Standardized Height */}
-      <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base tracking-wide flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-        Risk Score
+      <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between text-xs sm:text-sm md:text-sm xl:text-base tracking-wide flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+        <span>Risk Score</span>
+        <button
+          type="button"
+          onClick={() => setIsFormulaModalOpen(true)}
+          className="bg-white/15 hover:bg-white/25 text-white text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border border-white/20 cursor-pointer"
+          title="View Risk Score Calculation Formula"
+        >
+          <HiOutlineInformationCircle className="w-3.5 h-3.5" />
+          <span>Formula</span>
+        </button>
       </div>
 
       {/* Content Body */}
@@ -128,79 +139,27 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
               />
             </svg>
 
-            {/* Matching Font Size HTML Center Overlay - Number Only with Tooltip */}
+            {/* HTML Center Overlay - Clickable Score with Visual Indicators */}
             <div className="absolute inset-0 z-30 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center">
-              <div className="group/score relative cursor-help inline-flex items-center justify-center pointer-events-auto">
-                <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight hover:text-[#002B9A] transition-colors">
-                  {displayScore}
-                </span>
-
-                {/* Tooltip on hover score */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-96 sm:w-[420px] text-left">
-                  <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 z-10"></div>
-                  <div className="bg-white text-gray-800 text-xs rounded-xl p-4 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full space-y-3">
-                    {/* 1. Tenant Risk Score Formula */}
-                    <div>
-                      <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-1.5 border-b border-gray-100 pb-1">
-                        1. Tenant Risk Score Formula
-                      </div>
-                      <div className="bg-[#f4f7ff] py-2 px-3 rounded-lg border border-[#002B9A]/20 mb-1.5 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
-                        <span className="font-bold text-xs sm:text-sm">RiskScore =</span>
-                        <div className="inline-flex flex-col items-center">
-                          <span className="border-b border-[#002B9A]/40 px-2 pb-0.5 text-xs font-bold leading-none">
-                            AS₁ + AS₂ + ... + ASₙ
-                          </span>
-                          <span className="pt-1 text-[10px] font-semibold text-gray-600 leading-none">
-                            Total Registered Agents
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-[11px] text-gray-600 leading-normal font-medium">
-                        Sum of all <strong>Agent Scores (AS)</strong> divided by the <strong>Total Registered Agents</strong>.
-                      </div>
-                    </div>
-
-                    {/* 2. Agent Risk Score Formula */}
-                    <div className="border-t border-gray-100 pt-2.5">
-                      <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-1.5 border-b border-gray-100 pb-1">
-                        2. Agent Risk Score Formula (AS)
-                      </div>
-                      <div className="bg-[#f4f7ff] py-1.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2 text-center font-mono text-[#002B9A] font-bold text-xs">
-                        AgentScore(e) = min(100, ∑ SeverityWeight)
-                      </div>
-                      <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white mb-1.5">
-                        <thead className="bg-gray-100 text-gray-600 font-bold text-[10px]">
-                          <tr>
-                            <th className="py-1 px-2.5 border-b border-gray-200">Rule Level</th>
-                            <th className="py-1 px-2.5 border-b border-gray-200">Severity</th>
-                            <th className="py-1 px-2.5 border-b border-gray-200 text-right">Weight</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-[11px] bg-white">
-                          <tr>
-                            <td className="py-0.5 px-2.5 font-mono">15</td>
-                            <td className="py-0.5 px-2.5 text-rose-600 font-bold">Critical</td>
-                            <td className="py-0.5 px-2.5 text-right font-bold text-rose-600 font-mono">6</td>
-                          </tr>
-                          <tr>
-                            <td className="py-0.5 px-2.5 font-mono">12 - 14</td>
-                            <td className="py-0.5 px-2.5 text-orange-600 font-bold">High</td>
-                            <td className="py-0.5 px-2.5 text-right font-bold text-orange-600 font-mono">3</td>
-                          </tr>
-                          <tr>
-                            <td className="py-0.5 px-2.5 font-mono">7 - 11</td>
-                            <td className="py-0.5 px-2.5 text-[#002B9A] font-bold">Medium</td>
-                            <td className="py-0.5 px-2.5 text-right font-bold text-[#002B9A] font-mono">1</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <div className="text-[10px] text-gray-500 font-medium leading-relaxed">
-                        Accumulated weight of detected alerts on the agent, capped at maximum 100.
-                      </div>
-                    </div>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setIsFormulaModalOpen(true)}
+                className="group/score relative inline-flex flex-col items-center justify-center cursor-pointer pointer-events-auto transition-transform hover:scale-105 active:scale-95 focus:outline-none"
+                title="Click to view Risk Score calculation formula"
+                aria-label="Click to view Risk Score calculation formula"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight group-hover/score:text-[#002B9A] transition-colors">
+                    {displayScore}
+                  </span>
+                  <span className="p-1 rounded-full bg-blue-50 text-[#002B9A] border border-blue-200 group-hover/score:bg-[#002B9A] group-hover/score:text-white transition shadow-sm -mt-2">
+                    <HiOutlineInformationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </span>
                 </div>
-              </div>
+                <span className="mt-1 text-[10px] sm:text-[11px] font-bold text-[#002B9A] flex items-center gap-0.5 underline underline-offset-2 decoration-blue-300 group-hover/score:decoration-[#002B9A]">
+                  View Formula
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -254,6 +213,12 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Dedicated Risk Score Calculation Formula Modal */}
+      <RiskScoreFormulaModal
+        isOpen={isFormulaModalOpen}
+        onClose={() => setIsFormulaModalOpen(false)}
+      />
     </div>
   );
 };
