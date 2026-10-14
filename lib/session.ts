@@ -18,20 +18,18 @@ export const LEGACY_COOKIE_NAMES = ['asoc_client_session', 'auth_session'];
  * Enforces strict validation: fails closed in production if secret is missing or too short.
  */
 export function getSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET || process.env.BETTER_AUTH_SECRET;
+  const secret = process.env.SESSION_SECRET;
 
-  if (secret && secret.length >= 32) {
+  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build') {
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        'CRITICAL SECURITY FAILURE: SESSION_SECRET must be defined with at least 32 characters in production for HMAC token signing.'
+      );
+    }
     return secret;
   }
 
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build') {
-    // If neither is set or too short in production, use a deterministic or fallback secret rather than crashing login
-    return secret && secret.length > 0
-      ? secret.padEnd(32, '_')
-      : 'asoc_default_session_secret_32_characters_long_key_fallback';
-  }
-
-  return secret || 'dev_secret_key_minimum_32_characters_for_signing_tokens';
+  return secret || process.env.BETTER_AUTH_SECRET || 'dev_secret_key_minimum_32_characters_for_signing_tokens';
 }
 
 function base64UrlEncode(str: string): string {

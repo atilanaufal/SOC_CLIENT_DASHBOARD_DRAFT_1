@@ -15,8 +15,6 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - UV_THREADPOOL_SIZE=16
-      - SESSION_SECRET=${SESSION_SECRET:-soc_client_dashboard_session_secret_2026_super_hardened_32char_key}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-soc_client_dashboard_session_secret_2026_super_hardened_32char_key}
     networks:
       - soc_network
     logging:
