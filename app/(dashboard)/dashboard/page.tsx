@@ -437,27 +437,20 @@ export default function DashboardPage() {
                       </button>
                     </div>
 
-                    <div className="space-y-0.5">
-                      <p className="text-xs sm:text-sm xl:text-base font-extrabold text-gray-900 leading-snug">
-                        <span
-                          className={`hidden sm:inline font-black mr-1 ${
-                            inc.severity === 'Critical'
-                              ? 'text-[#B8251B]'
-                              : inc.severity === 'High'
-                              ? 'text-[#EA580C]'
-                              : 'text-[#5B9BD5]'
-                          }`}
-                        >
-                          {inc.severity}:
-                        </span>
-                        {inc.incidentName}
-                      </p>
-                      {inc.description && inc.description !== inc.incidentName && (
-                        <p className="text-[11px] sm:text-xs text-gray-600 font-semibold truncate max-w-full">
-                          {inc.description}
-                        </p>
-                      )}
-                    </div>
+                    <p className="text-xs sm:text-sm xl:text-base font-extrabold text-gray-900 leading-snug">
+                      <span
+                        className={`hidden sm:inline font-black mr-1 ${
+                          inc.severity === 'Critical'
+                            ? 'text-[#B8251B]'
+                            : inc.severity === 'High'
+                            ? 'text-[#EA580C]'
+                            : 'text-[#5B9BD5]'
+                        }`}
+                      >
+                        {inc.severity}:
+                      </span>
+                      {inc.incidentName}
+                    </p>
 
                     <div className="flex flex-wrap items-center gap-1 text-xs text-gray-600">
                       <span className="font-bold text-gray-500">Agent:</span>
