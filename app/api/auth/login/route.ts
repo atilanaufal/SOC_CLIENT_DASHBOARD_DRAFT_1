@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     // 2. Strict Input Type Validation & Length Caps (Defends against CPU DoS on Argon2)
     if (typeof rawUsername !== 'string' || typeof rawPassword !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Username dan Password wajib diisi dengan format teks.' },
+        { success: false, error: 'Username and Password must be valid text.' },
         { status: 400 }
       );
     }
@@ -92,14 +92,14 @@ export async function POST(req: NextRequest) {
 
     if (!usernameInput || !passwordInput) {
       return NextResponse.json(
-        { success: false, error: 'Username dan Password wajib diisi.' },
+        { success: false, error: 'Username and Password are required.' },
         { status: 400 }
       );
     }
 
     if (usernameInput.length > 128 || passwordInput.length > 256) {
       return NextResponse.json(
-        { success: false, error: 'Panjang karakter melebihi batas aman.' },
+        { success: false, error: 'Input length exceeds allowed limits.' },
         { status: 400 }
       );
     }
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       const res = NextResponse.json(
         {
           success: false,
-          error: `Terlalu banyak percobaan login yang gagal. Silakan coba kembali dalam ${Math.ceil(waitSeconds / 60)} menit.`,
+          error: `Too many failed login attempts. Please try again in ${Math.ceil(waitSeconds / 60)} minutes.`,
         },
         { status: 429 }
       );
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
     if (!syncRes.success || !syncRes.user) {
       // Uniform generic 401 error message (prevents username enumeration oracle)
       const res = NextResponse.json(
-        { success: false, error: 'Username atau password tidak valid.' },
+        { success: false, error: 'Invalid username or password.' },
         { status: 401 }
       );
       res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     // Enforce Tenant-Only Dashboard Access with identical uniform 401
     if (role === 'admin' || role === 'superadmin' || !dbName || dbName === '-') {
       return NextResponse.json(
-        { success: false, error: 'Username atau password tidak valid.' },
+        { success: false, error: 'Invalid username or password.' },
         { status: 401 }
       );
     }

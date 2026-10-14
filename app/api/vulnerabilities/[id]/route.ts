@@ -50,7 +50,7 @@ export async function GET(
 
     const idStr = doc._id.toString();
     const rawStatus = String(doc.status || '').trim().toLowerCase();
-    const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Not Patched';
+    const statusFormatted = (rawStatus === 'solved' || rawStatus === 'pass' || rawStatus === 'patched') ? 'Solved' : 'Active';
 
     const vuln = {
       id: idStr,

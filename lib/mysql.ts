@@ -197,7 +197,7 @@ export async function verifyUserCredentials(
     if (!Array.isArray(rows) || rows.length === 0) {
       // Execute dummy verification to prevent username enumeration timing attack
       await verifyArgon2(passwordInput, DUMMY_HASH);
-      return { success: false, error: 'Username atau password tidak valid.' };
+      return { success: false, error: 'Invalid username or password.' };
     }
 
     const user = rows[0];
@@ -207,7 +207,7 @@ export async function verifyUserCredentials(
     // Block admin/superadmin accounts from tenant portal with generic 401 (prevents admin password verification via tenant portal)
     if (roleLower === 'admin' || roleLower === 'superadmin' || !dbName || dbName === '-') {
       await verifyArgon2(passwordInput, DUMMY_HASH);
-      return { success: false, error: 'Username atau password tidak valid.' };
+      return { success: false, error: 'Invalid username or password.' };
     }
 
     const storedHash = user.password_hash || '';
@@ -263,13 +263,13 @@ export async function verifyUserCredentials(
         },
       };
     } else {
-      return { success: false, error: 'Username atau password tidak valid.' };
+      return { success: false, error: 'Invalid username or password.' };
     }
   } catch (err: any) {
     console.error('MySQL Database Connection Error:', err.message);
     const sanitizedMessage = process.env.NODE_ENV === 'production'
-      ? 'Gagal terhubung ke layanan database autentikasi. Silakan hubungi administrator.'
-      : `Gagal terhubung ke Database MySQL (${activeHost}:${MYSQL_PORT}): ${err.message}`;
+      ? 'Failed to connect to authentication database service. Please contact administrator.'
+      : `Failed to connect to MySQL Database (${activeHost}:${MYSQL_PORT}): ${err.message}`;
 
     return {
       success: false,

@@ -28,7 +28,7 @@ export default function LoginPage() {
     setErrorMessage(null);
 
     if (!username || !password) {
-      setErrorMessage('Silakan isi Username dan Password.');
+      setErrorMessage('Please enter both Username and Password.');
       return;
     }
 
@@ -49,7 +49,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data.error || 'Login gagal. Periksa username dan password Anda.');
+        setErrorMessage(data.error || 'Login failed. Please check your username and password.');
         setIsLoading(false);
         return;
       }
@@ -69,7 +69,7 @@ export default function LoginPage() {
       window.location.href = fromPath;
     } catch (err: any) {
       console.error('Login submit error:', err);
-      setErrorMessage('Terjadi kesalahan koneksi ke server. Silakan coba lagi.');
+      setErrorMessage('Connection error to server. Please try again.');
       setIsLoading(false);
     }
   };

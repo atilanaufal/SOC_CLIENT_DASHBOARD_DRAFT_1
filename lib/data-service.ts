@@ -226,7 +226,7 @@ function parseRawVulnerability(h: any, fallbackId: string): Vulnerability {
       const ms = String(detectDate.getUTCMilliseconds()).padStart(3, '0');
       return `${y}-${m}-${d} ${hr}:${mn}:${sc}.${ms}`;
     })() : String(detectDate)),
-    status: (isSolved ? 'Solved' : 'Not Patched') as any,
+    status: (isSolved ? 'Solved' : 'Active') as any,
     currentVersion: pkgVersion,
     version: pkgVersion,
     description: h.description || h.title || `Vulnerability ${cve} detected on ${pkgName || 'package'}`,
@@ -860,12 +860,13 @@ export async function queryDashboardIncidentStats(
       const firstObs = item.firstObserved || doc.first_observed || lastObs;
       const ts = getTimestamp(lastObs || item._id?.date);
       const rawType = doc.incident_type;
-      const incType = Array.isArray(rawType) ? rawType.join(', ') : (rawType || 'Unknown');
-      const incName = doc.description || (ruleId ? `Rule ${ruleId}` : 'Security Incident');
+      const incType = Array.isArray(rawType) ? rawType.join(', ') : (rawType || '');
+      const incName = incType || doc.description || (ruleId ? `Rule ${ruleId}` : 'Security Incident');
       return {
         id: String(doc._id || `top-inc-${idx + 1}_${ts}`),
         incidentName: incName,
-        incident_type: incType,
+        incident_type: incType || incName,
+        description: doc.description || incName,
         severity: parseSeverity(doc.severity),
         agent: agentName,
         agentsList: [agentName],

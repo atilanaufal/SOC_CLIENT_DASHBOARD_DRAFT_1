@@ -205,7 +205,7 @@ function IncidentsContent() {
   };
 
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
-    return [
+    const groups: FilterGroup[] = [
       {
         key: 'severity',
         label: 'Severity Level',
@@ -215,19 +215,25 @@ function IncidentsContent() {
           : ['Critical', 'High', 'Medium']
         ).filter((s) => s.toLowerCase() !== 'low'),
       },
-      {
+    ];
+
+    if (groupByMode === 'incidents') {
+      groups.push({
         key: 'incidentName',
-        label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
+        label: 'Incident Name',
         type: 'select',
         options: filterOptions.incidentNames || [],
-      },
-      {
-        key: 'agent',
-        label: 'Agent Affected',
-        type: 'select',
-        options: filterOptions.agents || [],
-      },
-    ];
+      });
+    }
+
+    groups.push({
+      key: 'agent',
+      label: 'Agent Affected',
+      type: 'select',
+      options: filterOptions.agents || [],
+    });
+
+    return groups;
   }, [filterOptions, groupByMode]);
 
   const startIndex = (currentPage - 1) * pageSize;

@@ -317,7 +317,7 @@ function VulnerabilitiesContent() {
                 <span className="text-emerald-700 text-base sm:text-lg font-black">{formatNumber(stats.solved)}</span>
               </div>
               <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center h-full">
-                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Not Patched</span>
+                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Active</span>
                 <span className="text-[#B8251B] text-base sm:text-lg font-black">{formatNumber(Math.max(0, totalVulnsCount - (stats.solved || 0)))}</span>
               </div>
             </div>
@@ -519,7 +519,7 @@ function VulnerabilitiesContent() {
                                 : 'bg-red-100 text-red-800 border border-red-300'
                             }`}
                           >
-                            {vuln.status}
+                            {vuln.status === 'Solved' || vuln.status === 'Patched' ? 'Solved' : 'Active'}
                           </span>
                         </div>
                         <span className="text-xs text-[#002B9A] font-bold font-mono">
@@ -627,7 +627,7 @@ function VulnerabilitiesContent() {
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-red-100 text-red-800 border border-red-300'
                             }`}>
-                              {vuln.status}
+                              {vuln.status === 'Solved' || vuln.status === 'Patched' ? 'Solved' : 'Active'}
                             </span>
                           </td>
 
