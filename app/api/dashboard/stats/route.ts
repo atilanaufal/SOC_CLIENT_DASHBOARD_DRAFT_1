@@ -10,7 +10,7 @@ import {
   getWeeklyHistoricalKpiFromRedis,
 } from '@/lib/data-service';
 
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 import { getTenantDeviceSummary, getTenantDevices } from '@/lib/wazuh-agent-store';
 import { groupAlertsToIncidents } from '@/lib/incident-grouping';
 import { getTimestamp, parseCustomDate } from '@/lib/date-utils';
@@ -117,12 +117,9 @@ export async function GET(request: Request) {
 
 
     // Get Tenant Context from authenticated session
-    const tenant = await getTenantContext(request);
+    const { tenant, error } = await getTenantContextWithStatus(request);
     if (!tenant) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Sesi autentikasi tidak valid atau telah berakhir.' },
-        { status: 401 }
-      );
+      return createAuthErrorResponse(error);
     }
 
     // 1. Fetch Devices strictly for tenant

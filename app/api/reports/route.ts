@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getReportsCollection } from '@/lib/db';
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,12 +82,9 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
 
-    const tenant = await getTenantContext(request);
+    const { tenant, error } = await getTenantContextWithStatus(request);
     if (!tenant) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
-        { status: 401 }
-      );
+      return createAuthErrorResponse(error);
     }
 
 

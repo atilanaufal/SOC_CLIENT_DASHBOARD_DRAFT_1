@@ -9,7 +9,7 @@ import {
   SESSION_MAX_ABSOLUTE_MS,
   SESSION_MAX_IDLE_MS,
 } from '@/lib/session';
-import { createServerSession } from '@/lib/session-store';
+import { createServerSession, bindUserActiveSession } from '@/lib/session-store';
 
 function isOriginAllowed(req: NextRequest): boolean {
   const origin = req.headers.get('origin');
@@ -172,6 +172,9 @@ export async function POST(req: NextRequest) {
       },
       Math.floor(SESSION_MAX_IDLE_MS / 1000)
     );
+
+    // 6b. Enforce Single Active Session per User (Displace and revoke previous concurrent logins)
+    await bindUserActiveSession(masterUser.id, sessionId);
 
     // 7. Issue cryptographically signed session token (HMAC-SHA256)
     const signedToken = await signSessionToken({

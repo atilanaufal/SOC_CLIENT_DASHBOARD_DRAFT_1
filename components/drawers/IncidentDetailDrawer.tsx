@@ -499,10 +499,10 @@ export const IncidentDetailDrawer: React.FC<IncidentDetailDrawerProps> = ({
             </p>
           </div>
 
-          {/* Affected File (if available) */}
+          {/* Source File (if available) */}
           {incident.affected_file && (
             <div className="pt-3 xl:pt-4 border-t border-gray-200">
-              <h4 className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-900 uppercase tracking-wider mb-1">Affected File</h4>
+              <h4 className="font-bold text-xs xl:text-sm 2xl:text-base text-gray-900 uppercase tracking-wider mb-1">Source File</h4>
               <p className="text-xs sm:text-sm xl:text-base font-mono text-gray-800 bg-white/70 backdrop-blur-sm p-2.5 rounded-xl border border-gray-200 break-all font-medium">
                 {incident.affected_file}
               </p>

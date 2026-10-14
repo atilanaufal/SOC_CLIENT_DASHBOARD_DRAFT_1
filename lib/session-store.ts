@@ -151,10 +151,90 @@ export async function touchServerSession(
   }
 }
 
+const USER_ACTIVE_SESSION_PREFIX = 'asoc:user_session:';
+const REVOKED_SESSION_PREFIX = 'asoc:revoked:';
+const REVOKED_TTL_SECONDS = 3600; // 1-hour revocation notice window
+
+const localUserSessionStore = new Map<string, string>();
+const localRevokedSessionStore = new Map<string, { reason: string; expiresAt: number }>();
+
+/**
+ * Binds an active session to a specific user.
+ * Enforces single-login restriction:
+ * If an active session already exists for this user, it is immediately revoked
+ * with reason 'CONCURRENT_LOGIN' so the previous browser/device is kicked out.
+ */
+export async function bindUserActiveSession(
+  userId: string | number,
+  newSessionId: string
+): Promise<string | null> {
+  const userKey = `${USER_ACTIVE_SESSION_PREFIX}${userId}`;
+  let oldSessionId: string | null = null;
+
+  try {
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      const existing = await redis.get(userKey);
+      if (existing && existing !== newSessionId) {
+        oldSessionId = existing;
+        // Invalidate old session in Redis
+        await redis.del(`${SESSION_PREFIX}${oldSessionId}`);
+        // Record revocation reason so old client gets informed
+        await redis.set(`${REVOKED_SESSION_PREFIX}${oldSessionId}`, 'CONCURRENT_LOGIN', 'EX', REVOKED_TTL_SECONDS);
+      }
+      // Store current active session ID for user (12 hours)
+      await redis.set(userKey, newSessionId, 'EX', Math.floor(MAX_SESSION_ABSOLUTE_MS / 1000));
+      return oldSessionId;
+    }
+  } catch (err: any) {
+    console.warn('[SessionStore] Redis bindUserActiveSession failed, using memory fallback:', err.message);
+  }
+
+  // Memory fallback
+  const userKeyMem = String(userId);
+  const existingMem = localUserSessionStore.get(userKeyMem);
+  if (existingMem && existingMem !== newSessionId) {
+    oldSessionId = existingMem;
+    localMemoryStore.delete(oldSessionId);
+    localRevokedSessionStore.set(oldSessionId, {
+      reason: 'CONCURRENT_LOGIN',
+      expiresAt: Date.now() + REVOKED_TTL_SECONDS * 1000,
+    });
+  }
+  localUserSessionStore.set(userKeyMem, newSessionId);
+  return oldSessionId;
+}
+
+/**
+ * Checks if a session ID was explicitly revoked (e.g. displaced by a concurrent login).
+ * Returns the revocation reason (e.g. 'CONCURRENT_LOGIN') or null.
+ */
+export async function getSessionRevocationReason(sessionId: string): Promise<string | null> {
+  if (!sessionId) return null;
+
+  const key = `${REVOKED_SESSION_PREFIX}${sessionId}`;
+  try {
+    const redis = await getActiveRedisClient();
+    if (redis) {
+      const reason = await redis.get(key);
+      if (reason) return reason;
+    }
+  } catch (err: any) {
+    console.warn('[SessionStore] Redis getSessionRevocationReason failed:', err.message);
+  }
+
+  const memItem = localRevokedSessionStore.get(sessionId);
+  if (memItem && memItem.expiresAt > Date.now()) {
+    return memItem.reason;
+  }
+
+  return null;
+}
+
 /**
  * Permanently revokes a session from server-side storage (e.g. upon user logout).
  */
-export async function revokeServerSession(sessionId: string): Promise<void> {
+export async function revokeServerSession(sessionId: string, userId?: string | number): Promise<void> {
   if (!sessionId) return;
 
   const key = `${SESSION_PREFIX}${sessionId}`;
@@ -163,10 +243,16 @@ export async function revokeServerSession(sessionId: string): Promise<void> {
     const redis = await getActiveRedisClient();
     if (redis) {
       await redis.del(key);
+      if (userId !== undefined && userId !== null) {
+        await redis.del(`${USER_ACTIVE_SESSION_PREFIX}${userId}`);
+      }
     }
   } catch (err: any) {
     console.warn('[SessionStore] Redis revoke failed:', err.message);
   }
 
   localMemoryStore.delete(sessionId);
+  if (userId !== undefined && userId !== null) {
+    localUserSessionStore.delete(String(userId));
+  }
 }

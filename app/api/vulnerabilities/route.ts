@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryServerSideVulnerabilities } from '@/lib/data-service';
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +23,9 @@ export async function GET(request: Request) {
     const sortOrder = (searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc';
 
     // Authenticated Tenant Context
-    const tenant = await getTenantContext(request);
+    const { tenant, error } = await getTenantContextWithStatus(request);
     if (!tenant) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
-        { status: 401 }
-      );
+      return createAuthErrorResponse(error);
     }
 
     // High-performance MongoDB $facet aggregation (Wazuh / OpenSearch style)

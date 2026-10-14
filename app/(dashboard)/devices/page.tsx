@@ -7,6 +7,7 @@ import {
   HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowPath,
   HiOutlineXMark,
+  HiOutlineInformationCircle,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
@@ -14,6 +15,7 @@ import { Device } from '@/lib/types';
 import { fetchDevices, fetchDeviceRiskScores } from '@/lib/api-client';
 import { DeviceDetailDrawer } from '@/components/drawers/DeviceDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
+import { RiskScoreFormulaModal } from '@/components/modals/RiskScoreFormulaModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { Pagination } from '@/components/ui/Pagination';
@@ -49,6 +51,7 @@ function DevicesContent() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isFormulaModalOpen, setIsFormulaModalOpen] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<SortKey>('score');
@@ -392,6 +395,16 @@ function DevicesContent() {
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
               <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
             </button>
+
+            <button
+              onClick={() => setIsFormulaModalOpen(true)}
+              className="bg-white/90 hover:bg-white text-[#002B9A] text-xs sm:text-sm font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition border border-blue-200/80 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
+              title="Risk Score Calculation Formula"
+            >
+              <HiOutlineInformationCircle className="w-4 h-4 text-[#002B9A]" />
+              <span className="hidden sm:inline">Calculation Formula</span>
+              <span className="sm:hidden">Formula</span>
+            </button>
           </div>
 
           <button
@@ -590,58 +603,24 @@ function DevicesContent() {
                           <span>Severity Breakdown</span>
                         </div>
                       </th>
-                      <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition relative group/scorecol">
-                        <div className="flex items-center text-white">
-                          <span>Risk Score</span>
-                          {renderSortIndicator('score')}
-                        </div>
-
-                        {/* Tooltip on header hover only */}
-                        <div className="absolute top-full right-0 mt-2 hidden group-hover/scorecol:flex flex-col items-end z-50 pointer-events-none w-96 sm:w-[420px] text-left font-normal normal-case">
-                          <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 mr-6 z-10"></div>
-                          <div className="bg-white text-gray-800 text-xs rounded-xl p-4 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
-                            <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2.5 border-b border-gray-100 pb-1.5">
-                              Agent Risk Score Formula
-                            </div>
-                            <div className="bg-[#f4f7ff] py-2.5 px-3.5 rounded-lg border border-[#002B9A]/20 mb-2.5 text-center font-mono text-[#002B9A]">
-                              <div className="font-bold text-xs whitespace-nowrap">
-                                AgentScore(e) = min(100, ∑ SeverityWeight)
-                              </div>
-                              <div className="text-[10.5px] text-gray-500 mt-1 font-mono whitespace-nowrap">
-                                ∑ SeverityWeight = W₁ + W₂ + ... + Wₙ
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-600 mb-1.5 font-bold">Severity Weight Reference:</div>
-                            <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white">
-                              <thead className="bg-gray-100 text-gray-600 font-bold text-[11px]">
-                                <tr>
-                                  <th className="py-1.5 px-3 border-b border-gray-200">Rule Level</th>
-                                  <th className="py-1.5 px-3 border-b border-gray-200">Severity Bucket</th>
-                                  <th className="py-1.5 px-3 border-b border-gray-200 text-right">Weight</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-xs bg-white">
-                                <tr className="hover:bg-rose-50/40">
-                                  <td className="py-1 px-3 font-mono">15</td>
-                                  <td className="py-1 px-3 text-rose-600 font-bold">Critical</td>
-                                  <td className="py-1 px-3 text-right font-bold text-rose-600 font-mono">6</td>
-                                </tr>
-                                <tr className="hover:bg-orange-50/40">
-                                  <td className="py-1 px-3 font-mono">12 - 14</td>
-                                  <td className="py-1 px-3 text-orange-600 font-bold">High</td>
-                                  <td className="py-1 px-3 text-right font-bold text-orange-600 font-mono">3</td>
-                                </tr>
-                                <tr className="hover:bg-blue-50/40">
-                                  <td className="py-1 px-3 font-mono">7 - 11</td>
-                                  <td className="py-1 px-3 text-[#002B9A] font-bold">Medium</td>
-                                  <td className="py-1 px-3 text-right font-bold text-[#002B9A] font-mono">1</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <div className="text-[10.5px] text-gray-500 mt-2 font-medium leading-relaxed">
-                              Accumulated weight of detected alerts, capped at a maximum score of 100.
-                            </div>
+                      <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center justify-between text-white">
+                          <div className="flex items-center">
+                            <span>Risk Score</span>
+                            {renderSortIndicator('score')}
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsFormulaModalOpen(true);
+                            }}
+                            className="text-blue-200 hover:text-white p-1 rounded transition cursor-pointer"
+                            title="View Risk Score Calculation Formula"
+                            aria-label="View Risk Score Calculation Formula"
+                          >
+                            <HiOutlineInformationCircle className="w-4 h-4" />
+                          </button>
                         </div>
                       </th>
                       <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
@@ -762,6 +741,12 @@ function DevicesContent() {
         sections={dynamicFilterSections}
         initialFilters={activeFilters}
         onApply={handleApplyFilters}
+      />
+
+      {/* Risk Score Calculation Formula Modal */}
+      <RiskScoreFormulaModal
+        isOpen={isFormulaModalOpen}
+        onClose={() => setIsFormulaModalOpen(false)}
       />
     </div>
   );

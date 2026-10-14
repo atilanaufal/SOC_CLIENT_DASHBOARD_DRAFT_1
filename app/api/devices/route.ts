@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 import { getTenantDevices, WazuhDevice } from '@/lib/wazuh-agent-store';
 import { getTenantIncidents } from '@/lib/data-service';
 import { parseSeverity } from '@/lib/severity';
@@ -48,12 +48,9 @@ function formatAgo(dateStr?: string): string {
 
 export async function GET(request: Request) {
   try {
-    const tenant = await getTenantContext(request);
+    const { tenant, error } = await getTenantContextWithStatus(request);
     if (!tenant) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
-        { status: 401 }
-      );
+      return createAuthErrorResponse(error);
     }
 
     // Prioritas 1: Redis Cache (<tenant.redisPrefix>:devices:list) -> < 1ms

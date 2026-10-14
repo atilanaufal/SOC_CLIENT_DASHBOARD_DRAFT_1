@@ -136,25 +136,67 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
                 </span>
 
                 {/* Tooltip on hover score */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-80 sm:w-[340px] text-left">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/score:flex flex-col items-center z-50 pointer-events-none w-96 sm:w-[420px] text-left">
                   <div className="w-2.5 h-2.5 bg-white border-t border-l border-blue-200 rotate-45 -mb-1.5 z-10"></div>
-                  <div className="bg-white text-gray-800 text-xs rounded-xl p-3.5 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full">
-                    <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-2 border-b border-gray-100 pb-1.5">
-                      Tenant Risk Score Formula
-                    </div>
-                    <div className="bg-[#f4f7ff] py-2.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
-                      <span className="font-bold text-xs sm:text-sm">RiskScore =</span>
-                      <div className="inline-flex flex-col items-center">
-                        <span className="border-b border-[#002B9A]/40 px-2 pb-0.5 text-xs font-bold leading-none">
-                          AS₁ + AS₂ + ... + ASₙ
-                        </span>
-                        <span className="pt-1 text-[10.5px] font-semibold text-gray-600 leading-none">
-                          Total Agents
-                        </span>
+                  <div className="bg-white text-gray-800 text-xs rounded-xl p-4 shadow-[0_16px_40px_rgba(0,43,154,0.22)] border border-blue-200 w-full space-y-3">
+                    {/* 1. Tenant Risk Score Formula */}
+                    <div>
+                      <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-1.5 border-b border-gray-100 pb-1">
+                        1. Tenant Risk Score Formula
+                      </div>
+                      <div className="bg-[#f4f7ff] py-2 px-3 rounded-lg border border-[#002B9A]/20 mb-1.5 flex items-center justify-center gap-2 font-mono text-[#002B9A]">
+                        <span className="font-bold text-xs sm:text-sm">RiskScore =</span>
+                        <div className="inline-flex flex-col items-center">
+                          <span className="border-b border-[#002B9A]/40 px-2 pb-0.5 text-xs font-bold leading-none">
+                            AS₁ + AS₂ + ... + ASₙ
+                          </span>
+                          <span className="pt-1 text-[10px] font-semibold text-gray-600 leading-none">
+                            Total Registered Agents
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-gray-600 leading-normal font-medium">
+                        Sum of all <strong>Agent Scores (AS)</strong> divided by the <strong>Total Registered Agents</strong>.
                       </div>
                     </div>
-                    <div className="text-[11px] text-gray-600 leading-normal font-medium">
-                      Sum of all <strong>Agent Scores (AS)</strong> divided by the <strong>Total Registered Agents</strong>.
+
+                    {/* 2. Agent Risk Score Formula */}
+                    <div className="border-t border-gray-100 pt-2.5">
+                      <div className="font-black text-xs text-[#002B9A] uppercase tracking-wider mb-1.5 border-b border-gray-100 pb-1">
+                        2. Agent Risk Score Formula (AS)
+                      </div>
+                      <div className="bg-[#f4f7ff] py-1.5 px-3 rounded-lg border border-[#002B9A]/20 mb-2 text-center font-mono text-[#002B9A] font-bold text-xs">
+                        AgentScore(e) = min(100, ∑ SeverityWeight)
+                      </div>
+                      <table className="w-full text-xs text-left border border-gray-200/80 rounded-lg overflow-hidden bg-white mb-1.5">
+                        <thead className="bg-gray-100 text-gray-600 font-bold text-[10px]">
+                          <tr>
+                            <th className="py-1 px-2.5 border-b border-gray-200">Rule Level</th>
+                            <th className="py-1 px-2.5 border-b border-gray-200">Severity</th>
+                            <th className="py-1 px-2.5 border-b border-gray-200 text-right">Weight</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 font-semibold text-gray-700 text-[11px] bg-white">
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-mono">15</td>
+                            <td className="py-0.5 px-2.5 text-rose-600 font-bold">Critical</td>
+                            <td className="py-0.5 px-2.5 text-right font-bold text-rose-600 font-mono">6</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-mono">12 - 14</td>
+                            <td className="py-0.5 px-2.5 text-orange-600 font-bold">High</td>
+                            <td className="py-0.5 px-2.5 text-right font-bold text-orange-600 font-mono">3</td>
+                          </tr>
+                          <tr>
+                            <td className="py-0.5 px-2.5 font-mono">7 - 11</td>
+                            <td className="py-0.5 px-2.5 text-[#002B9A] font-bold">Medium</td>
+                            <td className="py-0.5 px-2.5 text-right font-bold text-[#002B9A] font-mono">1</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="text-[10px] text-gray-500 font-medium leading-relaxed">
+                        Accumulated weight of detected alerts on the agent, capped at maximum 100.
+                      </div>
                     </div>
                   </div>
                 </div>

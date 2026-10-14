@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getIncidentsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 import { getTenantDeviceSummary } from '@/lib/wazuh-agent-store';
 
 export const dynamic = 'force-dynamic';
@@ -66,12 +66,9 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
 
-    const tenant = await getTenantContext(request);
+    const { tenant, error } = await getTenantContextWithStatus(request);
     if (!tenant) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: Sesi tidak valid atau telah berakhir.' },
-        { status: 401 }
-      );
+      return createAuthErrorResponse(error);
     }
 
 

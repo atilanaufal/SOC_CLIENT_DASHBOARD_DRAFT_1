@@ -63,8 +63,32 @@ export const Header: React.FC = () => {
     events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
     resetTimer();
 
+    // Periodic session heartbeat (detects displaced session when another user logs in)
+    const HEARTBEAT_INTERVAL_MS = 10000;
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (res.status === 401) {
+          try {
+            sessionStorage.clear();
+            localStorage.removeItem('user_session');
+          } catch {}
+          const authReason = res.headers.get('x-auth-reason');
+          let isConcurrent = authReason === 'concurrent_login';
+          if (!isConcurrent) {
+            try {
+              const data = await res.json();
+              if (data?.code === 'CONCURRENT_LOGIN') isConcurrent = true;
+            } catch {}
+          }
+          window.location.href = isConcurrent ? '/login?concurrent=1' : '/login?expired=1';
+        }
+      } catch {}
+    }, HEARTBEAT_INTERVAL_MS);
+
     return () => {
       clearTimeout(timer);
+      clearInterval(heartbeatInterval);
       events.forEach((evt) => window.removeEventListener(evt, resetTimer));
     };
   }, []);

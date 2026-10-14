@@ -8,7 +8,18 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
       localStorage.removeItem('user_session');
     } catch {}
     if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login?expired=1';
+      const authReason = res.headers.get('x-auth-reason');
+      let isConcurrent = authReason === 'concurrent_login';
+      if (!isConcurrent) {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          if (data?.code === 'CONCURRENT_LOGIN') {
+            isConcurrent = true;
+          }
+        } catch {}
+      }
+      window.location.href = isConcurrent ? '/login?concurrent=1' : '/login?expired=1';
     }
   }
   return res;

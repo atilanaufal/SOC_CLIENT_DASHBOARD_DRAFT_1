@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       try {
         const payload = await verifySessionToken(token, Infinity);
         if (payload?.sessionId) {
-          await revokeServerSession(payload.sessionId);
+          await revokeServerSession(payload.sessionId, payload.userId);
         }
       } catch {}
     }

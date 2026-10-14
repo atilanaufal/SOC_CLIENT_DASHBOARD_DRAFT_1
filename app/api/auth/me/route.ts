@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantContext } from '@/lib/tenant-context';
+import { getTenantContextWithStatus } from '@/lib/tenant-context';
 import { signSessionToken, SESSION_COOKIE_NAME, LEGACY_COOKIE_NAMES } from '@/lib/session';
 
 export async function GET(req: NextRequest) {
   try {
     // 1. Authoritative server-side tenant and cryptographic session validation
-    const tenant = await getTenantContext(req);
+    const { tenant, error } = await getTenantContextWithStatus(req);
 
     const isProduction = process.env.NODE_ENV === 'production';
 
@@ -22,10 +22,21 @@ export async function GET(req: NextRequest) {
     };
 
     if (!tenant) {
+      const isConcurrent = error === 'CONCURRENT_LOGIN';
       const res = NextResponse.json(
-        { success: false, authenticated: false, message: 'Sesi tidak valid atau telah berakhir.' },
+        {
+          success: false,
+          authenticated: false,
+          code: isConcurrent ? 'CONCURRENT_LOGIN' : 'SESSION_EXPIRED',
+          message: isConcurrent
+            ? 'Another user has logged into this account. You have been logged out.'
+            : 'Sesi tidak valid atau telah berakhir.',
+        },
         { status: 401 }
       );
+      if (isConcurrent) {
+        res.headers.set('X-Auth-Reason', 'concurrent_login');
+      }
       clearCookies(res);
       return res;
     }

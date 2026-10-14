@@ -12,12 +12,15 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpiredNotice, setIsExpiredNotice] = useState(false);
+  const [isConcurrentNotice, setIsConcurrentNotice] = useState(false);
   const router = useRouter();
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('expired') === '1') {
+      if (params.get('concurrent') === '1') {
+        setIsConcurrentNotice(true);
+      } else if (params.get('expired') === '1') {
         setIsExpiredNotice(true);
       }
     }
@@ -103,6 +106,13 @@ export default function LoginPage() {
 
         {/* Login Frosted Glass Card - 80% Opacity & rounded-lg */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-lg border border-white/80 p-6 sm:p-7 text-left space-y-4">
+          {isConcurrentNotice && (
+            <div className="bg-amber-50/90 backdrop-blur-md border border-amber-300 text-amber-900 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <span>Another user has logged into this account from another session. You have been logged out.</span>
+            </div>
+          )}
+
           {isExpiredNotice && (
             <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
               <HiOutlineExclamationTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
