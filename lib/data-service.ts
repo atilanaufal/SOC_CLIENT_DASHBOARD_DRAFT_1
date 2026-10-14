@@ -663,6 +663,7 @@ export async function queryDashboardIncidentStats(
             id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
             incidentName: inc.incidentName,
             incident_type: inc.incident_type,
+            description: inc.description || inc.incidentName,
             severity: inc.severity,
             agent: inc.agent,
             agentsList: [inc.agent],
