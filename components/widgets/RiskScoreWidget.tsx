@@ -139,27 +139,11 @@ export const RiskScoreWidget: React.FC<RiskScoreWidgetProps> = ({
               />
             </svg>
 
-            {/* HTML Center Overlay - Clickable Score with Visual Indicators */}
-            <div className="absolute inset-0 z-30 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center">
-              <button
-                type="button"
-                onClick={() => setIsFormulaModalOpen(true)}
-                className="group/score relative inline-flex flex-col items-center justify-center cursor-pointer pointer-events-auto transition-transform hover:scale-105 active:scale-95 focus:outline-none"
-                title="Click to view Risk Score calculation formula"
-                aria-label="Click to view Risk Score calculation formula"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight group-hover/score:text-[#002B9A] transition-colors">
-                    {displayScore}
-                  </span>
-                  <span className="p-1 rounded-full bg-blue-50 text-[#002B9A] border border-blue-200 group-hover/score:bg-[#002B9A] group-hover/score:text-white transition shadow-sm -mt-2">
-                    <HiOutlineInformationCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </span>
-                </div>
-                <span className="mt-1 text-[10px] sm:text-[11px] font-bold text-[#002B9A] flex items-center gap-0.5 underline underline-offset-2 decoration-blue-300 group-hover/score:decoration-[#002B9A]">
-                  View Formula
-                </span>
-              </button>
+            {/* HTML Center Overlay - Number Only */}
+            <div className="absolute inset-0 z-30 flex items-end justify-center pb-1.5 sm:pb-2 xl:pb-2.5 text-center pointer-events-none">
+              <span className="text-3xl sm:text-3xl md:text-3xl xl:text-4xl 2xl:text-5xl font-black text-gray-900 leading-none tracking-tight">
+                {displayScore}
+              </span>
             </div>
           </div>
         </div>
