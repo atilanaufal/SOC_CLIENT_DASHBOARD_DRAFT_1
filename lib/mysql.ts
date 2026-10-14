@@ -50,6 +50,16 @@ function parseBase64NoPadding(b64: string): Buffer {
 
 export async function verifyArgon2(password: string, hashStr: string): Promise<boolean> {
   if (!hashStr || !hashStr.startsWith('$argon2')) return false;
+
+  // 1. Primary: Fast WebAssembly verification via hash-wasm (~100-500ms, non-blocking)
+  try {
+    const { argon2Verify } = await import('hash-wasm');
+    return await argon2Verify({ password, hash: hashStr });
+  } catch {
+    // Fall through to noble-hashes fallback if WASM is unavailable
+  }
+
+  // 2. Fallback: Pure JS verification via @noble/hashes
   try {
     const { argon2id, argon2d, argon2i } = await import('@noble/hashes/argon2.js');
     const parts = hashStr.split('$');
@@ -149,6 +159,43 @@ export interface UserRecord {
   redis_prefix?: string;
 }
 
+interface CachedUserSchema {
+  usernameCol: string;
+  passwordCol: string;
+  hasRole: boolean;
+  hasEmail: boolean;
+  expiresAt: number;
+}
+
+let cachedUserSchema: CachedUserSchema | null = null;
+
+async function getUserSchema(conn: mysql.PoolConnection): Promise<CachedUserSchema> {
+  const now = Date.now();
+  if (cachedUserSchema && cachedUserSchema.expiresAt > now) {
+    return cachedUserSchema;
+  }
+  try {
+    const [cols]: any = await conn.query('DESCRIBE users');
+    const colSet = new Set((cols || []).map((c: any) => c.Field.toLowerCase()));
+    cachedUserSchema = {
+      usernameCol: colSet.has('username') ? 'u.username' : 'u.name',
+      passwordCol: colSet.has('password_hash') ? 'u.password_hash' : 'u.password',
+      hasRole: colSet.has('role'),
+      hasEmail: colSet.has('email'),
+      expiresAt: now + 5 * 60 * 1000, // cache schema 5 minutes
+    };
+    return cachedUserSchema;
+  } catch {
+    return {
+      usernameCol: 'u.name',
+      passwordCol: 'u.password',
+      hasRole: true,
+      hasEmail: false,
+      expiresAt: now + 30 * 1000,
+    };
+  }
+}
+
 export async function verifyUserCredentials(
   usernameOrEmailInput: string,
   passwordInput: string
@@ -157,22 +204,18 @@ export async function verifyUserCredentials(
   try {
     conn = await getMysqlConnection();
 
-    // Inspect available columns in users table to support various schemas (name/username, password/password_hash, role)
-    const [cols]: any = await conn.query('DESCRIBE users');
-    const colSet = new Set((cols || []).map((c: any) => c.Field.toLowerCase()));
-
-    const usernameCol = colSet.has('username') ? 'u.username' : 'u.name';
-    const passwordCol = colSet.has('password_hash') ? 'u.password_hash' : 'u.password';
-    const hasRole = colSet.has('role');
-
-    const hasEmail = colSet.has('email');
+    // 1. Efficient Schema Lookup (cached in-memory)
+    const { usernameCol, passwordCol, hasRole, hasEmail } = await getUserSchema(conn);
     const selectEmail = hasEmail ? 'u.email' : 'NULL AS email';
-    const whereClause = hasEmail
-      ? `WHERE ${usernameCol} = ? OR u.email = ?`
-      : `WHERE ${usernameCol} = ?`;
-    const queryParams = hasEmail
-      ? [usernameOrEmailInput, usernameOrEmailInput]
-      : [usernameOrEmailInput];
+
+    // 2. Optimized WHERE clause leveraging direct B-Tree index (idx_username / idx_name)
+    const isEmailInput = hasEmail && usernameOrEmailInput.includes('@');
+    const whereClause = isEmailInput
+      ? 'WHERE u.email = ?'
+      : (hasEmail ? `WHERE ${usernameCol} = ? OR u.email = ?` : `WHERE ${usernameCol} = ?`);
+    const queryParams = isEmailInput
+      ? [usernameOrEmailInput]
+      : (hasEmail ? [usernameOrEmailInput, usernameOrEmailInput] : [usernameOrEmailInput]);
 
     const [rows]: any = await conn.execute(
       `SELECT 
@@ -187,12 +230,13 @@ export async function verifyUserCredentials(
         t.redis_prefix
        FROM users u
        LEFT JOIN tenants t ON u.tenant_id = t.id
-       ${whereClause}`,
+       ${whereClause}
+       LIMIT 1`,
       queryParams
     );
 
-    // Static dummy hash for constant-time mitigation when username is not found
-    const DUMMY_HASH = '$argon2id$v=19$m=65536,t=3,p=4$4SBYL6abGQALpGBfkInxmw$ee5rkiAWk+dtq448O0F3VimcfzfwrkVfQ+uGSmeR7HI';
+    // OWASP-balanced Argon2id dummy hash (m=19456, t=2, p=1) for constant-time mitigation
+    const DUMMY_HASH = '$argon2id$v=19$m=19456,t=2,p=1$MTIzNDU2Nzg5MDEyMzQ1Ng$u+dT7EAHHTrTvvvwajvChP2Q1UsFbD/ikafuaSfWH9Q';
 
     if (!Array.isArray(rows) || rows.length === 0) {
       // Execute dummy verification to prevent username enumeration timing attack

@@ -34,6 +34,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV UV_THREADPOOL_SIZE=16
 
 # Create unprivileged system user for security
 RUN addgroup --system --gid 1001 nodejs && \

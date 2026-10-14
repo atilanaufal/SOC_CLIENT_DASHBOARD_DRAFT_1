@@ -15,3 +15,11 @@
 
 ## Filter Toolbar & Active Badges
 - **Aesthetic**: Follow the soft light glassmorphism theme (`bg-white/90 backdrop-blur-md text-xs font-semibold px-2.5 py-1 rounded-lg border shadow-sm`). Avoid oversized text or heavy 2px colored borders on active filter tags.
+
+## Authentication & Backend Performance Invariants
+- **Master User Lookup**: MySQL queries against table `users` MUST utilize the B-Tree indexes (`idx_username` on virtual column `username` or `idx_name` on `name`). Never introduce unindexed full-table scans.
+- **Schema Caching**: Database table schemas must remain cached in-memory with a TTL. Do NOT perform per-request `DESCRIBE` queries in hot authentication paths.
+- **Argon2id Verification**: Argon2id password verification must prioritize non-blocking WebAssembly execution via `hash-wasm` to prevent event-loop starvation, with `@noble/hashes` as fallback.
+- **OWASP-Balanced Dummy Hashing**: Dummy password verifications for constant-time mitigation must adhere to RFC 9106 / OWASP balanced settings (`m=19456, t=2, p=1`) to avoid CPU DoS on 2 vCPU servers.
+- **Single Active Session**: Every login must bind the user ID to the new active session ID in Redis (`bindUserActiveSession`). Concurrent logins must be displaced and rejected.
+- **Threadpool Sizing**: Keep `UV_THREADPOOL_SIZE=16` in container and system environments.
