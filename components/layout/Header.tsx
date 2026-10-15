@@ -41,7 +41,11 @@ export const Header: React.FC = () => {
     const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
     let timer: NodeJS.Timeout;
 
+    let isRedirecting = false;
+
     const performAutoLogout = async () => {
+      if (isRedirecting) return;
+      isRedirecting = true;
       try {
         const { invalidateClientCache } = await import('@/lib/client-cache');
         await invalidateClientCache();
@@ -51,7 +55,7 @@ export const Header: React.FC = () => {
         localStorage.removeItem('user_session');
         await fetch('/api/auth/logout', { method: 'POST' });
       } catch {}
-      window.location.href = '/login?expired=1';
+      window.location.replace('/login?expired=1');
     };
 
     const resetTimer = () => {
@@ -64,11 +68,12 @@ export const Header: React.FC = () => {
     resetTimer();
 
     // Periodic session heartbeat (detects displaced session when another user logs in)
-    const HEARTBEAT_INTERVAL_MS = 10000;
-    const heartbeatInterval = setInterval(async () => {
+    const checkSessionLiveness = async () => {
+      if (isRedirecting) return;
       try {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (res.status === 401) {
+          isRedirecting = true;
           try {
             sessionStorage.clear();
             localStorage.removeItem('user_session');
@@ -81,15 +86,31 @@ export const Header: React.FC = () => {
               if (data?.code === 'CONCURRENT_LOGIN') isConcurrent = true;
             } catch {}
           }
-          window.location.href = isConcurrent ? '/login?concurrent=1' : '/login?expired=1';
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch {}
+          window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
         }
       } catch {}
-    }, HEARTBEAT_INTERVAL_MS);
+    };
+
+    const HEARTBEAT_INTERVAL_MS = 5000;
+    const heartbeatInterval = setInterval(checkSessionLiveness, HEARTBEAT_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSessionLiveness();
+      }
+    };
+    window.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', checkSessionLiveness);
 
     return () => {
       clearTimeout(timer);
       clearInterval(heartbeatInterval);
       events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', checkSessionLiveness);
     };
   }, []);
 

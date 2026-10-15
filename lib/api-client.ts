@@ -1,12 +1,18 @@
 import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
 
+let isHandlingAuth401 = false;
+
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const res = await fetch(input, init);
   if (res.status === 401 && typeof window !== 'undefined') {
+    if (isHandlingAuth401) return res;
+    isHandlingAuth401 = true;
+
     try {
       sessionStorage.clear();
       localStorage.removeItem('user_session');
     } catch {}
+
     if (!window.location.pathname.startsWith('/login')) {
       const authReason = res.headers.get('x-auth-reason');
       let isConcurrent = authReason === 'concurrent_login';
@@ -19,7 +25,13 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
           }
         } catch {}
       }
-      window.location.href = isConcurrent ? '/login?concurrent=1' : '/login?expired=1';
+
+      // Proactively clear cookie via logout endpoint before replacing location
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {}
+
+      window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
     }
   }
   return res;

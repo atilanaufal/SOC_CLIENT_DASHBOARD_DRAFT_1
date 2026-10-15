@@ -18,10 +18,18 @@ export default function LoginPage() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('concurrent') === '1') {
-        setIsConcurrentNotice(true);
-      } else if (params.get('expired') === '1') {
-        setIsExpiredNotice(true);
+      const isConc = params.get('concurrent') === '1';
+      const isExp = params.get('expired') === '1';
+
+      if (isConc || isExp) {
+        if (isConc) setIsConcurrentNotice(true);
+        if (isExp) setIsExpiredNotice(true);
+
+        try {
+          sessionStorage.clear();
+          localStorage.removeItem('user_session');
+        } catch {}
+        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
       }
     }
   }, []);
