@@ -88,8 +88,12 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
           } catch {}
         }
       });
+  }, []);
 
-    const handleClickOutside = (event: MouseEvent) => {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
@@ -99,9 +103,23 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
 
   const handleLogout = async () => {
     try {
@@ -135,11 +153,19 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
       </button>
 
       {isOpen && mounted && coords && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{ position: 'fixed', top: `${coords.top}px`, right: `${coords.right}px` }}
-          className="w-64 sm:w-72 bg-white/95 backdrop-blur-2xl rounded-xl z-50 text-gray-900 p-3.5 sm:p-4 border border-white/80 animate-in fade-in zoom-in-95 duration-100 space-y-3 shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)]"
-        >
+        <>
+          {/* Backdrop overlay for reliable outside click / tap */}
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            aria-hidden="true"
+            onClick={() => setIsOpen(false)}
+            onTouchStart={() => setIsOpen(false)}
+          />
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: `${coords.top}px`, right: `${coords.right}px` }}
+            className="w-64 sm:w-72 bg-white/95 backdrop-blur-2xl rounded-xl z-50 text-gray-900 p-3.5 sm:p-4 border border-white/80 animate-in fade-in zoom-in-95 duration-100 space-y-3 shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)]"
+          >
           {/* User & Tenant Info Header */}
           <div className="flex items-center gap-3 pb-3 border-b border-gray-200/80">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#002B9A] flex items-center justify-center shrink-0 text-white shadow-sm">
@@ -175,7 +201,8 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
               <span>Log Out</span>
             </button>
           </div>
-        </div>,
+        </div>
+        </>,
         document.body
       )}
     </div>
