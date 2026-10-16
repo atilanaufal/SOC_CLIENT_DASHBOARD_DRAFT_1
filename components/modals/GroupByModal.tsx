@@ -48,12 +48,12 @@ export const GroupByModal: React.FC<GroupByModalProps> = ({
     /* Outer Backdrop Overlay - Matches FilterModal */
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-slate-950/25 z-50 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
+      className="fixed inset-0 bg-slate-950/25 z-50 overflow-y-auto p-3 sm:p-4 flex items-center justify-center cursor-pointer animate-in fade-in duration-150"
     >
       {/* Inner Modal Card - Matches FilterModal */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-lg w-full overflow-visible p-5 sm:p-6 space-y-4 sm:space-y-5 text-gray-900 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
+        className="my-auto bg-white/90 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-lg w-full overflow-visible p-5 sm:p-6 space-y-4 sm:space-y-5 text-gray-900 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
       >
         {/* Header - Matches FilterModal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
