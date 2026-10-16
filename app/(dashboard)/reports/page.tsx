@@ -388,22 +388,22 @@ function ReportsContent() {
 
               {/* DESKTOP DATA TABLE (md+) */}
               <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse table-fixed min-w-[650px]">
                   <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
                     <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                      <th onClick={() => handleSort('reportName')} className="bg-[#002B9A] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('reportName')} className="bg-[#002B9A] w-[58%] lg:w-[62%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
                         <div className="flex items-center text-white">
                           <span>Report Name</span>
                           {renderSortIndicator('reportName')}
                         </div>
                       </th>
-                      <th onClick={() => handleSort('severity')} className="bg-[#002B9A] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('severity')} className="bg-[#002B9A] w-[18%] lg:w-[16%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition whitespace-nowrap">
                         <div className="flex items-center text-white">
                           <span>Severity</span>
                           {renderSortIndicator('severity')}
                         </div>
                       </th>
-                      <th onClick={() => handleSort('dateGenerated')} className="bg-[#002B9A] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                      <th onClick={() => handleSort('dateGenerated')} className="bg-[#002B9A] w-[24%] lg:w-[22%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition whitespace-nowrap">
                         <div className="flex items-center text-white">
                           <span>Date Generated</span>
                           {renderSortIndicator('dateGenerated')}
@@ -426,14 +426,14 @@ function ReportsContent() {
                               : 'hover:bg-blue-50/40'
                           }`}
                         >
-                          <td className="relative py-3 px-3.5 xl:px-4 text-[#002B9A] font-bold">
+                          <td className="relative py-3 px-3.5 xl:px-4 text-[#002B9A] font-bold align-top">
                             {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
-                            <span>{report.reportName}</span>
+                            <span className="block break-words whitespace-normal leading-snug">{report.reportName}</span>
                           </td>
-                          <td className="py-3 px-3.5 xl:px-4 font-medium">
+                          <td className="py-3 px-3.5 xl:px-4 font-medium align-top whitespace-nowrap">
                             {renderSeverityBadge(report.severity)}
                           </td>
-                          <td className="py-3 px-3.5 xl:px-4">
+                          <td className="py-3 px-3.5 xl:px-4 align-top whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
                               <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
                               {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}

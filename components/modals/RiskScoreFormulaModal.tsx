@@ -121,31 +121,6 @@ export const RiskScoreFormulaModal: React.FC<RiskScoreFormulaModalProps> = ({ is
               </table>
             </div>
           </div>
-
-          {/* Section 3: Risk Level Scale */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-2">
-            <div className="font-extrabold text-xs uppercase tracking-wider text-gray-800">
-              3. Risk Scale Categorization
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-              <div className="bg-[#16A34A]/10 border border-[#16A34A]/30 p-2 rounded-lg text-[#16A34A] font-bold">
-                <div className="font-black text-sm">Low</div>
-                <div className="text-[11px] opacity-90">0 – 39</div>
-              </div>
-              <div className="bg-[#5B9BD5]/15 border border-[#5B9BD5]/30 p-2 rounded-lg text-[#002B9A] font-bold">
-                <div className="font-black text-sm">Medium</div>
-                <div className="text-[11px] opacity-90">40 – 59</div>
-              </div>
-              <div className="bg-[#EA580C]/10 border border-[#EA580C]/30 p-2 rounded-lg text-[#EA580C] font-bold">
-                <div className="font-black text-sm">High</div>
-                <div className="text-[11px] opacity-90">60 – 79</div>
-              </div>
-              <div className="bg-[#B8251B]/10 border border-[#B8251B]/30 p-2 rounded-lg text-[#B8251B] font-bold">
-                <div className="font-black text-sm">Critical</div>
-                <div className="text-[11px] opacity-90">80 – 100</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
