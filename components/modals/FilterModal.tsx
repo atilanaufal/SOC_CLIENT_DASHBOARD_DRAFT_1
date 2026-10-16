@@ -72,13 +72,13 @@ const CustomSelectDropdown: React.FC<{
         <div className="absolute left-0 top-full mt-1.5 w-full bg-white rounded-xl border border-gray-200/90 shadow-[0_16px_40px_rgba(0,43,154,0.18)] p-2 z-50 animate-in fade-in zoom-in-95 duration-100 space-y-1.5">
           {allOptions.length > 6 && (
             <div className="relative mb-1">
-              <HiOutlineMagnifyingGlass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <HiOutlineMagnifyingGlass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full bg-slate-50 border border-gray-200 rounded-lg pl-7.5 sm:pl-8.5 pr-2.5 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#002B9A]"
+                className="w-full bg-slate-50 border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#002B9A]"
                 autoFocus
               />
             </div>

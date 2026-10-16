@@ -270,7 +270,7 @@ function IncidentsContent() {
       },
       {
         key: 'incidentName',
-        label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
+        label: 'Incident Type',
         type: 'select',
         options: filterOptions.incidentNames || [],
       },
@@ -512,7 +512,7 @@ function IncidentsContent() {
             </span>
             {activeFilters.incidentName && activeFilters.incidentName !== 'All' && (
               <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
-                <span className="text-gray-500 font-semibold">{groupByMode === 'incidents' ? 'Incident:' : 'Alert:'}</span>
+                <span className="text-gray-500 font-semibold">Incident Type:</span>
                 <strong className="text-[#002B9A] font-black">{activeFilters.incidentName}</strong>
                 <button
                   onClick={() => {
