@@ -66,6 +66,8 @@ export interface FetchIncidentsResponse {
     agents: string[];
     incidentNames: string[];
     severities: string[];
+    ipSources?: string[];
+    counts?: string[];
   };
   groupBy?: 'alerts' | 'incidents';
   tenant?: string;
@@ -77,6 +79,8 @@ export async function fetchIncidents(filters?: {
   severity?: string;
   incidentType?: string;
   agent?: string;
+  sourceIp?: string;
+  count?: string | number;
   timeRange?: string;
   startDate?: string;
   endDate?: string;
@@ -91,6 +95,8 @@ export async function fetchIncidents(filters?: {
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
   if (filters?.incidentType && filters.incidentType !== 'All') params.set('incidentType', filters.incidentType);
   if (filters?.agent && filters.agent !== 'All') params.set('agent', filters.agent);
+  if (filters?.sourceIp && filters.sourceIp !== 'All') params.set('sourceIp', filters.sourceIp);
+  if (filters?.count && filters.count !== 'All') params.set('count', String(filters.count));
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);

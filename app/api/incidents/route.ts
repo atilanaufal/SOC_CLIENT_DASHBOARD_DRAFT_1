@@ -11,6 +11,8 @@ export async function GET(request: Request) {
     const severity = searchParams.get('severity') || '';
     const incidentType = searchParams.get('incidentType') || searchParams.get('incidentName') || '';
     const agent = searchParams.get('agent') || '';
+    const sourceIp = searchParams.get('sourceIp') || searchParams.get('ipSource') || '';
+    const count = searchParams.get('count') || '';
     const timeRange = searchParams.get('timeRange') || searchParams.get('timeFilter') || '';
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -36,6 +38,8 @@ export async function GET(request: Request) {
         severity,
         incidentType,
         agent,
+        sourceIp,
+        count,
         sortBy,
         sortOrder,
         timeRange,

@@ -1066,6 +1066,8 @@ export interface ServerSideIncidentsQuery {
   severity?: string;
   incidentType?: string;
   agent?: string;
+  sourceIp?: string;
+  count?: string | number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   timeRange?: string;
@@ -1109,6 +1111,8 @@ export interface ServerSideIncidentsResult {
     agents: string[];
     incidentNames: string[];
     severities: string[];
+    ipSources?: string[];
+    counts?: string[];
   };
 }
 
@@ -1171,6 +1175,14 @@ export async function queryServerSideIncidents(
           });
         }
 
+        if (options.sourceIp && options.sourceIp !== 'All') {
+          const ipRegex = new RegExp(options.sourceIp, 'i');
+          filtered = filtered.filter((d: any) => {
+            const ip = String(d.ip_source || d.sourceIp || d.src_ip || d.data?.srcip || '');
+            return ipRegex.test(ip);
+          });
+        }
+
         // Calculate severity breakdown on raw alerts
         let critical = 0;
         let high = 0;
@@ -1193,6 +1205,13 @@ export async function queryServerSideIncidents(
 
         if (options.severity && options.severity !== 'All') {
           mapped = mapped.filter((item) => item.severity.toLowerCase() === options.severity?.toLowerCase());
+        }
+
+        if (groupBy === 'incidents' && options.count && options.count !== 'All') {
+          const targetCount = Number(options.count);
+          if (!isNaN(targetCount)) {
+            mapped = mapped.filter((item) => Number(item.count || 1) === targetCount);
+          }
         }
 
         if (options.search && options.search.trim()) {
@@ -1284,6 +1303,8 @@ export async function queryServerSideIncidents(
               return d.incident_type || d.incidentName || d.description;
             }).filter(Boolean))).sort(),
             severities: ['Critical', 'High', 'Medium', 'Low'],
+            ipSources: Array.from(new Set(validDocs.map((d: any) => d.ip_source || d.sourceIp || d.src_ip || d.data?.srcip).filter(Boolean))).map(String).sort(),
+            counts: groupBy === 'incidents' ? Array.from(new Set(groupAlertsToIncidents(validDocs, tenantName, false).map((m: any) => Number(m.count || 1)))).sort((a, b) => a - b).map(String) : [],
           },
         };
       }
@@ -1357,6 +1378,13 @@ export async function queryServerSideIncidents(
       });
     }
 
+    if (options.sourceIp && options.sourceIp !== 'All') {
+      const ipRegex = new RegExp(options.sourceIp.trim(), 'i');
+      matchConditions.push({
+        $or: [{ ip_source: ipRegex }, { sourceIp: ipRegex }, { agent_ip: ipRegex }, { 'data.srcip': ipRegex }]
+      });
+    }
+
     if (options.search && options.search.trim()) {
       const q = options.search.trim();
       const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1409,6 +1437,10 @@ export async function queryServerSideIncidents(
         groupSortStage = { last_observed: sortDirection };
       }
 
+      const countMatchStage = (options.count && options.count !== 'All' && !isNaN(Number(options.count)))
+        ? [{ $match: { count: Number(options.count) } }]
+        : [];
+
       facetPipeline = {
         severityStats: [
           { $group: { _id: '$severity', count: { $sum: 1 } } }
@@ -1426,12 +1458,30 @@ export async function queryServerSideIncidents(
           { $group: { _id: '$incident_type' } },
           { $limit: 100 }
         ],
+        uniqueIpSources: [
+          { $match: { ip_source: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$ip_source' } },
+          { $limit: 100 }
+        ],
+        uniqueCounts: [
+          {
+            $group: {
+              _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+              count: { $sum: 1 }
+            }
+          },
+          { $group: { _id: '$count' } },
+          { $sort: { _id: 1 } },
+          { $limit: 50 }
+        ],
         groupedCount: [
           {
             $group: {
-              _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' }
+              _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+              count: { $sum: 1 }
             }
           },
+          ...countMatchStage,
           { $count: 'count' }
         ],
         paginatedRows: [
@@ -1457,6 +1507,7 @@ export async function queryServerSideIncidents(
               mitre_technique: { $first: '$mitre_technique' }
             }
           },
+          ...countMatchStage,
           { $sort: groupSortStage },
           { $skip: skip },
           { $limit: limit }
@@ -1476,8 +1527,14 @@ export async function queryServerSideIncidents(
           { $limit: 100 }
         ],
         uniqueIncidentNames: [
-          { $match: { description: { $exists: true, $ne: '' } } },
-          { $group: { _id: '$description' } },
+          { $match: { $or: [{ description: { $exists: true, $ne: '' } }, { incident_type: { $exists: true, $ne: '' } }] } },
+          { $project: { name: { $ifNull: ['$incident_type', '$description'] } } },
+          { $group: { _id: '$name' } },
+          { $limit: 100 }
+        ],
+        uniqueIpSources: [
+          { $match: { ip_source: { $exists: true, $ne: '' } } },
+          { $group: { _id: '$ip_source' } },
           { $limit: 100 }
         ],
       };
@@ -1628,6 +1685,8 @@ export async function queryServerSideIncidents(
           return String(val || '');
         }).filter(Boolean).sort(),
         severities: ['Critical', 'High', 'Medium', 'Low'],
+        ipSources: (facetRes.uniqueIpSources || []).map((i: any) => String(i._id || '')).filter(Boolean).sort(),
+        counts: (facetRes.uniqueCounts || []).map((c: any) => String(c._id || '')).filter(Boolean),
       },
     };
   } catch (mongoErr: any) {

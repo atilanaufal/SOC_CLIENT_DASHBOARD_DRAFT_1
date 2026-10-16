@@ -42,7 +42,9 @@ function IncidentsContent() {
     agents: string[];
     incidentNames: string[];
     severities: string[];
-  }>({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'] });
+    ipSources?: string[];
+    counts?: string[];
+  }>({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'], ipSources: [], counts: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [isTableFetching, setIsTableFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,17 @@ function IncidentsContent() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // When switching to alerts mode, automatically remove count filter
+  useEffect(() => {
+    if (groupByMode === 'alerts') {
+      setActiveFilters((prev) => {
+        if (!prev.count) return prev;
+        const { count, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [groupByMode]);
+
   // Sync URL search parameters (e.g. from Dashboard Top Incidents view)
   useEffect(() => {
     const paramIncident = searchParams.get('incidentName') || searchParams.get('incident') || searchParams.get('incidentType');
@@ -81,6 +94,12 @@ function IncidentsContent() {
     const paramSeverity = searchParams.get('severity');
     const paramSearch = searchParams.get('search');
     const paramGroupBy = searchParams.get('groupBy');
+    const paramSourceIp = searchParams.get('sourceIp') || searchParams.get('ipSource');
+    const paramCount = searchParams.get('count');
+
+    const effectiveGroupBy = paramGroupBy === 'incidents' || paramGroupBy === 'alerts'
+      ? (paramGroupBy as GroupByMode)
+      : groupByMode;
 
     if (paramGroupBy === 'incidents' || paramGroupBy === 'alerts') {
       setGroupByMode(paramGroupBy as GroupByMode);
@@ -90,6 +109,10 @@ function IncidentsContent() {
     if (paramIncident) newFilters.incidentName = paramIncident;
     if (paramAgent) newFilters.agent = paramAgent;
     if (paramSeverity) newFilters.severity = paramSeverity;
+    if (paramSourceIp) newFilters.sourceIp = paramSourceIp;
+    if (paramCount && effectiveGroupBy === 'incidents') {
+      newFilters.count = paramCount;
+    }
 
     if (Object.keys(newFilters).length > 0) {
       setActiveFilters(newFilters);
@@ -156,6 +179,8 @@ function IncidentsContent() {
         severity: activeFilters.severity,
         incidentType: activeFilters.incidentName,
         agent: activeFilters.agent,
+        sourceIp: activeFilters.sourceIp,
+        count: groupByMode === 'incidents' ? activeFilters.count : undefined,
         sortBy: sortKey,
         sortOrder: sortDirection,
         timeRange: timeFilter,
@@ -204,6 +229,34 @@ function IncidentsContent() {
     setCurrentPage(1);
   };
 
+  const availableIpSources = useMemo(() => {
+    const set = new Set<string>(filterOptions.ipSources || []);
+    incidents.forEach((inc) => {
+      if (inc.sourceIp && inc.sourceIp !== '-' && inc.sourceIp !== 'N/A') set.add(inc.sourceIp);
+      if (inc.ip_source && inc.ip_source !== '-' && inc.ip_source !== 'N/A') set.add(inc.ip_source);
+    });
+    if (activeFilters.sourceIp && activeFilters.sourceIp !== 'All') {
+      set.add(activeFilters.sourceIp);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.ipSources, incidents, activeFilters.sourceIp]);
+
+  const availableCounts = useMemo(() => {
+    const set = new Set<number>();
+    (filterOptions.counts || []).forEach((c) => {
+      const num = Number(c);
+      if (!isNaN(num)) set.add(num);
+    });
+    incidents.forEach((inc) => {
+      if (typeof inc.count === 'number') set.add(inc.count);
+    });
+    if (activeFilters.count && activeFilters.count !== 'All') {
+      const num = Number(activeFilters.count);
+      if (!isNaN(num)) set.add(num);
+    }
+    return Array.from(set).sort((a, b) => a - b).map(String);
+  }, [filterOptions.counts, incidents, activeFilters.count]);
+
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
     const groups: FilterSection[] = [
       {
@@ -215,36 +268,54 @@ function IncidentsContent() {
           : ['Critical', 'High', 'Medium']
         ).filter((s) => s.toLowerCase() !== 'low'),
       },
+      {
+        key: 'incidentName',
+        label: groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name',
+        type: 'select',
+        options: filterOptions.incidentNames || [],
+      },
+      {
+        key: 'agent',
+        label: 'Agent Affected',
+        type: 'select',
+        options: filterOptions.agents || [],
+      },
+      {
+        key: 'sourceIp',
+        label: 'IP Source',
+        type: 'select',
+        options: availableIpSources,
+      },
     ];
 
     if (groupByMode === 'incidents') {
       groups.push({
-        key: 'incidentName',
-        label: 'Incident Name',
+        key: 'count',
+        label: 'Count (Detected Alerts)',
         type: 'select',
-        options: filterOptions.incidentNames || [],
+        options: availableCounts,
       });
     }
 
-    groups.push({
-      key: 'agent',
-      label: 'Agent Affected',
-      type: 'select',
-      options: filterOptions.agents || [],
-    });
-
     return groups;
-  }, [filterOptions, groupByMode]);
+  }, [filterOptions, groupByMode, availableIpSources, availableCounts]);
 
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedIncidents = incidents;
 
   const handleApplyFilters = (filters: Record<string, string>) => {
-    setActiveFilters(filters);
+    const cleaned = { ...filters };
+    if (groupByMode === 'alerts' && cleaned.count) {
+      delete cleaned.count;
+    }
+    setActiveFilters(cleaned);
     setCurrentPage(1);
   };
 
-  const activeCount = Object.keys(activeFilters).filter((k) => activeFilters[k] && activeFilters[k] !== 'All').length;
+  const activeCount = Object.keys(activeFilters).filter((k) => {
+    if (k === 'count' && groupByMode !== 'incidents') return false;
+    return activeFilters[k] && activeFilters[k] !== 'All';
+  }).length;
 
   const handleToggleDetail = (inc: Incident) => {
     const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
@@ -441,7 +512,7 @@ function IncidentsContent() {
             </span>
             {activeFilters.incidentName && activeFilters.incidentName !== 'All' && (
               <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
-                <span className="text-gray-500 font-semibold">Incident:</span>
+                <span className="text-gray-500 font-semibold">{groupByMode === 'incidents' ? 'Incident:' : 'Alert:'}</span>
                 <strong className="text-[#002B9A] font-black">{activeFilters.incidentName}</strong>
                 <button
                   onClick={() => {
@@ -474,6 +545,46 @@ function IncidentsContent() {
                   }}
                   className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
                   title="Remove agent filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.sourceIp && activeFilters.sourceIp !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-emerald-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">IP Source:</span>
+                <strong className="text-emerald-700 font-black">{activeFilters.sourceIp}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.sourceIp;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove IP source filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {groupByMode === 'incidents' && activeFilters.count && activeFilters.count !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-purple-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Count:</span>
+                <strong className="text-purple-700 font-black">{activeFilters.count}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.count;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove count filter"
                 >
                   <HiOutlineXMark className="w-3.5 h-3.5" />
                 </button>
@@ -758,6 +869,13 @@ function IncidentsContent() {
         currentMode={groupByMode}
         onSelectMode={(mode) => {
           setGroupByMode(mode);
+          if (mode === 'alerts') {
+            setActiveFilters((prev) => {
+              if (!prev.count) return prev;
+              const { count, ...rest } = prev;
+              return rest;
+            });
+          }
           setCurrentPage(1);
         }}
       />
