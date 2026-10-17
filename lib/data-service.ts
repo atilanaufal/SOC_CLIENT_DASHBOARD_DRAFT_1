@@ -657,14 +657,51 @@ export async function queryDashboardIncidentStats(
         const score = Math.round((sumAgentScores / totalAgentsCount) * 10) / 10;
 
         const groupedList = groupAlertsToIncidents(validIncidents, tenantCampusName);
-        const topIncidents = groupedList.slice(0, 30).map((inc, index) => {
+
+        // Sort each severity bracket by count descending, then latest observed descending
+        const sortByCountAndDate = (a: any, b: any) => {
+          const countDiff = (Number(b.count) || 0) - (Number(a.count) || 0);
+          if (countDiff !== 0) return countDiff;
+          const tsA = getTimestamp(a.lastObserved || a.firstObserved || a.date);
+          const tsB = getTimestamp(b.lastObserved || b.firstObserved || b.date);
+          return tsB - tsA;
+        };
+
+        const critIncidents = groupedList
+          .filter((inc) => parseSeverity(inc.severity).toLowerCase() === 'critical')
+          .sort(sortByCountAndDate)
+          .slice(0, 10);
+
+        const highIncidents = groupedList
+          .filter((inc) => parseSeverity(inc.severity).toLowerCase() === 'high')
+          .sort(sortByCountAndDate)
+          .slice(0, 10);
+
+        const medIncidents = groupedList
+          .filter((inc) => parseSeverity(inc.severity).toLowerCase() === 'medium')
+          .sort(sortByCountAndDate)
+          .slice(0, 10);
+
+        const lowIncidents = groupedList
+          .filter((inc) => parseSeverity(inc.severity).toLowerCase() === 'low')
+          .sort(sortByCountAndDate)
+          .slice(0, 10);
+
+        const rawTopList = [
+          ...critIncidents,
+          ...highIncidents,
+          ...medIncidents,
+          ...lowIncidents,
+        ];
+
+        const topIncidents = rawTopList.map((inc, index) => {
           const ts = getTimestamp(inc.lastObserved || inc.firstObserved || inc.date);
           return {
             id: String(inc.id || inc._id || `top-inc-${index + 1}_${ts}`),
             incidentName: inc.incidentName,
             incident_type: inc.incident_type,
             description: inc.description || inc.incidentName,
-            severity: inc.severity,
+            severity: parseSeverity(inc.severity),
             agent: inc.agent,
             agentsList: [inc.agent],
             host: inc.host || inc.agent,
@@ -673,6 +710,8 @@ export async function queryDashboardIncidentStats(
             lastObserved: inc.lastObserved,
             rawDate: ts,
             ruleId: inc.ruleId || 'N/A',
+            sourceIp: inc.ip_source || inc.sourceIp || '',
+            ip_source: inc.ip_source || inc.sourceIp || '',
             tenant: tenantCampusName,
           };
         });
@@ -799,6 +838,32 @@ export async function queryDashboardIncidentStats(
             { $sort: { count: -1, lastObserved: -1 } },
             { $limit: 10 },
           ],
+          topIncidentsLow: [
+            {
+              $match: {
+                $or: [
+                  { severity: { $gte: 1, $lte: 6 } },
+                  { severity: { $in: ['Low', 'low', 'LOW'] } },
+                ],
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  rule_id: '$rule_id',
+                  agent: { $ifNull: ['$host', '$agent'] },
+                  ip_source: { $ifNull: ['$ip_source', ''] },
+                  date: '$date',
+                },
+                firstDoc: { $first: '$$ROOT' },
+                count: { $sum: 1 },
+                firstObserved: { $min: '$first_observed' },
+                lastObserved: { $max: '$first_observed' },
+              },
+            },
+            { $sort: { count: -1, lastObserved: -1 } },
+            { $limit: 10 },
+          ],
         },
       },
     ]).toArray();
@@ -850,6 +915,7 @@ export async function queryDashboardIncidentStats(
       ...(facet.topIncidentsCritical || []),
       ...(facet.topIncidentsHigh || []),
       ...(facet.topIncidentsMedium || []),
+      ...(facet.topIncidentsLow || []),
     ];
 
     const topIncidents = rawTopList.map((item: any, idx: number) => {

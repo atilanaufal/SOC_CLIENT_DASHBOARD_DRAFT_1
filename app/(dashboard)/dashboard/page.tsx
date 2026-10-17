@@ -151,22 +151,33 @@ export default function DashboardPage() {
   // Top Incidents (Real DB)
   const topIncidentsSource: any[] = useMemo(() => statsData?.topIncidents || [], [statsData]);
   const filteredIncidents = useMemo(() => {
+    const sortByCountAndDate = (a: any, b: any) => {
+      const countDiff = (Number(b.count) || 0) - (Number(a.count) || 0);
+      if (countDiff !== 0) return countDiff;
+      const dateA = a.rawDate ? Number(a.rawDate) : (a.lastObserved ? new Date(a.lastObserved).getTime() : 0);
+      const dateB = b.rawDate ? Number(b.rawDate) : (b.lastObserved ? new Date(b.lastObserved).getTime() : 0);
+      return dateB - dateA;
+    };
+
     if (severityFilter === 'All Severity') {
       const criticalList = topIncidentsSource
         .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'critical')
-        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+        .sort(sortByCountAndDate);
       const highList = topIncidentsSource
         .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'high')
-        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+        .sort(sortByCountAndDate);
       const mediumList = topIncidentsSource
         .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'medium')
-        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
-      return [...criticalList, ...highList, ...mediumList].slice(0, 5);
+        .sort(sortByCountAndDate);
+      const lowList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'low')
+        .sort(sortByCountAndDate);
+      return [...criticalList, ...highList, ...mediumList, ...lowList].slice(0, 5);
     }
     const targetSev = (severityFilter || '').trim().toLowerCase();
     return topIncidentsSource
       .filter((inc) => String(inc.severity || '').trim().toLowerCase() === targetSev)
-      .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
+      .sort(sortByCountAndDate)
       .slice(0, 5);
   }, [topIncidentsSource, severityFilter]);
 
