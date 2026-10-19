@@ -23,24 +23,13 @@ export function isQueryForRecentDays(
   endDate?: string | null
 ): boolean {
   if (!timeRange && !startDate && !endDate) {
-    // Default mode: coba hot-cache Redis terlebih dahulu
+    // Default mode: coba hot-cache Redis terlebih dahulu (1-7 hari)
     return true;
   }
 
   const lower = (timeRange || '').toLowerCase().trim();
 
-  // Custom date range atau rentang tanggal spesifik:
-  // Selalu arahkan ke MongoDB Master agar rentang multi-hari / historis tidak terpotong
-  // oleh buffer harian Redis.
-  if (lower.startsWith('custom') || (startDate && endDate)) {
-    return false;
-  }
-
-  if (lower === 'today') {
-    return true;
-  }
-
-  if (lower === 'this week' || lower === '7d') {
+  if (lower === 'today' || lower === 'this week' || lower === '7d') {
     return true;
   }
 
@@ -48,7 +37,27 @@ export function isQueryForRecentDays(
     return false;
   }
 
-  return false;
+  // Jika custom range atau rentang tanggal spesifik
+  if (lower.startsWith('custom') || (startDate && endDate)) {
+    let sStr = startDate;
+    if (lower.includes(':')) {
+      const parts = timeRange?.split(':')[1]?.split('_');
+      if (parts && parts.length === 2) {
+        sStr = parts[0];
+      }
+    }
+
+    if (sStr) {
+      const start = new Date(sStr.includes('T') ? sStr : `${sStr}T00:00:00.000`);
+      if (!isNaN(start.getTime())) {
+        const diffMs = Date.now() - start.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays <= 7.5; // Berada dalam 7 hari terakhir
+      }
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -335,15 +344,12 @@ async function fetchIncidentsFromRedis(
         }
         const results = await pipeline.exec();
         const incidents: Incident[] = [];
-        const datesWithData = new Set<string>();
         if (results) {
           let itemIdx = 0;
           for (let i = 0; i < results.length; i++) {
             const [err, rawHash] = results[i];
             const redisKey = keys[i] || `key_${i}`;
-            if (!err && rawHash && typeof rawHash === 'object' && Object.keys(rawHash).length > 0) {
-              const matchedDate = targetDates[i];
-              if (matchedDate) datesWithData.add(matchedDate);
+            if (!err && rawHash && typeof rawHash === 'object') {
               for (const [fieldKey, fieldVal] of Object.entries(rawHash)) {
                 try {
                   const parsed = typeof fieldVal === 'string' ? JSON.parse(fieldVal) : fieldVal;
@@ -356,11 +362,6 @@ async function fetchIncidentsFromRedis(
               }
             }
           }
-        }
-        // Integrity check: Jika query meminta lebih dari 1 tanggal dan ada tanggal yang kosong/hilang di Redis,
-        // batalkan dan fallback ke MongoDB agar data tidak bolong / terpotong!
-        if (targetDates && targetDates.length > 1 && datesWithData.size < targetDates.length) {
-          return [];
         }
         if (incidents.length > 0) {
           incidents.sort((a, b) => {
