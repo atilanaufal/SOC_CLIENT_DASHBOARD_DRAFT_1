@@ -7,7 +7,6 @@ import {
   HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowPath,
   HiOutlineXMark,
-  HiOutlineInformationCircle,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
@@ -15,7 +14,6 @@ import { Device } from '@/lib/types';
 import { fetchDevices, fetchDeviceRiskScores } from '@/lib/api-client';
 import { DeviceDetailDrawer } from '@/components/drawers/DeviceDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
-import { RiskScoreFormulaModal } from '@/components/modals/RiskScoreFormulaModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { useTimeFilter } from '@/lib/time-filter-context';
 import { Pagination } from '@/components/ui/Pagination';
@@ -51,7 +49,6 @@ function DevicesContent() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isFormulaModalOpen, setIsFormulaModalOpen] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<SortKey>('score');
@@ -399,16 +396,6 @@ function DevicesContent() {
             </button>
 
             <button
-              onClick={() => setIsFormulaModalOpen(true)}
-              className="bg-white/90 hover:bg-white text-[#002B9A] text-xs sm:text-sm font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition border border-blue-200/80 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] flex-1 sm:flex-initial"
-              title="Risk Score Calculation Formula"
-            >
-              <HiOutlineInformationCircle className="w-4 h-4 text-[#002B9A]" />
-              <span className="hidden sm:inline">Calculation Formula</span>
-              <span className="sm:hidden truncate">Formula</span>
-            </button>
-
-            <button
               onClick={() => loadData(true)}
               className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] shrink-0"
               title="Refresh"
@@ -607,23 +594,9 @@ function DevicesContent() {
                         </div>
                       </th>
                       <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
-                        <div className="flex items-center justify-between text-white">
-                          <div className="flex items-center">
-                            <span>Risk Score</span>
-                            {renderSortIndicator('score')}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsFormulaModalOpen(true);
-                            }}
-                            className="text-blue-200 hover:text-white p-1 rounded transition cursor-pointer"
-                            title="View Risk Score Calculation Formula"
-                            aria-label="View Risk Score Calculation Formula"
-                          >
-                            <HiOutlineInformationCircle className="w-4 h-4" />
-                          </button>
+                        <div className="flex items-center text-white">
+                          <span>Risk Score</span>
+                          {renderSortIndicator('score')}
                         </div>
                       </th>
                       <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
@@ -744,12 +717,6 @@ function DevicesContent() {
         sections={dynamicFilterSections}
         initialFilters={activeFilters}
         onApply={handleApplyFilters}
-      />
-
-      {/* Risk Score Calculation Formula Modal */}
-      <RiskScoreFormulaModal
-        isOpen={isFormulaModalOpen}
-        onClose={() => setIsFormulaModalOpen(false)}
       />
     </div>
   );

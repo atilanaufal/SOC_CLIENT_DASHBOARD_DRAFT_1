@@ -64,8 +64,12 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
       setErrorMessage('Password baru harus diisi.');
       return;
     }
-    if (newPassword.length < 8) {
-      setErrorMessage('Password baru minimal 8 karakter.');
+    if (newPassword.length < 6) {
+      setErrorMessage('Password baru minimal 6 karakter.');
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) {
+      setErrorMessage('Password baru harus memiliki huruf besar (A-Z) dan huruf kecil (a-z).');
       return;
     }
     if (newPassword === currentPassword) {
@@ -199,7 +203,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimal 8 karakter"
+                placeholder="Minimal 6 karakter, huruf besar & kecil"
                 disabled={isLoading || !!successMessage}
                 required
                 className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002B9A]/30 focus:border-[#002B9A] transition"
@@ -216,6 +220,9 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
                 )}
               </button>
             </div>
+            <p className="text-[11px] text-gray-500 mt-1 font-medium">
+              Minimal 6 karakter, wajib kombinasi huruf besar (A-Z) dan huruf kecil (a-z).
+            </p>
           </div>
 
           {/* Confirm Password */}

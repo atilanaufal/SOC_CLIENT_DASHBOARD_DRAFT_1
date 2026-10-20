@@ -49,9 +49,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (newPassword.length < 8) {
+    if (newPassword.length < 6) {
       return NextResponse.json(
-        { success: false, error: 'Password baru minimal harus 8 karakter.' },
+        { success: false, error: 'Password baru minimal harus 6 karakter.' },
+        { status: 400 }
+      );
+    }
+
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) {
+      return NextResponse.json(
+        { success: false, error: 'Password baru harus mengandung setidaknya satu huruf besar (A-Z) dan satu huruf kecil (a-z).' },
         { status: 400 }
       );
     }
