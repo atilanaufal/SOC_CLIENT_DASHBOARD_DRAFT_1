@@ -417,3 +417,45 @@ export async function getAuthoritativeTenantByUserId(userId: number | string): P
     }
   }
 }
+
+export async function hashPasswordArgon2id(password: string): Promise<string> {
+  const { argon2id } = await import('hash-wasm');
+  const salt = crypto.randomBytes(16);
+  return await argon2id({
+    password,
+    salt,
+    parallelism: 4,
+    iterations: 3,
+    memorySize: 65536,
+    hashLength: 32,
+    outputType: 'encoded',
+  });
+}
+
+export async function updateUserPassword(
+  userId: number | string,
+  newPasswordPlain: string
+): Promise<{ success: boolean; error?: string }> {
+  let conn: mysql.PoolConnection | null = null;
+  try {
+    const passwordHash = await hashPasswordArgon2id(newPasswordPlain);
+    conn = await getMysqlConnection();
+    const [result]: any = await conn.execute(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [passwordHash, userId]
+    );
+    if (!result || result.affectedRows === 0) {
+      return { success: false, error: 'User tidak ditemukan.' };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error updating user password in MySQL:', err);
+    return { success: false, error: err.message || 'Gagal mengubah password di basis data.' };
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch {}
+    }
+  }
+}
