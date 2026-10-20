@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: error === 'CONCURRENT_LOGIN'
-            ? 'Sesi Anda telah berakhir karena akun digunakan di perangkat lain.'
-            : 'Sesi tidak valid atau telah berakhir. Silakan login kembali.',
+            ? 'Your session has expired because another login was detected.'
+            : 'Invalid or expired session. Please log in again.',
         },
         { status: 401 }
       );
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     } catch {
       return NextResponse.json(
-        { success: false, error: 'Format permintaan tidak valid.' },
+        { success: false, error: 'Invalid request payload.' },
         { status: 400 }
       );
     }
@@ -37,49 +37,49 @@ export async function POST(req: NextRequest) {
       typeof confirmPassword !== 'string'
     ) {
       return NextResponse.json(
-        { success: false, error: 'Data password tidak valid.' },
+        { success: false, error: 'Invalid password data.' },
         { status: 400 }
       );
     }
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       return NextResponse.json(
-        { success: false, error: 'Semua field password wajib diisi.' },
+        { success: false, error: 'All password fields are required.' },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 6) {
       return NextResponse.json(
-        { success: false, error: 'Password baru minimal harus 6 karakter.' },
+        { success: false, error: 'New password must be at least 6 characters.' },
         { status: 400 }
       );
     }
 
     if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) {
       return NextResponse.json(
-        { success: false, error: 'Password baru harus mengandung setidaknya satu huruf besar (A-Z) dan satu huruf kecil (a-z).' },
+        { success: false, error: 'New password must contain both uppercase (A-Z) and lowercase (a-z) letters.' },
         { status: 400 }
       );
     }
 
     if (newPassword.length > 128) {
       return NextResponse.json(
-        { success: false, error: 'Password baru melebihi panjang maksimal (128 karakter).' },
+        { success: false, error: 'New password exceeds maximum length (128 characters).' },
         { status: 400 }
       );
     }
 
     if (newPassword !== confirmPassword) {
       return NextResponse.json(
-        { success: false, error: 'Konfirmasi password baru tidak cocok.' },
+        { success: false, error: 'Password confirmation does not match.' },
         { status: 400 }
       );
     }
 
     if (newPassword === currentPassword) {
       return NextResponse.json(
-        { success: false, error: 'Password baru tidak boleh sama dengan password saat ini.' },
+        { success: false, error: 'New password cannot be the same as current password.' },
         { status: 400 }
       );
     }
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     const verifyResult = await verifyUserCredentials(tenant.username, currentPassword);
     if (!verifyResult.success || !verifyResult.user) {
       return NextResponse.json(
-        { success: false, error: 'Password saat ini salah.' },
+        { success: false, error: 'Incorrect current password.' },
         { status: 400 }
       );
     }
@@ -97,19 +97,19 @@ export async function POST(req: NextRequest) {
     const updateResult = await updateUserPassword(tenant.userId, newPassword);
     if (!updateResult.success) {
       return NextResponse.json(
-        { success: false, error: updateResult.error || 'Gagal mengubah password.' },
+        { success: false, error: updateResult.error || 'Failed to update password.' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Password berhasil diperbarui. Silakan gunakan password baru pada sesi berikutnya.',
+      message: 'Password updated successfully. Please use your new password for future logins.',
     });
   } catch (err: any) {
     console.error('[Reset Password] Unexpected error:', err);
     return NextResponse.json(
-      { success: false, error: 'Terjadi kesalahan sistem saat memproses perubahan password.' },
+      { success: false, error: 'An unexpected system error occurred while updating password.' },
       { status: 500 }
     );
   }

@@ -57,27 +57,27 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
     setSuccessMessage(null);
 
     if (!currentPassword) {
-      setErrorMessage('Password saat ini harus diisi.');
+      setErrorMessage('Current password is required.');
       return;
     }
     if (!newPassword) {
-      setErrorMessage('Password baru harus diisi.');
+      setErrorMessage('New password is required.');
       return;
     }
     if (newPassword.length < 6) {
-      setErrorMessage('Password baru minimal 6 karakter.');
+      setErrorMessage('New password must be at least 6 characters.');
       return;
     }
     if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) {
-      setErrorMessage('Password baru harus memiliki huruf besar (A-Z) dan huruf kecil (a-z).');
+      setErrorMessage('New password must contain both uppercase (A-Z) and lowercase (a-z) letters.');
       return;
     }
     if (newPassword === currentPassword) {
-      setErrorMessage('Password baru tidak boleh sama dengan password saat ini.');
+      setErrorMessage('New password cannot be the same as current password.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMessage('Konfirmasi password tidak cocok dengan password baru.');
+      setErrorMessage('Password confirmation does not match.');
       return;
     }
 
@@ -97,9 +97,9 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data.error || 'Gagal mengubah password. Silakan coba lagi.');
+        setErrorMessage(data.error || 'Failed to update password. Please try again.');
       } else {
-        setSuccessMessage(data.message || 'Password berhasil diperbarui.');
+        setSuccessMessage(data.message || 'Password updated successfully.');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
@@ -108,7 +108,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
         }, 1800);
       }
     } catch {
-      setErrorMessage('Terjadi gangguan jaringan saat menghubungi server.');
+      setErrorMessage('Network error occurred. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +161,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
           {/* Current Password */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">
-              Password Saat Ini
+              Current Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -171,7 +171,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
                 type={showCurrentPassword ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Masukkan password saat ini"
+                placeholder="Enter current password"
                 disabled={isLoading || !!successMessage}
                 required
                 className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002B9A]/30 focus:border-[#002B9A] transition"
@@ -193,7 +193,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
           {/* New Password */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">
-              Password Baru
+              New Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -203,7 +203,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimal 6 karakter, huruf besar & kecil"
+                placeholder="Min. 6 characters, uppercase & lowercase"
                 disabled={isLoading || !!successMessage}
                 required
                 className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002B9A]/30 focus:border-[#002B9A] transition"
@@ -221,14 +221,14 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
               </button>
             </div>
             <p className="text-[11px] text-gray-500 mt-1 font-medium">
-              Minimal 6 karakter, wajib kombinasi huruf besar (A-Z) dan huruf kecil (a-z).
+              Minimum 6 characters, must include uppercase (A-Z) and lowercase (a-z).
             </p>
           </div>
 
           {/* Confirm Password */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">
-              Konfirmasi Password Baru
+              Confirm New Password
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -238,7 +238,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Ulangi password baru"
+                placeholder="Re-enter new password"
                 disabled={isLoading || !!successMessage}
                 required
                 className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-gray-50/80 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002B9A]/30 focus:border-[#002B9A] transition"
@@ -265,7 +265,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
               disabled={isLoading}
               className="px-3.5 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
             >
-              Batal
+              Cancel
             </button>
             <button
               type="submit"
@@ -275,10 +275,10 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
               {isLoading ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Menyimpan...</span>
+                  <span>Saving...</span>
                 </>
               ) : (
-                <span>Simpan Password</span>
+                <span>Save Password</span>
               )}
             </button>
           </div>
