@@ -8,6 +8,7 @@ import {
   HiOutlineClock,
   HiOutlineUser,
   HiOutlineKey,
+  HiOutlineBookOpen,
 } from 'react-icons/hi2';
 
 import { useRouter } from 'next/navigation';
@@ -197,6 +198,17 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
 
             {/* Actions */}
             <div className="pt-1 space-y-1">
+              <a
+                href="/guide/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsOpen(false)}
+                className="w-full text-left py-2 px-2.5 text-gray-800 font-bold text-xs sm:text-sm hover:bg-blue-50/80 hover:text-[#002B9A] rounded-lg transition flex items-center gap-2 cursor-pointer"
+              >
+                <HiOutlineBookOpen className="w-4 h-4 text-[#002B9A]" />
+                <span>Guide</span>
+              </a>
+
               <button
                 type="button"
                 onClick={() => {
