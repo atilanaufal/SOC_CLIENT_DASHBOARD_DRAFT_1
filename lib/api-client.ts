@@ -26,9 +26,9 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
         } catch {}
       }
 
-      // Proactively clear cookie via logout endpoint before replacing location
+      // Proactively clear cookie via logout endpoint non-blockingly before replacing location
       try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
       } catch {}
 
       window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');

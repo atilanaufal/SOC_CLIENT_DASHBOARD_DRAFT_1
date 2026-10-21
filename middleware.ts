@@ -70,6 +70,7 @@ export async function middleware(request: NextRequest) {
       'better-auth.session_data',
     ];
     allCookieNames.forEach((name) => {
+      res.cookies.delete(name);
       res.cookies.set(name, '', {
         httpOnly: true,
         secure: isHttps,
@@ -77,6 +78,15 @@ export async function middleware(request: NextRequest) {
         path: '/',
         maxAge: 0,
       });
+      if (!isHttps) {
+        res.cookies.set(name, '', {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 0,
+        });
+      }
     });
   };
 

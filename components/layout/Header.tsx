@@ -37,6 +37,22 @@ export const Header: React.FC = () => {
     setMounted(true);
     initClientSession();
 
+    // Browser close detection: sessionStorage is destroyed when browser is closed.
+    // If the browser was closed and reopened directly to /dashboard or via restored tab,
+    // sessionStorage is empty. Immediately log out and redirect to login instead of getting stuck!
+    if (typeof window !== 'undefined') {
+      const browserSession = sessionStorage.getItem('asoc_browser_session');
+      if (!browserSession) {
+        try {
+          sessionStorage.clear();
+          localStorage.removeItem('user_session');
+          navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+        } catch {}
+        window.location.replace('/login?expired=1');
+        return;
+      }
+    }
+
     // Auto logout 15 menit jika pengguna tidak ada aktivitas (mouse/keyboard/touch/scroll)
     const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
     let timer: NodeJS.Timeout;
@@ -53,7 +69,7 @@ export const Header: React.FC = () => {
       try {
         sessionStorage.clear();
         localStorage.removeItem('user_session');
-        await fetch('/api/auth/logout', { method: 'POST' });
+        navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
       } catch {}
       window.location.replace('/login?expired=1');
     };
@@ -87,7 +103,7 @@ export const Header: React.FC = () => {
             } catch {}
           }
           try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
           } catch {}
           window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
         }
@@ -95,6 +111,7 @@ export const Header: React.FC = () => {
     };
 
     const HEARTBEAT_INTERVAL_MS = 5000;
+    checkSessionLiveness(); // Check immediately on mount!
     const heartbeatInterval = setInterval(checkSessionLiveness, HEARTBEAT_INTERVAL_MS);
 
     const onVisibilityChange = () => {

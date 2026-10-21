@@ -68,6 +68,7 @@ export default function LoginPage() {
       // Save user session in sessionStorage (destroyed on browser close)
       if (data.user) {
         sessionStorage.setItem('user_session', JSON.stringify(data.user));
+        sessionStorage.setItem('asoc_browser_session', Date.now().toString());
       }
       try {
         localStorage.removeItem('user_session');
