@@ -101,31 +101,42 @@ export async function verifyArgon2(password: string, hashStr: string): Promise<b
 }
 
 
-export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
-  const primaryHost = getMysqlHost();
-  const fallbackHost = getMysqlFallbackHost();
+export function getOrCreateMysqlPool(): mysql.Pool {
+  if (activePool) return activePool;
 
-  // Primary attempt
+  const primaryHost = getMysqlHost();
+  activeHost = primaryHost;
+  activePool = mysql.createPool({
+    host: primaryHost,
+    port: MYSQL_PORT,
+    user: MYSQL_USER,
+    password: MYSQL_PASSWORD,
+    database: MYSQL_DATABASE,
+    waitForConnections: true,
+    connectionLimit: 10,
+    connectTimeout: 5000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+  });
+
+  return activePool;
+}
+
+export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
+  const pool = getOrCreateMysqlPool();
+
   try {
-    const primaryPool = mysql.createPool({
-      host: primaryHost,
-      port: MYSQL_PORT,
-      user: MYSQL_USER,
-      password: MYSQL_PASSWORD,
-      database: MYSQL_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 10,
-      connectTimeout: 3000,
-    });
-    const conn = await primaryPool.getConnection();
-    activePool = primaryPool;
-    activeHost = primaryHost;
-    return conn;
+    return await pool.getConnection();
   } catch (primaryErr: any) {
-    // Fallback attempt if configured
-    if (fallbackHost && fallbackHost !== primaryHost) {
+    const fallbackHost = getMysqlFallbackHost();
+    if (fallbackHost && fallbackHost !== activeHost) {
       try {
-        const fallbackPool = mysql.createPool({
+        if (activePool) {
+          try { await activePool.end(); } catch {}
+          activePool = null;
+        }
+        activeHost = fallbackHost;
+        activePool = mysql.createPool({
           host: fallbackHost,
           port: MYSQL_PORT,
           user: MYSQL_USER,
@@ -133,14 +144,13 @@ export async function getMysqlConnection(): Promise<mysql.PoolConnection> {
           database: MYSQL_DATABASE,
           waitForConnections: true,
           connectionLimit: 10,
-          connectTimeout: 3000,
+          connectTimeout: 5000,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 10000,
         });
-        const conn = await fallbackPool.getConnection();
-        activePool = fallbackPool;
-        activeHost = fallbackHost;
-        return conn;
+        return await activePool.getConnection();
       } catch (fallbackErr: any) {
-        throw new Error(`MySQL connection failed to primary and fallback hosts: ${primaryErr.message}`);
+        throw new Error(`MySQL connection failed to primary (${activeHost}) and fallback (${fallbackHost}): ${primaryErr.message}`);
       }
     }
     throw primaryErr;

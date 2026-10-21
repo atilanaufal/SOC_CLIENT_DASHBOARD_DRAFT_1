@@ -29,22 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { currentPassword, newPassword, confirmPassword, claimedUsername } = body || {};
-    
-    // Check for cross-tab session mismatch to prevent updating password for wrong account
-    if (
-      claimedUsername &&
-      typeof claimedUsername === 'string' &&
-      claimedUsername.toLowerCase().trim() !== tenant.username.toLowerCase().trim()
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Session conflict: Account has been switched in another browser tab. Please reload the page.',
-        },
-        { status: 409 }
-      );
-    }
+    const { currentPassword, newPassword, confirmPassword } = body || {};
 
     if (
       typeof currentPassword !== 'string' ||

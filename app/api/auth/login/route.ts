@@ -131,6 +131,18 @@ export async function POST(req: NextRequest) {
     // 5. Verify credentials against master database (Argon2id / bcrypt) with constant-time dummy mitigation
     const syncRes = await syncMasterUserToBetterAuth(usernameInput, passwordInput);
     if (!syncRes.success || !syncRes.user) {
+      if (
+        syncRes.error &&
+        (syncRes.error.toLowerCase().includes('connect') ||
+         syncRes.error.toLowerCase().includes('database') ||
+         syncRes.error.toLowerCase().includes('mysql'))
+      ) {
+        console.error('[Auth Login] Database connection failure during auth:', syncRes.error);
+        return NextResponse.json(
+          { success: false, error: 'Database service is temporarily unavailable. Please try again shortly.' },
+          { status: 503 }
+        );
+      }
       // Uniform generic 401 error message (prevents username enumeration oracle)
       const res = NextResponse.json(
         { success: false, error: 'Invalid username or password.' },
