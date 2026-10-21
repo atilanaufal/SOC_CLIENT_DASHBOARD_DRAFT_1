@@ -67,7 +67,19 @@ export const Header: React.FC = () => {
     events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
     resetTimer();
 
-    // Periodic session heartbeat (detects displaced session when another user logs in)
+    const handleAccountMismatch = async () => {
+      if (isRedirecting) return;
+      isRedirecting = true;
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('user_session');
+        const { invalidateClientCache } = await import('@/lib/client-cache');
+        await invalidateClientCache();
+      } catch {}
+      window.location.reload();
+    };
+
+    // Periodic session heartbeat (detects displaced session when another user logs in, or account switch)
     const checkSessionLiveness = async () => {
       if (isRedirecting) return;
       try {
@@ -90,9 +102,65 @@ export const Header: React.FC = () => {
             await fetch('/api/auth/logout', { method: 'POST' });
           } catch {}
           window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
+          return;
+        }
+
+        if (res.status === 200) {
+          try {
+            const data = await res.json();
+            if (data?.success && data?.user?.username) {
+              const serverUsername = data.user.username;
+              let currentTabUser = '';
+              try {
+                const stored = sessionStorage.getItem('user_session') || sessionStorage.getItem('auth_me_cache');
+                if (stored) {
+                  currentTabUser = JSON.parse(stored)?.username || '';
+                }
+              } catch {}
+
+              if (currentTabUser && serverUsername && currentTabUser !== serverUsername) {
+                // Different account logged in from another tab in the same browser!
+                await handleAccountMismatch();
+                return;
+              }
+            }
+          } catch {}
         }
       } catch {}
     };
+
+    let authChannel: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        authChannel = new BroadcastChannel('asoc_auth_channel');
+        authChannel.onmessage = async (evt) => {
+          if (evt.data?.type === 'AUTH_SWITCHED' && evt.data.username) {
+            let currentTabUser = '';
+            try {
+              const stored = sessionStorage.getItem('user_session') || sessionStorage.getItem('auth_me_cache');
+              if (stored) currentTabUser = JSON.parse(stored)?.username || '';
+            } catch {}
+            if (currentTabUser && currentTabUser !== evt.data.username) {
+              await handleAccountMismatch();
+            }
+          }
+        };
+      }
+    } catch {}
+
+    const onStorageChange = async (evt: StorageEvent) => {
+      if (evt.key === 'asoc_active_user' && evt.newValue) {
+        let currentTabUser = '';
+        try {
+          const stored = sessionStorage.getItem('user_session') || sessionStorage.getItem('auth_me_cache');
+          if (stored) currentTabUser = JSON.parse(stored)?.username || '';
+        } catch {}
+        if (currentTabUser && currentTabUser !== evt.newValue) {
+          await handleAccountMismatch();
+        }
+      }
+    };
+    window.addEventListener('storage', onStorageChange);
 
     const HEARTBEAT_INTERVAL_MS = 5000;
     const heartbeatInterval = setInterval(checkSessionLiveness, HEARTBEAT_INTERVAL_MS);
@@ -108,6 +176,8 @@ export const Header: React.FC = () => {
     return () => {
       clearTimeout(timer);
       clearInterval(heartbeatInterval);
+      if (authChannel) authChannel.close();
+      window.removeEventListener('storage', onStorageChange);
       events.forEach((evt) => window.removeEventListener(evt, resetTimer));
       window.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', checkSessionLiveness);

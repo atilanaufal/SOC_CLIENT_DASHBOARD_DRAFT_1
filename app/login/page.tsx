@@ -72,6 +72,14 @@ export default function LoginPage() {
       try {
         localStorage.removeItem('user_session');
         sessionStorage.removeItem('auth_me_cache');
+        if (data.user?.username) {
+          localStorage.setItem('asoc_active_user', data.user.username);
+          if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+            const authChannel = new BroadcastChannel('asoc_auth_channel');
+            authChannel.postMessage({ type: 'AUTH_SWITCHED', username: data.user.username });
+            authChannel.close();
+          }
+        }
       } catch {}
 
       // Hard redirect to target destination so all session cookies & server state are evaluated freshly

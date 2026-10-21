@@ -60,42 +60,39 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    // Read session info from sessionStorage/localStorage first to avoid redundant network requests
-    try {
-      const cached = sessionStorage.getItem('auth_me_cache') || sessionStorage.getItem('user_session');
-      if (cached) {
-        setUserSession(JSON.parse(cached));
-        return;
-      }
-    } catch {}
-
-    fetch('/api/auth/me')
+  const refreshUserSession = () => {
+    fetch('/api/auth/me', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.user) {
           setUserSession(data.user);
           try {
             sessionStorage.setItem('auth_me_cache', JSON.stringify(data.user));
+            sessionStorage.setItem('user_session', JSON.stringify(data.user));
           } catch {}
-        } else {
-          const stored = sessionStorage.getItem('user_session');
-          if (stored) {
-            try {
-              setUserSession(JSON.parse(stored));
-            } catch {}
-          }
         }
       })
-      .catch(() => {
-        const stored = sessionStorage.getItem('user_session');
-        if (stored) {
-          try {
-            setUserSession(JSON.parse(stored));
-          } catch {}
-        }
-      });
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    // Initial optimistic render from cache
+    try {
+      const cached = sessionStorage.getItem('auth_me_cache') || sessionStorage.getItem('user_session');
+      if (cached) {
+        setUserSession(JSON.parse(cached));
+      }
+    } catch {}
+
+    // Always revalidate with authoritative server session
+    refreshUserSession();
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshUserSession();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;

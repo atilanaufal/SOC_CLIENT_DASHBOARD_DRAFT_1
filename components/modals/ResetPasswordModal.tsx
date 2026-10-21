@@ -83,6 +83,12 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
 
     setIsLoading(true);
 
+    let claimedUsername = '';
+    try {
+      const stored = sessionStorage.getItem('user_session') || sessionStorage.getItem('auth_me_cache');
+      if (stored) claimedUsername = JSON.parse(stored)?.username || '';
+    } catch {}
+
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
@@ -91,6 +97,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ isOpen, 
           currentPassword,
           newPassword,
           confirmPassword,
+          claimedUsername,
         }),
       });
 
