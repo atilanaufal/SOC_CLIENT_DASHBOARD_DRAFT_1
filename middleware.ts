@@ -155,7 +155,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/incidents') ||
     pathname.startsWith('/devices') ||
     pathname.startsWith('/vulnerabilities') ||
-    pathname.startsWith('/reports');
+    pathname.startsWith('/reports') ||
+    pathname.startsWith('/guide/');
 
   if (isProtectedPage) {
     if (!isAuthenticated) {
