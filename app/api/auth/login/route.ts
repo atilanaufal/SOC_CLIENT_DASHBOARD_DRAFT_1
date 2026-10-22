@@ -206,7 +206,6 @@ export async function POST(req: NextRequest) {
       user: {
         username: masterUser.username,
         role: masterUser.role || 'tenant',
-        tenant_code: masterUser.tenant_code || '',
         campus_name: masterUser.campus_name || '',
       },
     });

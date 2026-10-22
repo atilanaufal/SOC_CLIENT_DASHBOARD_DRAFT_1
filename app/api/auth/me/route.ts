@@ -48,7 +48,6 @@ export async function GET(req: NextRequest) {
       user: {
         username: tenant.username,
         role: tenant.role || 'tenant',
-        tenant_code: tenant.tenantCode,
         campus_name: tenant.campusName,
       },
     });

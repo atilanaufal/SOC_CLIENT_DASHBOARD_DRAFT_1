@@ -26,7 +26,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
     username: string;
     role: string;
     campus_name?: string;
-    tenant_code?: string;
     email?: string;
   } | null>(null);
   const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
