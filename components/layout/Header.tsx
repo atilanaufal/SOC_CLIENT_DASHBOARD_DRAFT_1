@@ -48,7 +48,7 @@ export const Header: React.FC = () => {
           localStorage.removeItem('user_session');
           navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
         } catch {}
-        window.location.replace('/login?expired=1');
+        window.location.replace('/login');
         return;
       }
     }
@@ -71,7 +71,7 @@ export const Header: React.FC = () => {
         localStorage.removeItem('user_session');
         navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
       } catch {}
-      window.location.replace('/login?expired=1');
+      window.location.replace('/login');
     };
 
     const resetTimer = () => {
@@ -94,18 +94,10 @@ export const Header: React.FC = () => {
             sessionStorage.clear();
             localStorage.removeItem('user_session');
           } catch {}
-          const authReason = res.headers.get('x-auth-reason');
-          let isConcurrent = authReason === 'concurrent_login';
-          if (!isConcurrent) {
-            try {
-              const data = await res.json();
-              if (data?.code === 'CONCURRENT_LOGIN') isConcurrent = true;
-            } catch {}
-          }
           try {
             navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
           } catch {}
-          window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
+          window.location.replace('/login');
         }
       } catch {}
     };

@@ -17,20 +17,16 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const isConc = params.get('concurrent') === '1';
-      const isExp = params.get('expired') === '1';
-
-      if (isConc || isExp) {
-        if (isConc) setIsConcurrentNotice(true);
-        if (isExp) setIsExpiredNotice(true);
-
-        try {
-          sessionStorage.clear();
-          localStorage.removeItem('user_session');
-        } catch {}
-        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+      // Clean up URL query parameters if present
+      if (window.location.search) {
+        window.history.replaceState({}, '', '/login');
       }
+
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('user_session');
+      } catch {}
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     }
   }, []);
 
@@ -75,10 +71,8 @@ export default function LoginPage() {
         sessionStorage.removeItem('auth_me_cache');
       } catch {}
 
-      // Hard redirect to target destination so all session cookies & server state are evaluated freshly
-      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const fromPath = params?.get('from') || '/dashboard';
-      window.location.href = fromPath;
+      // Always land directly to /dashboard upon successful authentication
+      window.location.href = '/dashboard';
     } catch (err: any) {
       console.error('Login submit error:', err);
       setErrorMessage('Connection error to server. Please try again.');

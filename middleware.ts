@@ -129,18 +129,6 @@ export async function middleware(request: NextRequest) {
 
   // 2. `/login` page
   if (pathname === '/login') {
-    const hasExitSignal =
-      request.nextUrl.searchParams.has('concurrent') ||
-      request.nextUrl.searchParams.has('expired') ||
-      request.nextUrl.searchParams.has('logout');
-
-    if (hasExitSignal) {
-      // Explicit logout or concurrent kickout: Force purge cookies and stay on login page
-      const res = NextResponse.next();
-      clearSessionCookies(res);
-      return res;
-    }
-
     if (isAuthenticated) {
       return NextResponse.redirect(new URL('/dashboard', baseUrl));
     }
@@ -161,10 +149,6 @@ export async function middleware(request: NextRequest) {
   if (isProtectedPage) {
     if (!isAuthenticated) {
       const loginUrl = new URL('/login', baseUrl);
-      loginUrl.searchParams.set('from', pathname);
-      if (token) {
-        loginUrl.searchParams.set('expired', '1');
-      }
       const res = NextResponse.redirect(loginUrl);
       clearSessionCookies(res);
       return res;

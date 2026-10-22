@@ -31,7 +31,7 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
         navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
       } catch {}
 
-      window.location.replace(isConcurrent ? '/login?concurrent=1' : '/login?expired=1');
+      window.location.replace('/login');
     }
   }
   return res;

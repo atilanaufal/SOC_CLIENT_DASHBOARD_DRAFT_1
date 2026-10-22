@@ -178,14 +178,8 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
               </div>
               <div className="overflow-hidden min-w-0">
                 <p className="text-sm sm:text-base font-extrabold text-gray-900 truncate">{displayName}</p>
-                {userSession?.username && (
+                {userSession?.username && userSession.username !== displayName && (
                   <p className="text-xs text-gray-500 font-semibold truncate">@{userSession.username}</p>
-                )}
-
-                {userSession?.tenant_code && (
-                  <span className="inline-block bg-blue-100/90 text-[#002B9A] text-xs font-bold px-2 py-0.5 rounded-md mt-1 border border-blue-200">
-                    Tenant: {userSession.tenant_code}
-                  </span>
                 )}
               </div>
             </div>
