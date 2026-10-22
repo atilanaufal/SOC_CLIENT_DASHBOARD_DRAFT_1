@@ -426,14 +426,14 @@ function ReportsContent() {
                               : 'hover:bg-blue-50/40'
                           }`}
                         >
-                          <td className="relative py-3 px-3.5 xl:px-4 text-[#002B9A] font-bold align-top">
+                          <td className="relative py-3 px-3.5 xl:px-4 text-[#002B9A] font-bold align-middle">
                             {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
                             <span className="block break-words whitespace-normal leading-snug">{report.reportName}</span>
                           </td>
-                          <td className="py-3 px-3.5 xl:px-4 font-medium align-top whitespace-nowrap">
+                          <td className="py-3 px-3.5 xl:px-4 font-medium align-middle whitespace-nowrap">
                             {renderSeverityBadge(report.severity)}
                           </td>
-                          <td className="py-3 px-3.5 xl:px-4 align-top whitespace-nowrap">
+                          <td className="py-3 px-3.5 xl:px-4 align-middle whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
                               <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
                               {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
