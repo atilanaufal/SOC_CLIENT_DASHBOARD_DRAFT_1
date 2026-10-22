@@ -199,7 +199,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ tenantName = '
             {/* Actions */}
             <div className="pt-1 space-y-1">
               <a
-                href="/guide/"
+                href="/guide/index.html"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setIsOpen(false)}
