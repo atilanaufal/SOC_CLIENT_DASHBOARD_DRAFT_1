@@ -437,10 +437,9 @@ export default function DashboardPage() {
                         onClick={() => {
                           const agentParam = inc.agent || inc.host || '';
                           const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
-                          const countVal = inc.count || 1;
                           const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
                             agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
-                          }&count=${encodeURIComponent(countVal)}&groupBy=incidents`;
+                          }&groupBy=incidents`;
                           router.push(targetUrl);
                         }}
                         className="bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-xs px-3 py-1 rounded-md transition shadow-sm cursor-pointer"
@@ -495,10 +494,9 @@ export default function DashboardPage() {
                       onClick={() => {
                         const agentParam = inc.agent || inc.host || '';
                         const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
-                        const countVal = inc.count || 1;
                         const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
                           agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
-                        }&count=${encodeURIComponent(countVal)}&groupBy=incidents`;
+                        }&groupBy=incidents`;
                         router.push(targetUrl);
                       }}
                       className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-xs xl:text-sm px-3.5 py-1.5 rounded-lg transition shadow-[0_2px_6px_rgba(0,43,154,0.25)] cursor-pointer"

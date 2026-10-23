@@ -1283,7 +1283,7 @@ export async function queryServerSideIncidents(
           else if (s === 'medium') medium++;
           else low++;
         });
-        const totalAlerts = filtered.length;
+        let totalAlerts = filtered.length;
 
         // Group or map with includeFullLogs = false (lazy loading!)
         let mapped = groupBy === 'incidents'
@@ -1298,6 +1298,20 @@ export async function queryServerSideIncidents(
           const targetCount = Number(options.count);
           if (!isNaN(targetCount)) {
             mapped = mapped.filter((item) => Number(item.count || 1) === targetCount);
+            critical = 0;
+            high = 0;
+            medium = 0;
+            low = 0;
+            totalAlerts = 0;
+            mapped.forEach((item: any) => {
+              const s = String(item.severity || '').toLowerCase();
+              const cnt = Number(item.count || 1);
+              totalAlerts += cnt;
+              if (s === 'critical') critical += cnt;
+              else if (s === 'high') high += cnt;
+              else if (s === 'medium') medium += cnt;
+              else low += cnt;
+            });
           }
         }
 
@@ -1422,7 +1436,7 @@ export async function queryServerSideIncidents(
     const col = await getIncidentsCollection(databaseName);
     const baseDateFilter = buildMongoIncidentFilter(timeRange, startDate, endDate);
 
-    const matchConditions: any[] = [
+    const baseMatchConditions: any[] = [
       {
         agent_id: { $nin: ['000', '0', 0] },
         host: { $nin: ['health-checker', '000'], $not: /srv-web\.campus\.ac\.id/i }
@@ -1430,8 +1444,20 @@ export async function queryServerSideIncidents(
     ];
 
     if (Object.keys(baseDateFilter).length > 0) {
-      matchConditions.push(baseDateFilter);
+      baseMatchConditions.push(baseDateFilter);
     }
+
+    const baseFilter = baseMatchConditions.length === 1 ? baseMatchConditions[0] : { $and: baseMatchConditions };
+    const matchConditions: any[] = [...baseMatchConditions];
+
+    const hasUserFilters = Boolean(
+      (options.severity && options.severity !== 'All') ||
+      (options.agent && options.agent !== 'All') ||
+      (options.incidentType && options.incidentType !== 'All') ||
+      (options.sourceIp && options.sourceIp !== 'All') ||
+      (options.search && options.search.trim()) ||
+      (options.count && options.count !== 'All')
+    );
 
     if (options.severity && options.severity !== 'All') {
       const sLower = options.severity.trim().toLowerCase();
@@ -1580,12 +1606,45 @@ export async function queryServerSideIncidents(
         : [];
 
       facetPipeline = {
-        severityStats: [
-          { $group: { _id: '$severity', count: { $sum: 1 } } }
-        ],
-        totalAlerts: [
-          { $count: 'count' }
-        ],
+        severityStats: countMatchStage.length > 0
+          ? [
+              {
+                $group: {
+                  _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+                  count: { $sum: 1 },
+                  severity: { $first: '$severity' }
+                }
+              },
+              ...countMatchStage,
+              {
+                $group: {
+                  _id: '$severity',
+                  count: { $sum: '$count' }
+                }
+              }
+            ]
+          : [
+              { $group: { _id: '$severity', count: { $sum: 1 } } }
+            ],
+        totalAlerts: countMatchStage.length > 0
+          ? [
+              {
+                $group: {
+                  _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+                  count: { $sum: 1 }
+                }
+              },
+              ...countMatchStage,
+              {
+                $group: {
+                  _id: null,
+                  count: { $sum: '$count' }
+                }
+              }
+            ]
+          : [
+              { $count: 'count' }
+            ],
         uniqueAgents: [
           { $match: { host: { $exists: true, $ne: '' } } },
           { $group: { _id: '$host' } },
@@ -1727,8 +1786,66 @@ export async function queryServerSideIncidents(
       };
     }
 
+    const optionsFacetPipeline = {
+      uniqueAgents: [
+        { $match: { host: { $exists: true, $ne: '' } } },
+        { $group: { _id: '$host' } },
+        { $limit: 100 }
+      ],
+      uniqueIncidentNames: [
+        {
+          $project: {
+            types: {
+              $cond: {
+                if: { $isArray: '$incident_type' },
+                then: '$incident_type',
+                else: {
+                  $cond: {
+                    if: { $and: [{ $ne: ['$incident_type', null] }, { $ne: ['$incident_type', ''] }] },
+                    then: ['$incident_type'],
+                    else: {
+                      $cond: {
+                        if: { $and: [{ $ne: ['$description', null] }, { $ne: ['$description', ''] }] },
+                        then: ['$description'],
+                        else: []
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        { $unwind: '$types' },
+        { $match: { types: { $ne: '' } } },
+        { $group: { _id: '$types' } },
+        { $sort: { _id: 1 } },
+        { $limit: 150 }
+      ],
+      uniqueIpSources: [
+        { $match: { ip_source: { $exists: true, $ne: '' } } },
+        { $group: { _id: '$ip_source' } },
+        { $limit: 100 }
+      ],
+      uniqueCounts: [
+        {
+          $group: {
+            _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
+            count: { $sum: 1 }
+          }
+        },
+        { $group: { _id: '$count' } },
+        { $sort: { _id: 1 } },
+        { $limit: 50 }
+      ],
+    };
+
     let rawAlertRows: any[] = [];
     let facetRes: any = {};
+
+    const optionsPromise = hasUserFilters
+      ? col.aggregate([{ $match: baseFilter }, { $facet: optionsFacetPipeline }]).toArray().catch(() => null)
+      : null;
 
     if (groupBy === 'alerts') {
       const rowsPromise = col.find(searchAndFilter, {
@@ -1744,15 +1861,29 @@ export async function queryServerSideIncidents(
         { $facet: facetPipeline }
       ]).toArray();
 
-      const [rows, [statsResult]] = await Promise.all([rowsPromise, statsPromise]);
+      const [rows, [statsResult], optionsResult] = await Promise.all([rowsPromise, statsPromise, optionsPromise]);
       rawAlertRows = rows || [];
       facetRes = statsResult || {};
+      if (optionsResult && optionsResult[0]) {
+        facetRes.uniqueAgents = optionsResult[0].uniqueAgents;
+        facetRes.uniqueIncidentNames = optionsResult[0].uniqueIncidentNames;
+        facetRes.uniqueIpSources = optionsResult[0].uniqueIpSources;
+        facetRes.uniqueCounts = optionsResult[0].uniqueCounts;
+      }
     } else {
-      const [fRes] = await col.aggregate([
+      const dataPromise = col.aggregate([
         { $match: searchAndFilter },
         { $facet: facetPipeline }
       ]).toArray();
+
+      const [[fRes], optionsResult] = await Promise.all([dataPromise, optionsPromise]);
       facetRes = fRes || {};
+      if (optionsResult && optionsResult[0]) {
+        facetRes.uniqueAgents = optionsResult[0].uniqueAgents;
+        facetRes.uniqueIncidentNames = optionsResult[0].uniqueIncidentNames;
+        facetRes.uniqueIpSources = optionsResult[0].uniqueIpSources;
+        facetRes.uniqueCounts = optionsResult[0].uniqueCounts;
+      }
     }
 
     let critical = 0;

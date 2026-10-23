@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   HiOutlineXMark,
@@ -16,6 +16,7 @@ export interface FilterSection {
   label: string;
   type: 'buttons' | 'select';
   options: string[];
+  isMultiSelect?: boolean;
 }
 
 interface FilterModalProps {
@@ -36,7 +37,8 @@ const CustomSelectDropdown: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
-}> = ({ value, options, onChange, placeholder = 'Select option', isOpen, onToggle, onClose }) => {
+  isMultiSelect?: boolean;
+}> = ({ value, options, onChange, placeholder = 'Select option', isOpen, onToggle, onClose, isMultiSelect = false }) => {
   const [openUpwards, setOpenUpwards] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -65,10 +67,48 @@ const CustomSelectDropdown: React.FC<{
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
+  const selectedItems = useMemo(() => {
+    if (!value || value === 'All') return [];
+    return value.split(',').map((s) => s.trim()).filter(Boolean);
+  }, [value]);
+
   const allOptions = ['All', ...options.filter((o) => o !== 'All')];
   const filtered = allOptions.filter((opt) =>
     opt.toLowerCase().includes(search.toLowerCase())
   );
+
+  const displayLabel = useMemo(() => {
+    if (!isMultiSelect) return value || 'All';
+    if (selectedItems.length === 0) return 'All';
+    if (selectedItems.length === 1) return selectedItems[0];
+    return `${selectedItems.length} Selected (${selectedItems.slice(0, 2).join(', ')}${selectedItems.length > 2 ? '...' : ''})`;
+  }, [isMultiSelect, selectedItems, value]);
+
+  const handleSelectOption = (opt: string) => {
+    if (!isMultiSelect) {
+      onChange(opt);
+      onClose();
+      return;
+    }
+
+    if (opt === 'All') {
+      onChange('All');
+      return;
+    }
+
+    let newSelected: string[];
+    if (selectedItems.includes(opt)) {
+      newSelected = selectedItems.filter((i: string) => i !== opt);
+    } else {
+      newSelected = [...selectedItems, opt];
+    }
+
+    if (newSelected.length === 0) {
+      onChange('All');
+    } else {
+      onChange(newSelected.join(', '));
+    }
+  };
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -76,9 +116,10 @@ const CustomSelectDropdown: React.FC<{
         ref={buttonRef}
         type="button"
         onClick={onToggle}
+        title={isMultiSelect && selectedItems.length > 0 ? selectedItems.join(', ') : undefined}
         className="w-full bg-white hover:bg-slate-50/80 border border-gray-300/90 rounded-xl px-3.5 sm:px-4 py-2 sm:py-2.5 2xl:py-3 text-xs sm:text-sm 2xl:text-base font-semibold text-gray-900 flex items-center justify-between shadow-sm focus:outline-none focus:ring-2 focus:ring-[#002B9A] transition cursor-pointer"
       >
-        <span className="truncate">{value || 'All'}</span>
+        <span className="truncate">{displayLabel}</span>
         <HiOutlineChevronDown
           className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform duration-150 ${
             isOpen ? 'rotate-180 text-[#002B9A]' : ''
@@ -113,28 +154,57 @@ const CustomSelectDropdown: React.FC<{
               </div>
             ) : (
               filtered.map((opt) => {
-                const isSelected = value === opt || (!value && opt === 'All');
+                const isSelected = isMultiSelect
+                  ? (opt === 'All' ? selectedItems.length === 0 : selectedItems.includes(opt))
+                  : (value === opt || (!value && opt === 'All'));
+
                 return (
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => {
-                      onChange(opt);
-                      onClose();
-                    }}
+                    onClick={() => handleSelectOption(opt)}
                     className={`w-full text-left px-3.5 py-1.5 sm:py-2 2xl:py-2.5 text-xs sm:text-sm 2xl:text-base font-semibold rounded-lg transition flex items-center justify-between cursor-pointer ${
                       isSelected
                         ? 'bg-blue-50 text-[#002B9A] font-bold'
                         : 'text-gray-700 hover:bg-slate-100/80 hover:text-gray-900'
                     }`}
                   >
-                    <span className="truncate">{opt}</span>
-                    {isSelected && <HiOutlineCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#002B9A] shrink-0" />}
+                    <div className="flex items-center gap-2 min-w-0 pr-1">
+                      {isMultiSelect && opt !== 'All' && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          readOnly
+                          className="w-4 h-4 rounded text-[#002B9A] border-gray-300 focus:ring-[#002B9A] pointer-events-none"
+                        />
+                      )}
+                      <span className="truncate">{opt}</span>
+                    </div>
+                    {isSelected && <HiOutlineCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#002B9A] shrink-0 ml-1" />}
                   </button>
                 );
               })
             )}
           </div>
+
+          {isMultiSelect && (
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={() => onChange('All')}
+                className="text-xs text-gray-500 hover:text-red-600 font-bold transition cursor-pointer"
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-[#002B9A] hover:bg-[#002175] text-white text-xs font-bold px-3 py-1 rounded-lg transition shadow-sm cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -255,6 +325,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     setOpenSectionKey((prev) => (prev === section.key ? null : section.key))
                   }
                   onClose={() => setOpenSectionKey(null)}
+                  isMultiSelect={section.isMultiSelect}
                 />
               )}
             </div>

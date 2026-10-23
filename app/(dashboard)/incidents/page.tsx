@@ -133,6 +133,7 @@ function IncidentsContent() {
   useEffect(() => {
     setCurrentPage(1);
     setIncidents([]);
+    setFilterOptions({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'], ipSources: [], counts: [] });
   }, [timeFilter, customRange, groupByMode]);
 
   // Fetch server-side paginated & aggregated data with in-memory caching
@@ -152,7 +153,15 @@ function IncidentsContent() {
           setTotalAlerts(cached.totalAlerts);
           setTotalPages(cached.totalPages);
           if (cached.stats) setStatsData({ incidents: cached.stats });
-          if (cached.filterOptions) setFilterOptions(cached.filterOptions);
+          if (cached.filterOptions) {
+            setFilterOptions((prev) => ({
+              agents: Array.from(new Set([...(prev.agents || []), ...(cached.filterOptions?.agents || [])])).filter(Boolean).sort(),
+              incidentNames: Array.from(new Set([...(prev.incidentNames || []), ...(cached.filterOptions?.incidentNames || [])])).filter(Boolean).sort(),
+              severities: ['Critical', 'High', 'Medium', 'Low'],
+              ipSources: Array.from(new Set([...(prev.ipSources || []), ...(cached.filterOptions?.ipSources || [])])).filter(Boolean).sort(),
+              counts: Array.from(new Set([...(prev.counts || []), ...(cached.filterOptions?.counts || [])])).filter(Boolean),
+            }));
+          }
           setIsLoading(false);
           setIsTableFetching(false);
           return;
@@ -196,7 +205,15 @@ function IncidentsContent() {
       setTotalAlerts(res.totalAlerts);
       setTotalPages(res.totalPages);
       if (res.stats) setStatsData({ incidents: res.stats });
-      if (res.filterOptions) setFilterOptions(res.filterOptions);
+      if (res.filterOptions) {
+        setFilterOptions((prev) => ({
+          agents: Array.from(new Set([...(prev.agents || []), ...(res.filterOptions?.agents || [])])).filter(Boolean).sort(),
+          incidentNames: Array.from(new Set([...(prev.incidentNames || []), ...(res.filterOptions?.incidentNames || [])])).filter(Boolean).sort(),
+          severities: ['Critical', 'High', 'Medium', 'Low'],
+          ipSources: Array.from(new Set([...(prev.ipSources || []), ...(res.filterOptions?.ipSources || [])])).filter(Boolean).sort(),
+          counts: Array.from(new Set([...(prev.counts || []), ...(res.filterOptions?.counts || [])])).filter(Boolean),
+        }));
+      }
 
       setClientCache(cacheKey, res);
     } catch (err: any) {
@@ -257,18 +274,37 @@ function IncidentsContent() {
     return Array.from(set).sort((a, b) => a - b).map(String);
   }, [filterOptions.counts, incidents, activeFilters.count]);
 
+  const availableAgents = useMemo(() => {
+    const set = new Set<string>(filterOptions.agents || []);
+    incidents.forEach((inc) => {
+      if (inc.agent) set.add(inc.agent);
+      if (inc.host) set.add(inc.host);
+    });
+    if (activeFilters.agent && activeFilters.agent !== 'All') {
+      set.add(activeFilters.agent);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.agents, incidents, activeFilters.agent]);
+
   const availableIncidentNames = useMemo(() => {
     const set = new Set<string>(filterOptions.incidentNames || []);
     incidents.forEach((inc) => {
+      if (inc.incidentName) set.add(inc.incidentName);
       if (inc.incident_type) {
         if (Array.isArray(inc.incident_type)) {
           inc.incident_type.forEach((t) => t && set.add(String(t).trim()));
+          if (inc.incident_type.length > 1) {
+            set.add(inc.incident_type.filter(Boolean).map((t) => String(t).trim()).join(', '));
+          }
         } else {
           String(inc.incident_type).split(',').forEach((t) => t.trim() && set.add(t.trim()));
+          set.add(String(inc.incident_type).trim());
         }
       }
     });
     if (activeFilters.incidentName && activeFilters.incidentName !== 'All') {
+      const parts = activeFilters.incidentName.split(',').map((p) => p.trim()).filter(Boolean);
+      parts.forEach((p) => set.add(p));
       set.add(activeFilters.incidentName);
     }
     return Array.from(set).filter(Boolean).sort();
@@ -290,12 +326,13 @@ function IncidentsContent() {
         label: 'Incident Type',
         type: 'select',
         options: availableIncidentNames,
+        isMultiSelect: true,
       },
       {
         key: 'agent',
         label: 'Agent Affected',
         type: 'select',
-        options: filterOptions.agents || [],
+        options: availableAgents,
       },
       {
         key: 'sourceIp',
@@ -315,7 +352,7 @@ function IncidentsContent() {
     }
 
     return groups;
-  }, [filterOptions, groupByMode, availableIpSources, availableCounts, availableIncidentNames]);
+  }, [filterOptions, groupByMode, availableIpSources, availableCounts, availableIncidentNames, availableAgents]);
 
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedIncidents = incidents;
