@@ -436,7 +436,7 @@ export default function DashboardPage() {
                       <button
                         onClick={() => {
                           const agentParam = inc.agent || inc.host || '';
-                          const incName = inc.incidentName || inc.incident_type || '';
+                          const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
                           const countVal = inc.count || 1;
                           const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
                             agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
@@ -494,7 +494,7 @@ export default function DashboardPage() {
                     <button
                       onClick={() => {
                         const agentParam = inc.agent || inc.host || '';
-                        const incName = inc.incidentName || inc.incident_type || '';
+                        const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
                         const countVal = inc.count || 1;
                         const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
                           agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''

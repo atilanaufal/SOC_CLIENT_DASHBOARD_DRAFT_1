@@ -1182,6 +1182,10 @@ export interface ServerSideIncidentsResult {
   };
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * High-Performance Server-Side Aggregation and Pagination for Incidents (Wazuh / OpenSearch style).
  * - Rentang 1-7 Hari: Prioritas ke Redis Hot-Cache dengan memory pagination & grouping.
@@ -1225,11 +1229,28 @@ export async function queryServerSideIncidents(
         let filtered = validDocs;
 
         if (options.incidentType && options.incidentType !== 'All') {
-          const typeRegex = new RegExp(options.incidentType, 'i');
+          const rawType = options.incidentType.trim().toLowerCase();
+          const parts = rawType.includes(',')
+            ? rawType.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean)
+            : [rawType];
+
           filtered = filtered.filter((d: any) => {
-            const incType = Array.isArray(d.incidentName || d.incident_type) ? (d.incidentName || d.incident_type).join(', ') : String(d.incidentName || d.incident_type || '');
-            const desc = String(d.description || '');
-            return typeRegex.test(incType) || typeRegex.test(desc);
+            const rawTypes: string[] = Array.isArray(d.incident_type)
+              ? d.incident_type.map((t: any) => String(t).toLowerCase())
+              : [String(d.incident_type || '').toLowerCase()];
+            const incTypeStr = (Array.isArray(d.incidentName || d.incident_type)
+              ? (d.incidentName || d.incident_type).join(', ')
+              : String(d.incidentName || d.incident_type || '')
+            ).toLowerCase();
+            const desc = String(d.description || '').toLowerCase();
+            const rule = String(d.rule_id || d.ruleId || '').toLowerCase();
+
+            if (parts.length > 1) {
+              const allMatch = parts.every((p) => rawTypes.some((t) => t.includes(p)) || incTypeStr.includes(p));
+              return allMatch || desc.includes(rawType) || rule.includes(rawType);
+            }
+            const single = parts[0];
+            return rawTypes.some((t) => t.includes(single)) || incTypeStr.includes(single) || desc.includes(single) || rule.includes(single);
           });
         }
 
@@ -1362,16 +1383,33 @@ export async function queryServerSideIncidents(
             totalDelta: totalAlerts - totalPrev,
             periodLabel: histComp.periodLabel || 'PREVIOUS PERIOD',
           },
-          filterOptions: {
-            agents: Array.from(new Set(validDocs.map((d: any) => d.host || d.agent).filter(Boolean))).sort(),
-            incidentNames: Array.from(new Set(validDocs.map((d: any) => {
-              if (Array.isArray(d.incident_type) && d.incident_type.length > 0) return d.incident_type[0];
-              return d.incident_type || d.incidentName || d.description;
-            }).filter(Boolean))).sort(),
-            severities: ['Critical', 'High', 'Medium', 'Low'],
-            ipSources: Array.from(new Set(validDocs.map((d: any) => d.ip_source || d.sourceIp || d.src_ip || d.data?.srcip).filter(Boolean))).map(String).sort(),
-            counts: groupBy === 'incidents' ? Array.from(new Set(groupAlertsToIncidents(validDocs, tenantName, false).map((m: any) => Number(m.count || 1)))).sort((a, b) => a - b).map(String) : [],
-          },
+          filterOptions: (() => {
+            const incidentTypeSet = new Set<string>();
+            validDocs.forEach((d: any) => {
+              if (Array.isArray(d.incident_type)) {
+                d.incident_type.forEach((t: any) => {
+                  const s = String(t || '').trim();
+                  if (s) incidentTypeSet.add(s);
+                });
+              } else if (d.incident_type) {
+                String(d.incident_type).split(',').forEach((t) => {
+                  const s = t.trim();
+                  if (s) incidentTypeSet.add(s);
+                });
+              } else if (d.description) {
+                const s = String(d.description).trim();
+                if (s) incidentTypeSet.add(s);
+              }
+            });
+
+            return {
+              agents: Array.from(new Set(validDocs.map((d: any) => d.host || d.agent).filter(Boolean))).sort(),
+              incidentNames: Array.from(incidentTypeSet).filter(Boolean).sort(),
+              severities: ['Critical', 'High', 'Medium', 'Low'],
+              ipSources: Array.from(new Set(validDocs.map((d: any) => d.ip_source || d.sourceIp || d.src_ip || d.data?.srcip).filter(Boolean))).map(String).sort(),
+              counts: groupBy === 'incidents' ? Array.from(new Set(groupAlertsToIncidents(validDocs, tenantName, false).map((m: any) => Number(m.count || 1)))).sort((a, b) => a - b).map(String) : [],
+            };
+          })(),
         };
       }
     } catch (redisErr: any) {
@@ -1438,14 +1476,38 @@ export async function queryServerSideIncidents(
     }
 
     if (options.incidentType && options.incidentType !== 'All') {
-      const tRegex = new RegExp(options.incidentType, 'i');
-      matchConditions.push({
-        $or: [{ incident_type: tRegex }, { description: tRegex }]
-      });
+      const rawType = options.incidentType.trim();
+      const escapedFull = escapeRegex(rawType);
+
+      if (rawType.includes(',')) {
+        const parts = rawType.split(',').map((p) => p.trim()).filter(Boolean);
+        const allTagsCondition = {
+          $and: parts.map((p) => ({
+            incident_type: new RegExp(escapeRegex(p), 'i')
+          }))
+        };
+        matchConditions.push({
+          $or: [
+            allTagsCondition,
+            { incident_type: new RegExp(escapedFull, 'i') },
+            { description: new RegExp(escapedFull, 'i') },
+            { rule_id: new RegExp(escapedFull, 'i') }
+          ]
+        });
+      } else {
+        const tRegex = new RegExp(escapedFull, 'i');
+        matchConditions.push({
+          $or: [
+            { incident_type: tRegex },
+            { description: tRegex },
+            { rule_id: tRegex }
+          ]
+        });
+      }
     }
 
     if (options.sourceIp && options.sourceIp !== 'All') {
-      const ipRegex = new RegExp(options.sourceIp.trim(), 'i');
+      const ipRegex = new RegExp(escapeRegex(options.sourceIp.trim()), 'i');
       matchConditions.push({
         $or: [{ ip_source: ipRegex }, { sourceIp: ipRegex }, { agent_ip: ipRegex }, { 'data.srcip': ipRegex }]
       });
@@ -1453,21 +1515,31 @@ export async function queryServerSideIncidents(
 
     if (options.search && options.search.trim()) {
       const q = options.search.trim();
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escaped = escapeRegex(q);
       const sRegex = new RegExp(escaped, 'i');
-      matchConditions.push({
-        $or: [
-          { description: sRegex },
-          { incident_type: sRegex },
-          { host: sRegex },
-          { agent: sRegex },
-          { agent_id: sRegex },
-          { agent_ip: sRegex },
-          { ip_source: sRegex },
-          { sourceIp: sRegex },
-          { rule_id: sRegex }
-        ]
-      });
+
+      const searchOrs: any[] = [
+        { description: sRegex },
+        { incident_type: sRegex },
+        { host: sRegex },
+        { agent: sRegex },
+        { agent_id: sRegex },
+        { agent_ip: sRegex },
+        { ip_source: sRegex },
+        { sourceIp: sRegex },
+        { rule_id: sRegex }
+      ];
+
+      if (q.includes(',')) {
+        const parts = q.split(',').map((p) => p.trim()).filter(Boolean);
+        if (parts.length > 1) {
+          searchOrs.push({
+            $and: parts.map((p) => ({ incident_type: new RegExp(escapeRegex(p), 'i') }))
+          });
+        }
+      }
+
+      matchConditions.push({ $or: searchOrs });
     }
 
     const searchAndFilter = matchConditions.length === 1 ? matchConditions[0] : { $and: matchConditions };
@@ -1520,9 +1592,34 @@ export async function queryServerSideIncidents(
           { $limit: 100 }
         ],
         uniqueIncidentNames: [
-          { $match: { incident_type: { $exists: true, $ne: '' } } },
-          { $group: { _id: '$incident_type' } },
-          { $limit: 100 }
+          {
+            $project: {
+              types: {
+                $cond: {
+                  if: { $isArray: '$incident_type' },
+                  then: '$incident_type',
+                  else: {
+                    $cond: {
+                      if: { $and: [{ $ne: ['$incident_type', null] }, { $ne: ['$incident_type', ''] }] },
+                      then: ['$incident_type'],
+                      else: {
+                        $cond: {
+                          if: { $and: [{ $ne: ['$description', null] }, { $ne: ['$description', ''] }] },
+                          then: ['$description'],
+                          else: []
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          { $unwind: '$types' },
+          { $match: { types: { $ne: '' } } },
+          { $group: { _id: '$types' } },
+          { $sort: { _id: 1 } },
+          { $limit: 150 }
         ],
         uniqueIpSources: [
           { $match: { ip_source: { $exists: true, $ne: '' } } },
@@ -1593,10 +1690,34 @@ export async function queryServerSideIncidents(
           { $limit: 100 }
         ],
         uniqueIncidentNames: [
-          { $match: { $or: [{ description: { $exists: true, $ne: '' } }, { incident_type: { $exists: true, $ne: '' } }] } },
-          { $project: { name: { $ifNull: ['$incident_type', '$description'] } } },
-          { $group: { _id: '$name' } },
-          { $limit: 100 }
+          {
+            $project: {
+              types: {
+                $cond: {
+                  if: { $isArray: '$incident_type' },
+                  then: '$incident_type',
+                  else: {
+                    $cond: {
+                      if: { $and: [{ $ne: ['$incident_type', null] }, { $ne: ['$incident_type', ''] }] },
+                      then: ['$incident_type'],
+                      else: {
+                        $cond: {
+                          if: { $and: [{ $ne: ['$description', null] }, { $ne: ['$description', ''] }] },
+                          then: ['$description'],
+                          else: []
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          { $unwind: '$types' },
+          { $match: { types: { $ne: '' } } },
+          { $group: { _id: '$types' } },
+          { $sort: { _id: 1 } },
+          { $limit: 150 }
         ],
         uniqueIpSources: [
           { $match: { ip_source: { $exists: true, $ne: '' } } },
@@ -1747,8 +1868,8 @@ export async function queryServerSideIncidents(
         agents: (facetRes.uniqueAgents || []).map((a: any) => String(a._id || '')).filter(Boolean).sort(),
         incidentNames: (facetRes.uniqueIncidentNames || []).map((i: any) => {
           const val = i._id;
-          if (Array.isArray(val)) return val[0] || '';
-          return String(val || '');
+          if (Array.isArray(val)) return String(val[0] || '').trim();
+          return String(val || '').trim();
         }).filter(Boolean).sort(),
         severities: ['Critical', 'High', 'Medium', 'Low'],
         ipSources: (facetRes.uniqueIpSources || []).map((i: any) => String(i._id || '')).filter(Boolean).sort(),

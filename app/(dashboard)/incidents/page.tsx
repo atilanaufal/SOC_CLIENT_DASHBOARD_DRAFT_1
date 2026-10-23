@@ -257,6 +257,23 @@ function IncidentsContent() {
     return Array.from(set).sort((a, b) => a - b).map(String);
   }, [filterOptions.counts, incidents, activeFilters.count]);
 
+  const availableIncidentNames = useMemo(() => {
+    const set = new Set<string>(filterOptions.incidentNames || []);
+    incidents.forEach((inc) => {
+      if (inc.incident_type) {
+        if (Array.isArray(inc.incident_type)) {
+          inc.incident_type.forEach((t) => t && set.add(String(t).trim()));
+        } else {
+          String(inc.incident_type).split(',').forEach((t) => t.trim() && set.add(t.trim()));
+        }
+      }
+    });
+    if (activeFilters.incidentName && activeFilters.incidentName !== 'All') {
+      set.add(activeFilters.incidentName);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.incidentNames, incidents, activeFilters.incidentName]);
+
   const dynamicFilterSections: FilterSection[] = useMemo(() => {
     const groups: FilterSection[] = [
       {
@@ -272,7 +289,7 @@ function IncidentsContent() {
         key: 'incidentName',
         label: 'Incident Type',
         type: 'select',
-        options: filterOptions.incidentNames || [],
+        options: availableIncidentNames,
       },
       {
         key: 'agent',
@@ -298,7 +315,7 @@ function IncidentsContent() {
     }
 
     return groups;
-  }, [filterOptions, groupByMode, availableIpSources, availableCounts]);
+  }, [filterOptions, groupByMode, availableIpSources, availableCounts, availableIncidentNames]);
 
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedIncidents = incidents;
