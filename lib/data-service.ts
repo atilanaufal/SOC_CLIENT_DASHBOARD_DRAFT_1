@@ -1270,13 +1270,13 @@ export async function queryServerSideIncidents(
           });
         }
 
-        // Calculate severity breakdown on raw alerts
+        // Calculate severity breakdown for KPI cards on time range only (validDocs)
         let critical = 0;
         let high = 0;
         let medium = 0;
         let low = 0;
 
-        filtered.forEach((doc: any) => {
+        validDocs.forEach((doc: any) => {
           const s = parseSeverity(doc.severity).toLowerCase();
           if (s === 'critical') critical++;
           else if (s === 'high') high++;
@@ -1298,20 +1298,6 @@ export async function queryServerSideIncidents(
           const targetCount = Number(options.count);
           if (!isNaN(targetCount)) {
             mapped = mapped.filter((item) => Number(item.count || 1) === targetCount);
-            critical = 0;
-            high = 0;
-            medium = 0;
-            low = 0;
-            totalAlerts = 0;
-            mapped.forEach((item: any) => {
-              const s = String(item.severity || '').toLowerCase();
-              const cnt = Number(item.count || 1);
-              totalAlerts += cnt;
-              if (s === 'critical') critical += cnt;
-              else if (s === 'high') high += cnt;
-              else if (s === 'medium') medium += cnt;
-              else low += cnt;
-            });
           }
         }
 
@@ -1606,26 +1592,9 @@ export async function queryServerSideIncidents(
         : [];
 
       facetPipeline = {
-        severityStats: countMatchStage.length > 0
-          ? [
-              {
-                $group: {
-                  _id: { rule_id: '$rule_id', agent: '$host', ip: '$ip_source', date: '$date' },
-                  count: { $sum: 1 },
-                  severity: { $first: '$severity' }
-                }
-              },
-              ...countMatchStage,
-              {
-                $group: {
-                  _id: '$severity',
-                  count: { $sum: '$count' }
-                }
-              }
-            ]
-          : [
-              { $group: { _id: '$severity', count: { $sum: 1 } } }
-            ],
+        severityStats: [
+          { $group: { _id: '$severity', count: { $sum: 1 } } }
+        ],
         totalAlerts: countMatchStage.length > 0
           ? [
               {
@@ -1787,6 +1756,9 @@ export async function queryServerSideIncidents(
     }
 
     const optionsFacetPipeline = {
+      severityStats: [
+        { $group: { _id: '$severity', count: { $sum: 1 } } }
+      ],
       uniqueAgents: [
         { $match: { host: { $exists: true, $ne: '' } } },
         { $group: { _id: '$host' } },
@@ -1865,6 +1837,9 @@ export async function queryServerSideIncidents(
       rawAlertRows = rows || [];
       facetRes = statsResult || {};
       if (optionsResult && optionsResult[0]) {
+        if (optionsResult[0].severityStats) {
+          facetRes.severityStats = optionsResult[0].severityStats;
+        }
         facetRes.uniqueAgents = optionsResult[0].uniqueAgents;
         facetRes.uniqueIncidentNames = optionsResult[0].uniqueIncidentNames;
         facetRes.uniqueIpSources = optionsResult[0].uniqueIpSources;
@@ -1879,6 +1854,9 @@ export async function queryServerSideIncidents(
       const [[fRes], optionsResult] = await Promise.all([dataPromise, optionsPromise]);
       facetRes = fRes || {};
       if (optionsResult && optionsResult[0]) {
+        if (optionsResult[0].severityStats) {
+          facetRes.severityStats = optionsResult[0].severityStats;
+        }
         facetRes.uniqueAgents = optionsResult[0].uniqueAgents;
         facetRes.uniqueIncidentNames = optionsResult[0].uniqueIncidentNames;
         facetRes.uniqueIpSources = optionsResult[0].uniqueIpSources;
