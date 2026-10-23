@@ -129,6 +129,13 @@ export async function middleware(request: NextRequest) {
 
   // 2. `/login` page
   if (pathname === '/login') {
+    const hasExitSignal = request.cookies.has('asoc_notice');
+    if (hasExitSignal) {
+      const res = NextResponse.next();
+      clearSessionCookies(res);
+      return res;
+    }
+
     if (isAuthenticated) {
       return NextResponse.redirect(new URL('/dashboard', baseUrl));
     }
@@ -151,6 +158,15 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL('/login', baseUrl);
       const res = NextResponse.redirect(loginUrl);
       clearSessionCookies(res);
+      if (token) {
+        res.cookies.set('asoc_notice', 'expired', {
+          path: '/',
+          maxAge: 15,
+          httpOnly: false,
+          secure: isHttps,
+          sameSite: 'lax',
+        });
+      }
       return res;
     }
 

@@ -8,11 +8,6 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
     if (isHandlingAuth401) return res;
     isHandlingAuth401 = true;
 
-    try {
-      sessionStorage.clear();
-      localStorage.removeItem('user_session');
-    } catch {}
-
     if (!window.location.pathname.startsWith('/login')) {
       const authReason = res.headers.get('x-auth-reason');
       let isConcurrent = authReason === 'concurrent_login';
@@ -25,6 +20,16 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
           }
         } catch {}
       }
+
+      const noticeType = isConcurrent ? 'concurrent' : 'expired';
+      try {
+        document.cookie = `asoc_notice=${noticeType}; path=/; max-age=15; SameSite=Lax`;
+        sessionStorage.setItem('asoc_notice', noticeType);
+        sessionStorage.removeItem('user_session');
+        sessionStorage.removeItem('asoc_browser_session');
+        sessionStorage.removeItem('auth_me_cache');
+        localStorage.removeItem('user_session');
+      } catch {}
 
       // Proactively clear cookie via logout endpoint non-blockingly before replacing location
       try {

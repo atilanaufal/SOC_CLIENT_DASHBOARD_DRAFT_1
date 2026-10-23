@@ -67,7 +67,11 @@ export const Header: React.FC = () => {
         await invalidateClientCache();
       } catch {}
       try {
-        sessionStorage.clear();
+        document.cookie = 'asoc_notice=expired; path=/; max-age=15; SameSite=Lax';
+        sessionStorage.setItem('asoc_notice', 'expired');
+        sessionStorage.removeItem('user_session');
+        sessionStorage.removeItem('asoc_browser_session');
+        sessionStorage.removeItem('auth_me_cache');
         localStorage.removeItem('user_session');
         navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
       } catch {}
@@ -90,8 +94,21 @@ export const Header: React.FC = () => {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (res.status === 401) {
           isRedirecting = true;
+          const authReason = res.headers.get('x-auth-reason');
+          let isConcurrent = authReason === 'concurrent_login';
+          if (!isConcurrent) {
+            try {
+              const data = await res.json();
+              if (data?.code === 'CONCURRENT_LOGIN') isConcurrent = true;
+            } catch {}
+          }
+          const noticeType = isConcurrent ? 'concurrent' : 'expired';
           try {
-            sessionStorage.clear();
+            document.cookie = `asoc_notice=${noticeType}; path=/; max-age=15; SameSite=Lax`;
+            sessionStorage.setItem('asoc_notice', noticeType);
+            sessionStorage.removeItem('user_session');
+            sessionStorage.removeItem('asoc_browser_session');
+            sessionStorage.removeItem('auth_me_cache');
             localStorage.removeItem('user_session');
           } catch {}
           try {

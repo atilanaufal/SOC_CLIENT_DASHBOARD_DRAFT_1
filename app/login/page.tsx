@@ -17,13 +17,37 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Clean up URL query parameters if present
+      // Clean up URL query parameters if present (keeps address bar clean at /login)
       if (window.location.search) {
         window.history.replaceState({}, '', '/login');
       }
 
+      // Read flash notice from sessionStorage or cookie
+      let notice: string | null = null;
       try {
-        sessionStorage.clear();
+        notice = sessionStorage.getItem('asoc_notice');
+        sessionStorage.removeItem('asoc_notice');
+      } catch {}
+
+      if (!notice) {
+        const match = document.cookie.match(/(?:^|; )asoc_notice=([^;]*)/);
+        if (match) {
+          notice = decodeURIComponent(match[1]);
+          // Consume immediately (self-destructing flash cookie)
+          document.cookie = 'asoc_notice=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+        }
+      }
+
+      if (notice === 'concurrent') {
+        setIsConcurrentNotice(true);
+      } else if (notice === 'expired') {
+        setIsExpiredNotice(true);
+      }
+
+      try {
+        sessionStorage.removeItem('user_session');
+        sessionStorage.removeItem('asoc_browser_session');
+        sessionStorage.removeItem('auth_me_cache');
         localStorage.removeItem('user_session');
       } catch {}
       fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
