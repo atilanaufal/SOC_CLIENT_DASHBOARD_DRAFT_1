@@ -1,0 +1,133 @@
+import { betterAuth } from 'better-auth';
+import { username } from 'better-auth/plugins';
+import mysql from 'mysql2/promise';
+
+import { verifyUserCredentials } from './mysql';
+
+function getMysqlHost(): string {
+  return process.env.MYSQL_HOST || '127.0.0.1';
+
+}
+
+const MYSQL_PORT = Number(process.env.MYSQL_PORT) || 3306;
+const MYSQL_USER = process.env.MYSQL_USER || 'auth_user';
+
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'auth_db';
+
+// Ensure secret is securely provided
+const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ||
+  (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build'
+    ? (() => { throw new Error('CRITICAL: BETTER_AUTH_SECRET environment variable is missing.'); })()
+    : 'dev_default_secret_please_set_in_production_32_chars_long');
+
+
+// Create resilient connection pool for Better Auth
+export const authDbPool = mysql.createPool({
+  host: getMysqlHost(),
+  port: MYSQL_PORT,
+  user: MYSQL_USER,
+  password: MYSQL_PASSWORD,
+  database: MYSQL_DATABASE,
+  waitForConnections: true,
+  connectionLimit: 10,
+
+  connectTimeout: 3000,
+
+});
+
+export const auth = betterAuth({
+  database: authDbPool,
+
+  secret: BETTER_AUTH_SECRET,
+
+  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+  trustedOrigins: async () => {
+    const isProd = process.env.NODE_ENV === 'production';
+    const origins: string[] = [];
+
+    if (!isProd) {
+      origins.push('http://localhost:3000', 'http://127.0.0.1:3000');
+    }
+
+    if (process.env.BETTER_AUTH_URL) {
+      origins.push(process.env.BETTER_AUTH_URL);
+    }
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      origins.push(process.env.NEXT_PUBLIC_APP_URL);
+    }
+    if (process.env.BETTER_AUTH_TRUSTED_ORIGINS) {
+      origins.push(...process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(',').map((s) => s.trim()));
+    }
+
+    return Array.from(new Set(origins.filter(Boolean)));
+  },
+  advanced: {
+    useSecureCookies: process.env.NODE_ENV === 'production',
+  },
+  session: {
+    expiresIn: 60 * 15, // 15 minutes in seconds
+    updateAge: 60 * 5,  // update session if active
+  },
+  emailAndPassword: {
+    enabled: false, // Disabled: all authentication must go through custom hardened login route
+  },
+  user: {
+    modelName: 'users',
+    fields: {
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+    additionalFields: {
+      role: {
+        type: 'string',
+        required: false,
+        input: true,
+      },
+      tenantId: {
+        type: 'number',
+        fieldName: 'tenant_id',
+        required: false,
+        input: true,
+      },
+      tenant_id: {
+        type: 'number',
+        required: false,
+        input: true,
+      },
+    },
+  },
+  plugins: [
+    username(),
+  ],
+});
+
+/**
+ * Ensures a user from the master MySQL `users` & `tenants` table
+ * is synchronized with Better Auth `users` table.
+ */
+export async function syncMasterUserToBetterAuth(
+  usernameOrEmail: string,
+  plainPassword: string
+): Promise<{ success: boolean; error?: string; user?: any }> {
+  try {
+    // 1. Verify against master users/tenants table with bcrypt/salted hash
+    const check = await verifyUserCredentials(usernameOrEmail, plainPassword);
+    if (!check.success || !check.user) {
+      return { success: false, error: check.error || 'Autentikasi gagal.' };
+    }
+
+    const masterUser = check.user;
+    return { success: true, user: masterUser };
+  } catch (err: any) {
+    console.error('Error in syncMasterUserToBetterAuth:', err);
+
+    return {
+      success: false,
+      error: process.env.NODE_ENV === 'production'
+        ? 'Gagal memproses sinkronisasi akun pengguna.'
+        : `Database sync error: ${err.message}`,
+    };
+
+  }
+}

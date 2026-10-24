@@ -3,22 +3,63 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { HiOutlineEye, HiOutlineEyeSlash } from 'react-icons/hi2';
+import { HiOutlineEye, HiOutlineEyeSlash, HiOutlineExclamationTriangle } from 'react-icons/hi2';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isExpiredNotice, setIsExpiredNotice] = useState(false);
+  const [isConcurrentNotice, setIsConcurrentNotice] = useState(false);
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Clean up URL query parameters if present (keeps address bar clean at /login)
+      if (window.location.search) {
+        window.history.replaceState({}, '', '/login');
+      }
+
+      // Read flash notice from sessionStorage or cookie
+      let notice: string | null = null;
+      try {
+        notice = sessionStorage.getItem('asoc_notice');
+        sessionStorage.removeItem('asoc_notice');
+      } catch {}
+
+      if (!notice) {
+        const match = document.cookie.match(/(?:^|; )asoc_notice=([^;]*)/);
+        if (match) {
+          notice = decodeURIComponent(match[1]);
+          // Consume immediately (self-destructing flash cookie)
+          document.cookie = 'asoc_notice=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+        }
+      }
+
+      if (notice === 'concurrent') {
+        setIsConcurrentNotice(true);
+      } else if (notice === 'expired') {
+        setIsExpiredNotice(true);
+      }
+
+      try {
+        sessionStorage.removeItem('user_session');
+        sessionStorage.removeItem('asoc_browser_session');
+        sessionStorage.removeItem('auth_me_cache');
+        localStorage.removeItem('user_session');
+      } catch {}
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    }
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!email || !password) {
-      setErrorMessage('Silakan isi Email/Username dan Password.');
+    if (!username || !password) {
+      setErrorMessage('Please enter both Username and Password.');
       return;
     }
 
@@ -31,7 +72,7 @@ export default function LoginPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: email,
+          username: username,
           password: password,
         }),
       });
@@ -39,75 +80,99 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data.error || 'Login gagal. Periksa username dan password Anda.');
+        setErrorMessage(data.error || 'Login failed. Please check your username and password.');
         setIsLoading(false);
         return;
       }
 
-      // Save username in localStorage for frontend persistence
+      // Save user session in sessionStorage (destroyed on browser close)
       if (data.user) {
-        localStorage.setItem('user_session', JSON.stringify(data.user));
+        sessionStorage.setItem('user_session', JSON.stringify(data.user));
+        sessionStorage.setItem('asoc_browser_session', Date.now().toString());
       }
+      try {
+        localStorage.removeItem('user_session');
+        sessionStorage.removeItem('auth_me_cache');
+      } catch {}
 
-      // Redirect to dashboard on successful login
-      router.push('/dashboard');
+      // Always land directly to /dashboard upon successful authentication
+      window.location.href = '/dashboard';
     } catch (err: any) {
       console.error('Login submit error:', err);
-      setErrorMessage('Terjadi kesalahan koneksi ke server. Silakan coba lagi.');
+      setErrorMessage('Connection error to server. Please try again.');
       setIsLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 selection:bg-navy-800 selection:text-white">
-      <div className="w-full max-w-md space-y-6 text-center">
-        {/* Top Logo & Subtitle: Plain Gambar 1 Icon Only (No ASOC text) */}
-        <div className="flex flex-col items-center gap-2">
-          {/* Plain Gambar 1 Logo Icon */}
-          <div className="w-16 h-16 relative flex items-center justify-center mb-1">
+    <main className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-[#002B9A] selection:text-white">
+      <div className="w-full max-w-md space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+        {/* Top Logo & Subtitle */}
+        <div className="flex flex-col items-center gap-2.5">
+          {/* Logo Container with Glass Accent */}
+          <div className="w-14 h-14 rounded-lg bg-white/80 backdrop-blur-xl border border-white/80 flex items-center justify-center p-2">
             <Image
-              src="/tguard.png"
-              alt="Logo"
-              width={64}
-              height={64}
+              src="/infoguard.png"
+              alt="InfoGuard Logo"
+              width={48}
+              height={48}
               className="object-contain"
               priority
             />
           </div>
           
-          <p className="text-base font-semibold text-gray-800">
-            Sign in to your tenant security console
-          </p>
+          <div>
+            <h1 className="text-xl font-black text-[#002B9A] tracking-tight">
+              ASOC Dashboard
+            </h1>
+            <p className="text-xs font-bold text-gray-600 mt-1">
+              Sign in to manage and monitor your security posture
+            </p>
+          </div>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-8 text-left space-y-5">
+        {/* Login Frosted Glass Card - 80% Opacity & rounded-lg */}
+        <div className="bg-white/80 backdrop-blur-2xl rounded-lg border border-white/80 p-6 sm:p-7 text-left space-y-4">
+          {isConcurrentNotice && (
+            <div className="bg-amber-50/90 backdrop-blur-md border border-amber-300 text-amber-900 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <span>Another user has logged into this account from another session. You have been logged out.</span>
+            </div>
+          )}
+
+          {isExpiredNotice && (
+            <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <span>Your session has expired for security reasons due to 15 minutes of inactivity. Please sign in again.</span>
+            </div>
+          )}
+
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-semibold animate-in fade-in duration-150 flex items-start gap-2">
-              <span className="font-bold">⚠️</span>
+            <div className="bg-red-50/80 backdrop-blur-md border border-red-200/80 text-red-700 px-3.5 py-2.5 rounded-md text-xs font-bold animate-in fade-in duration-150 flex items-start gap-2">
+              <HiOutlineExclamationTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleSignIn} className="space-y-5">
+          <form onSubmit={handleSignIn} className="space-y-3.5">
             <div>
-              <label htmlFor="email-input" className="block text-base font-bold text-gray-900 mb-1.5">
-                Email
+              <label htmlFor="username-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
+                Username
               </label>
               <input
-                id="email-input"
+                id="username-input"
                 type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter you email"
-                className="w-full bg-[#f3f4f6] border border-gray-300 rounded-lg px-4 py-3 text-gray-900 font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:bg-white transition"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                className="w-full bg-white/60 hover:bg-white/80 focus:bg-white/95 backdrop-blur-md border border-white/80 rounded-md px-3.5 py-2.5 text-xs text-gray-900 font-semibold placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#002B9A] focus:border-[#002B9A] transition"
                 required
                 disabled={isLoading}
               />
             </div>
 
             <div>
-              <label htmlFor="password-input" className="block text-base font-bold text-gray-900 mb-1.5">
+              <label htmlFor="password-input" className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -116,22 +181,22 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter you password"
-                  className="w-full bg-[#f3f4f6] border border-gray-300 rounded-lg pl-4 pr-11 py-3 text-gray-900 font-medium placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:bg-white transition"
+                  placeholder="Enter your password"
+                  className="w-full bg-white/60 hover:bg-white/80 focus:bg-white/95 backdrop-blur-md border border-white/80 rounded-md pl-3.5 pr-10 py-2.5 text-xs text-gray-900 font-semibold placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#002B9A] focus:border-[#002B9A] transition"
                   required
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-800 transition cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 transition cursor-pointer"
                   title={showPassword ? 'Hide password' : 'Show password'}
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    <HiOutlineEyeSlash className="w-5 h-5" />
+                    <HiOutlineEyeSlash className="w-4 h-4" />
                   ) : (
-                    <HiOutlineEye className="w-5 h-5" />
+                    <HiOutlineEye className="w-4 h-4" />
                   )}
                 </button>
               </div>
@@ -140,11 +205,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-lg py-3 rounded-lg transition shadow-md disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-[#002B9A] hover:bg-[#002175] active:bg-[#001854] text-white font-extrabold text-xs py-2.5 rounded-md transition disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer border border-[#002175] mt-2"
             >
               {isLoading ? (
                 <>
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   <span>Signing In...</span>
                 </>
               ) : (
@@ -155,8 +220,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer Note */}
-        <p className="text-sm font-semibold text-gray-800 pt-1">
-          Don&apos;t have an account? Ask your admin to create one for you.
+        <p className="text-xs font-bold text-gray-500">
+          Don&apos;t have an account? Ask your administrator for access.
         </p>
       </div>
     </main>

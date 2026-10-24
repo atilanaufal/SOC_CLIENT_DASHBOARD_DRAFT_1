@@ -1,32 +1,37 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  HiOutlineMagnifyingGlass,
-  HiOutlineArrowPath,
   HiOutlineDocumentText,
+  HiOutlineMagnifyingGlass,
   HiOutlineAdjustmentsHorizontal,
+  HiOutlineArrowPath,
+  HiOutlineXMark,
   HiChevronUp,
-  HiChevronDown
+  HiChevronDown,
 } from 'react-icons/hi2';
-import { SecurityReport } from '@/lib/mock-data';
+import { SecurityReport } from '@/lib/types';
 import { fetchReports } from '@/lib/api-client';
 import { ReportDetailDrawer } from '@/components/drawers/ReportDetailDrawer';
 import { ReportDetailsModal } from '@/components/modals/ReportDetailsModal';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
+import { Pagination } from '@/components/ui/Pagination';
+import { formatDateTimeAndAgo, getTimestamp } from '@/lib/date-utils';
+import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
 type SortKey = 'reportName' | 'severity' | 'dateGenerated';
 type SortDirection = 'asc' | 'desc';
 
 function renderSeverityBadge(sev: string) {
   const s = String(sev || '').toLowerCase();
-  if (s === 'critical') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-red-100 text-red-800 border border-red-300">Critical</span>;
-  if (s === 'high') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-orange-100 text-orange-800 border border-orange-300">High</span>;
-  if (s === 'medium') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">Medium</span>;
-  if (s === 'low') return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-blue-100 text-blue-800 border border-blue-300">Low</span>;
-  return <span className="inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black bg-slate-100 text-slate-800 border border-slate-300">Info</span>;
+  const baseClasses = "inline-block px-2 sm:px-2 xl:px-2.5 2xl:px-3 py-0.5 xl:py-1 rounded-md text-xs sm:text-xs xl:text-sm 2xl:text-base font-bold";
+  if (s === 'critical') return <span className={`${baseClasses} bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]`}>Critical</span>;
+  if (s === 'high') return <span className={`${baseClasses} bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]`}>High</span>;
+  if (s === 'medium') return <span className={`${baseClasses} bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]`}>Medium</span>;
+  if (s === 'low') return <span className={`${baseClasses} bg-blue-100 text-blue-800 border border-blue-300`}>Low</span>;
+  return <span className={`${baseClasses} bg-slate-100 text-slate-800 border border-slate-300`}>Info</span>;
 }
 
 function ReportsContent() {
@@ -45,26 +50,58 @@ function ReportsContent() {
   const [selectedFullReport, setSelectedFullReport] = useState<SecurityReport | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Sorting state
+  // Sorting state (default: newest first)
   const [sortKey, setSortKey] = useState<SortKey>('dateGenerated');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
+    const cacheKey = `reports:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+
+    if (!forceRefresh) {
+      try {
+        const cached = await getClientCache<SecurityReport[]>(cacheKey);
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          setReports(cached);
+          setIsLoading(false);
+
+          if (targetReportId) {
+            const found = cached.find((r) => r.id === targetReportId || String(r.report_id) === targetReportId);
+            if (found) {
+              setSelectedReport(found);
+              setIsDrawerOpen(true);
+            }
+          }
+          return;
+        }
+      } catch {}
+    } else {
+      await invalidateClientCache(cacheKey);
+    }
+
     try {
       setIsLoading(true);
       setError(null);
       const data = await fetchReports({
         timeRange: timeFilter,
-        startDate: customRange?.startDate,
-        endDate: customRange?.endDate,
+        startDate: customRange?.startDate || undefined,
+        endDate: customRange?.endDate || undefined,
       });
-      setReports(data);
+      const reportList = data || [];
+      setReports(reportList);
+      setClientCache(cacheKey, reportList);
+
+      if (targetReportId && reportList.length > 0) {
+        const found = reportList.find((r) => r.id === targetReportId || String(r.report_id) === targetReportId);
+        if (found) {
+          setSelectedReport(found);
+          setIsDrawerOpen(true);
+        }
+      }
     } catch (err: any) {
-      console.error('Failed to load reports:', err);
-      setError(err.message || 'Failed to load reports');
+      setError(err.message || 'Failed to fetch reports');
     } finally {
       setIsLoading(false);
     }
@@ -72,18 +109,48 @@ function ReportsContent() {
 
   useEffect(() => {
     loadData();
-  }, [timeFilter, customRange]);
+  }, [timeFilter, customRange, targetReportId]);
 
-  useEffect(() => {
-    if (targetReportId && reports.length > 0) {
-      const found = reports.find((r) => r.id === targetReportId || r.report_id === Number(targetReportId) || r._id === targetReportId);
-      if (found) {
-        setSelectedReport(found);
-        setIsDrawerOpen(true);
+  const filterSections: FilterSection[] = useMemo(() => {
+    const severities = Array.from(new Set(reports.map((r) => r.severity).filter(Boolean)));
+
+    return [
+      {
+        key: 'severity',
+        label: 'Severity Level',
+        type: 'buttons',
+        options: severities.length ? severities : ['Critical', 'High', 'Medium'],
+      },
+    ];
+  }, [reports]);
+
+  const handleApplyFilters = (filters: Record<string, string>) => {
+    setActiveFilters(filters);
+    setCurrentPage(1);
+  };
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((r) => {
+      // Search
+      const search = searchTerm.toLowerCase();
+      const matchSearch =
+        !searchTerm ||
+        r.reportName.toLowerCase().includes(search) ||
+        (r.summary && r.summary.toLowerCase().includes(search)) ||
+        (r.recommendedAction && r.recommendedAction.toLowerCase().includes(search));
+
+      if (!matchSearch) return false;
+
+      // Filter
+      if (activeFilters.severity && activeFilters.severity !== 'All') {
+        if (r.severity.toLowerCase() !== activeFilters.severity.toLowerCase()) return false;
       }
-    }
-  }, [targetReportId, reports]);
 
+      return true;
+    });
+  }, [reports, searchTerm, activeFilters]);
+
+  // Handle Sort
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -95,53 +162,31 @@ function ReportsContent() {
         setSortDirection('asc');
       }
     }
+    setCurrentPage(1);
   };
 
-  const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(reports.map((r) => r.severity))).filter(Boolean);
-
-    return [
-      { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-    ];
-  }, [reports]);
-
-  const filteredReports = useMemo(() => {
-    return reports.filter((rep) => {
-      const matchesSearch =
-        rep.reportName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rep.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (rep.recommendedAction && rep.recommendedAction.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : String(rep.severity || '').toLowerCase() === activeFilters.severity.toLowerCase();
-
-      return matchesSearch && matchesSeverity;
-    });
-  }, [reports, searchTerm, activeFilters]);
-
   const sortedReports = useMemo(() => {
-    return [...filteredReports].sort((a: any, b: any) => {
-      if (sortKey === 'dateGenerated') {
-        const getTime = (r: any) => {
-          const raw = r.date_generated || r.dateGenerated || r.created_at || r.date;
-          if (!raw) return 0;
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? 0 : d.getTime();
-        };
-        const aTime = getTime(a);
-        const bTime = getTime(b);
-        return sortDirection === 'desc' ? bTime - aTime : aTime - bTime;
-      }
-
-      let aVal: any = a[sortKey] || '';
-      let bVal: any = b[sortKey] || '';
+    return [...filteredReports].sort((a, b) => {
+      let aVal = a[sortKey] || '';
+      let bVal = b[sortKey] || '';
 
       if (sortKey === 'severity') {
-        const order: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, informational: 0, info: 0 };
-        aVal = order[String(aVal).toLowerCase()] || 0;
-        bVal = order[String(bVal).toLowerCase()] || 0;
+        const severityWeight: Record<string, number> = {
+          critical: 4,
+          high: 3,
+          medium: 2,
+          low: 1,
+          unspecified: 0,
+        };
+        const aWeight = severityWeight[String(aVal).toLowerCase()] || 0;
+        const bWeight = severityWeight[String(bVal).toLowerCase()] || 0;
+        return sortDirection === 'asc' ? aWeight - bWeight : bWeight - aWeight;
+      }
+
+      if (sortKey === 'dateGenerated') {
+        const timeA = getTimestamp(aVal);
+        const timeB = getTimestamp(bVal);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
       }
 
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
@@ -178,202 +223,271 @@ function ReportsContent() {
   };
 
   return (
-    <div className="h-full flex flex-row gap-3 w-full overflow-hidden">
-      {/* Left Container: KPI Card + Search Bar + Table */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0 h-full overflow-hidden">
-        {/* KPI */}
-        <div className="max-w-md bg-white p-3.5 rounded-md border border-gray-200 flex items-center gap-3.5 flex-shrink-0">
-          <div className="w-12 h-12 rounded-md bg-navy-800 text-white flex items-center justify-center font-black text-xs shadow-xs">
-            <HiOutlineDocumentText className="w-6 h-6 text-blue-300" />
-          </div>
-          <div>
-            <h4 className="font-black text-sm text-gray-900">Total Reports</h4>
-            <p className="text-2xl font-black text-navy-800">
-              {filteredReports.length} <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Available</span>
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Container: KPI Card + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
+
+        {/* Total Reports KPI */}
+        <div className="max-w-md bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2 flex-shrink-0">
+          <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+            Total Reports
+          </p>
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#002B9A]/95 backdrop-blur-sm text-white flex items-center justify-center font-bold text-xs border border-white/20 shadow-[0_4px_12px_rgba(0,43,154,0.3)] flex-shrink-0">
+              <HiOutlineDocumentText className="w-6 h-6 text-blue-300" />
+            </div>
+            <p className="text-2xl sm:text-3xl font-black text-[#002B9A]">
+              {filteredReports.length} <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Available</span>
             </p>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <HiOutlineMagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                placeholder="Search Reports"
-                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy-800"
-              />
-            </div>
+        {/* Filter Toolbar - Responsive on Mobile & Desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="relative flex-1 order-2 sm:order-1">
+            <HiOutlineMagnifyingGlass className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              placeholder="Search Reports"
+              className="w-full bg-white/80 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-sm"
+            />
+          </div>
 
+          <div className="flex items-center gap-2 order-1 sm:order-2 justify-end">
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+              title="Filter"
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
             >
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
-              <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
+              <span className="hidden sm:inline">Filter</span>
+              {activeCount > 0 && <span className="text-blue-300 text-xs">({activeCount})</span>}
+            </button>
+
+            <button
+              onClick={() => loadData(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
+              title="Refresh"
+            >
+              <HiOutlineArrowPath className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-
-          <button
-            onClick={() => loadData()}
-            className="bg-gray-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
-          >
-            <HiOutlineArrowPath className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
         </div>
 
-        {/* Data Table Container */}
-        <div className="bg-white rounded-md border border-gray-200 flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-navy-800 text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none">
-                  <th onClick={() => handleSort('reportName')} className="py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Report Name</span>
-                      {renderSortIndicator('reportName')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('severity')} className="py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Severity</span>
-                      {renderSortIndicator('severity')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('dateGenerated')} className="py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Date Generated</span>
-                      {renderSortIndicator('dateGenerated')}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 text-xs font-semibold">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center font-bold text-gray-500">
-                      Loading reports from database...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center font-bold text-red-600">
-                      Error: {error}
-                    </td>
-                  </tr>
-                ) : paginatedReports.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center font-bold text-gray-500">
-                      No reports found.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedReports.map((rep) => {
-                    const isSelected = isDrawerOpen && selectedReport?.id === rep.id;
-                    const parts = (rep.dateGenerated || '').split(' ');
-                    const datePart = parts.slice(0, 3).join(' ');
-                    const timePart = parts.slice(3).join(' ');
-
-                    return (
-                      <tr
-                        key={rep.id}
-                        onClick={() => handleToggleDetail(rep)}
-                        className={`cursor-pointer transition ${
-                          isSelected ? 'bg-blue-100/80 border-l-4 border-l-navy-800' : 'hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <td className="py-2 px-3.5 text-gray-900 font-extrabold">
-                          <div className="flex items-center gap-2">
-                            <HiOutlineDocumentText className="w-4 h-4 text-navy-800 flex-shrink-0" />
-                            <span>{rep.reportName}</span>
-                          </div>
-                        </td>
-
-                        <td className="py-2 px-3.5 font-bold">
-                          {renderSeverityBadge(rep.severity)}
-                        </td>
-
-                        <td className="py-2 px-3.5">
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs">{datePart}</span>
-                            <span className="text-[11px] text-gray-500 font-semibold">{timePart}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        {/* Active Filter Badges */}
+        {(activeCount > 0 || searchTerm.trim()) && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 uppercase tracking-wider">
+              Active Filters:
+            </span>
+            {activeFilters.severity && activeFilters.severity !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Severity:</span>
+                <strong className="text-amber-800 font-black">{activeFilters.severity}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.severity;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove severity filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {searchTerm.trim() && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Search:</span>
+                <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Clear search"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setActiveFilters({});
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+            >
+              Clear all
+            </button>
           </div>
+        )}
+
+        {/* Data Container */}
+        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+          {isLoading ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              Loading reports...
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-red-600">
+              Error: {error}
+            </div>
+          ) : paginatedReports.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              No reports found.
+            </div>
+          ) : (
+            <>
+              {/* MOBILE CARD LIST VIEW (Phones: < md) */}
+              <div className="block md:hidden divide-y divide-gray-100 p-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+                {paginatedReports.map((report) => {
+                  const isSelected = Boolean(isDrawerOpen && selectedReport?.id === report.id);
+                  const { dateTime, timeAgo } = formatDateTimeAndAgo(report.dateGenerated);
+
+                  return (
+                    <div
+                      key={report.id}
+                      onClick={() => handleToggleDetail(report)}
+                      className={`p-3 rounded-xl transition cursor-pointer mb-2 border ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-[#002B9A]/30 shadow-sm'
+                          : 'bg-white/80 hover:bg-blue-50/50 border-white/80 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div>{renderSeverityBadge(report.severity)}</div>
+                        <span className="text-[11px] text-gray-500 font-medium">
+                          {timeAgo || dateTime}
+                        </span>
+                      </div>
+
+                      <p className="text-sm font-extrabold text-[#002B9A] leading-snug mb-2 break-words">
+                        {report.reportName}
+                      </p>
+
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100">
+                        <span className="text-gray-500 font-medium">Click to view recommendations</span>
+                        <span className="text-xs text-[#002B9A] font-extrabold hover:underline">
+                          View Details →
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP DATA TABLE (md+) */}
+              <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
+                <table className="w-full text-left border-collapse table-fixed min-w-[650px]">
+                  <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                      <th onClick={() => handleSort('reportName')} className="bg-[#002B9A] w-[58%] lg:w-[62%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Report Name</span>
+                          {renderSortIndicator('reportName')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('severity')} className="bg-[#002B9A] w-[18%] lg:w-[16%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition whitespace-nowrap">
+                        <div className="flex items-center text-white">
+                          <span>Severity</span>
+                          {renderSortIndicator('severity')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('dateGenerated')} className="bg-[#002B9A] w-[24%] lg:w-[22%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition whitespace-nowrap">
+                        <div className="flex items-center text-white">
+                          <span>Date Generated</span>
+                          {renderSortIndicator('dateGenerated')}
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
+                    {paginatedReports.map((report) => {
+                      const isSelected = Boolean(isDrawerOpen && selectedReport?.id === report.id);
+                      const { dateTime, timeAgo } = formatDateTimeAndAgo(report.dateGenerated);
+
+                      return (
+                        <tr
+                          key={report.id}
+                          onClick={() => handleToggleDetail(report)}
+                          className={`cursor-pointer transition ${
+                            isSelected
+                              ? 'bg-blue-100/80'
+                              : 'hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <td className="relative py-3 px-3.5 xl:px-4 text-[#002B9A] font-bold align-middle">
+                            {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                            <span className="block break-words whitespace-normal leading-snug">{report.reportName}</span>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 font-medium align-middle whitespace-nowrap">
+                            {renderSeverityBadge(report.severity)}
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 align-middle whitespace-nowrap">
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white border-t border-gray-200 px-3.5 py-2 flex items-center justify-between text-xs font-bold text-gray-800 flex-shrink-0">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
               Showing {filteredReports.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredReports.length)} of {filteredReports.length} Reports
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ◄
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-2 py-0.5 rounded-md transition ${
-                      currentPage === pageNum
-                        ? 'bg-navy-800 text-white font-extrabold'
-                        : 'hover:bg-gray-100 text-gray-700 font-bold'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ►
-              </button>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>
 
-      {/* Right Container: Detail Drawer */}
+      {/* Slide-out Drawer */}
       <ReportDetailDrawer
-        report={selectedReport}
         isOpen={isDrawerOpen}
-        onClose={() => { setIsDrawerOpen(false); setSelectedReport(null); }}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedReport(null);
+        }}
+        report={selectedReport}
         onOpenFullSummary={(rep) => setSelectedFullReport(rep)}
       />
 
-      {/* Large Full Summary Modal */}
+      {/* Full Screen Report Detail Modal */}
       <ReportDetailsModal
-        report={selectedFullReport}
-        isOpen={!!selectedFullReport}
+        isOpen={Boolean(selectedFullReport)}
         onClose={() => setSelectedFullReport(null)}
+        report={selectedFullReport}
       />
 
+      {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={(filters) => { setActiveFilters(filters); setCurrentPage(1); }}
-        initialFilters={activeFilters}
-        sections={adaptiveFilterSections}
         title="Filter Reports"
+        sections={filterSections}
+        initialFilters={activeFilters}
+        onApply={handleApplyFilters}
       />
     </div>
   );
@@ -381,7 +495,7 @@ function ReportsContent() {
 
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<div className="p-4 font-bold text-gray-700">Loading Reports...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-sm font-semibold text-gray-500">Loading reports...</div>}>
       <ReportsContent />
     </Suspense>
   );

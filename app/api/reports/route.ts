@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getReportsCollection } from '@/lib/db';
-import { ObjectId } from 'mongodb';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
+
+import { parseCustomDate } from '@/lib/date-utils';
 
 function formatDate(val: any): string {
   if (!val) return 'N/A';
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const d = parseCustomDate(val);
+    if (!d || isNaN(d.getTime())) return String(val);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     return `${dateStr} ${timeStr}`;
@@ -19,7 +21,7 @@ function formatDate(val: any): string {
 }
 
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
-  if (!range || range === 'All') return true;
+  if (!range || range.toLowerCase() === 'all') return true;
 
   const rawDate = doc.date_generated || doc.synced_at || doc.created_at || doc.date || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null);
   if (!rawDate) return true;
@@ -56,8 +58,10 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   }
 
   if (lower === 'this week' || lower === '7d') {
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return d >= startOfWeek;
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return d >= mondayThisWeek;
   }
 
   if (lower === 'this month' || lower === '30d') {
@@ -77,7 +81,14 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const collection = await getReportsCollection();
+
+    const { tenant, error } = await getTenantContextWithStatus(request);
+    if (!tenant) {
+      return createAuthErrorResponse(error);
+    }
+
+
+    const collection = await getReportsCollection(tenant.databaseName);
 
     const query: Record<string, any> = {};
 
@@ -98,7 +109,7 @@ export async function GET(request: Request) {
 
     const docs = await collection.find(query).sort({ _id: -1 }).toArray();
 
-    // Filter reports by time range while guaranteeing Report ID 1 is always preserved
+    // Filter reports by time range
     const timeFilteredDocs = docs.filter((doc) => matchesTimeRange(doc, timeRange, startDate, endDate));
 
     const reports = timeFilteredDocs.map((doc) => {
@@ -113,27 +124,36 @@ export async function GET(request: Request) {
         report_id: doc.report_id,
         report_uuid: doc.report_uuid,
         soc_id: doc.soc_id,
+        customerName: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
+        customer_name: doc.customer_name || doc.customerName || doc.client_name || tenant.campusName || 'N/A',
         severity: doc.severity || 'Unspecified',
         dateGenerated: formatDate(rawDate),
-        date_generated: rawDate ? String(rawDate) : undefined,
+        date_generated: rawDate ? (rawDate instanceof Date ? rawDate.toISOString() : String(rawDate)) : undefined,
         lastUpdated: formatDate(doc.synced_at || rawDate),
         synced_at: doc.synced_at ? String(doc.synced_at) : undefined,
         summary: doc.summary || 'No summary description provided.',
         recommendedAction: doc.recommended_action || 'No recommended action specified.',
         recommended_action: doc.recommended_action || 'No recommended action specified.',
-        type: 'Security Alert Incident'
+        type: 'Security Alert Incident',
+        tenant: tenant.campusName
       };
     });
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
       total: reports.length,
       data: reports
     });
   } catch (error: any) {
     console.error('Error in GET /api/reports:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch reports' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat laporan DFIR.'
+          : error.message || 'Failed to fetch reports',
+      },
       { status: 500 }
     );
   }

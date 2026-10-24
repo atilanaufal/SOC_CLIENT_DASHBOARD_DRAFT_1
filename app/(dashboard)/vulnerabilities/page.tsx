@@ -1,237 +1,215 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   HiOutlineMagnifyingGlass,
+  HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowPath,
   HiOutlineCheckCircle,
-  HiOutlineShieldExclamation,
-  HiOutlineAdjustmentsHorizontal,
-  HiOutlineXCircle,
+  HiOutlineXMark,
   HiChevronUp,
-  HiChevronDown
+  HiChevronDown,
 } from 'react-icons/hi2';
-import { Vulnerability } from '@/lib/mock-data';
-import { fetchVulnerabilities } from '@/lib/api-client';
+import { Vulnerability } from '@/lib/types';
+import { fetchVulnerabilities, FetchVulnerabilitiesResponse } from '@/lib/api-client';
 import { VulnerabilityDetailDrawer } from '@/components/drawers/VulnerabilityDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { useTimeFilter } from '@/lib/time-filter-context';
+import { Pagination } from '@/components/ui/Pagination';
+import { formatDateTimeAndAgo, formatNumber } from '@/lib/date-utils';
+import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
 type SortKey = 'name' | 'severity' | 'status' | 'agent' | 'cveId' | 'detectionDate';
 type SortDirection = 'asc' | 'desc';
 
-function isWithinTimeFilter(
-  dateStr: string,
-  filter: string,
-  customRange?: { startDate: string; endDate: string } | null
-): boolean {
-  if (!dateStr || dateStr === 'N/A') return true;
-  try {
-    const itemDate = new Date(dateStr);
-    if (isNaN(itemDate.getTime())) return true;
+function VulnerabilitiesContent() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('search') || searchParams.get('agent') || '';
 
-    if (filter === 'Custom' || filter.toLowerCase().startsWith('custom')) {
-      if (customRange?.startDate && customRange?.endDate) {
-        const start = new Date(`${customRange.startDate}T00:00:00.000`);
-        const end = new Date(`${customRange.endDate}T23:59:59.999`);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          return itemDate >= start && itemDate <= end;
-        }
-      }
-      return true;
-    }
-
-    const now = Date.now();
-    const diffMs = now - itemDate.getTime();
-
-    if (filter === 'Today') {
-      return diffMs <= 24 * 60 * 60 * 1000 || itemDate.toDateString() === new Date().toDateString();
-    } else if (filter === 'This Week') {
-      return diffMs <= 7 * 24 * 60 * 60 * 1000;
-    } else if (filter === 'This Month') {
-      return diffMs <= 30 * 24 * 60 * 60 * 1000;
-    }
-  } catch {
-    return true;
-  }
-  return true;
-}
-
-export default function VulnerabilitiesPage() {
   const { timeFilter, customRange } = useTimeFilter();
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [filteredTotal, setFilteredTotal] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  // Stats for Donut Chart & Cards
+  const [stats, setStats] = useState({
+    total: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    solved: 0,
+  });
+
+  // Top Vulnerability Distribution for Donut Widget
+  const [vulnDistSegments, setVulnDistSegments] = useState<Array<{
+    label: string;
+    value: number;
+    color: string;
+    fullLabel: string;
+  }>>([]);
+
+  // Filter options from database
+  const [filterOptions, setFilterOptions] = useState<{
+    agents: string[];
+    categories: string[];
+    vulnerabilities: string[];
+  }>({
+    agents: [],
+    categories: [],
+    vulnerabilities: [],
+  });
+
+  // Search & Filter state
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Sorting state
+  // Sorting state (default: newest first)
   const [sortKey, setSortKey] = useState<SortKey>('detectionDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  // Server Pagination state (10 items per page)
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const loadData = async () => {
+  // Cycle tracking to discard stale async responses
+  const cycleIdRef = React.useRef<number>(0);
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 whenever filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, activeFilters, timeFilter, customRange]);
+
+  // Fetch server-side paginated & aggregated data with in-memory caching
+  const loadData = async (forceRefresh = false) => {
+    cycleIdRef.current += 1;
+    const currentCycle = cycleIdRef.current;
+
+    const cacheKey = `vulnerabilities:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}:${currentPage}:${sortKey}:${sortDirection}:${debouncedSearch}:${JSON.stringify(activeFilters)}`;
+
+    // Read from in-memory cache if navigating between pages in same session
+    if (!forceRefresh) {
+      try {
+        const cached = await getClientCache<FetchVulnerabilitiesResponse>(cacheKey);
+        if (cycleIdRef.current !== currentCycle) return;
+
+        if (cached && Array.isArray(cached.data)) {
+          setVulnerabilities(cached.data);
+          setFilteredTotal(cached.filteredTotal);
+          setTotalPages(cached.totalPages);
+          if (cached.stats) setStats(cached.stats);
+          if (cached.distribution) setVulnDistSegments(cached.distribution);
+          if (cached.filterOptions) setFilterOptions(cached.filterOptions);
+          setLoading(false);
+          return;
+        }
+      } catch (cacheErr) {
+        console.warn('[Vulnerabilities] Cache read notice:', cacheErr);
+      }
+    } else {
+      await invalidateClientCache(cacheKey);
+    }
+
     try {
-      setIsLoading(true);
+      setLoading(true);
       setError(null);
-      const data = await fetchVulnerabilities({
+
+      const res = await fetchVulnerabilities({
+        page: currentPage,
+        limit: pageSize,
+        search: debouncedSearch,
+        severity: activeFilters.severity,
+        status: activeFilters.status,
+        category: activeFilters.category,
+        vulnerability: activeFilters.vulnerability,
+        agent: activeFilters.agent,
+        sortBy: sortKey,
+        sortOrder: sortDirection,
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
       });
-      setVulnerabilities(data);
+
+      if (cycleIdRef.current !== currentCycle) return;
+
+      setVulnerabilities(res.data);
+      setFilteredTotal(res.filteredTotal);
+      setTotalPages(res.totalPages);
+      setStats(res.stats);
+      setVulnDistSegments(res.distribution);
+      setFilterOptions(res.filterOptions);
+      setLoading(false);
+
+      // Save to in-memory session cache
+      setClientCache(cacheKey, res);
     } catch (err: any) {
-      console.error('Failed to load vulnerabilities:', err);
-      setError(err.message || 'Failed to load vulnerabilities');
-    } finally {
-      setIsLoading(false);
+      if (cycleIdRef.current === currentCycle) {
+        console.error('Error fetching server-side vulnerabilities:', err);
+        setError(err.message || 'Failed to load vulnerability data from database.');
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [timeFilter, customRange]);
+    return () => {
+      cycleIdRef.current += 1;
+    };
+  }, [currentPage, sortKey, sortDirection, debouncedSearch, activeFilters, timeFilter, customRange]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      if (key === 'detectionDate') {
-        setSortDirection('desc');
-      } else {
-        setSortDirection('asc');
-      }
+      setSortDirection(key === 'detectionDate' ? 'desc' : 'asc');
     }
+    setCurrentPage(1);
   };
 
+  // Adaptive Filter Sections dynamically populated from MongoDB facet options
   const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(vulnerabilities.map((v) => v.severity))).filter(Boolean);
-    const statuses = Array.from(new Set(vulnerabilities.map((v) => v.status))).filter(Boolean);
-    const classifications = Array.from(new Set(vulnerabilities.map((v) => v.classification || v.category).filter(Boolean))) as string[];
-    const agents = Array.from(new Set(vulnerabilities.map((v) => v.agent))).filter(Boolean);
+    const severities = ['Critical', 'High', 'Medium'];
+    const statuses = ['Active', 'Solved'];
+    const agents = filterOptions.agents || [];
+    const names = filterOptions.vulnerabilities || [];
 
     return [
-      { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-      { key: 'status', label: 'Patch Status', type: 'buttons', options: statuses.length ? statuses : ['Patched', 'Not Patched'] },
-      { key: 'classification', label: 'Category', type: 'buttons', options: classifications },
+      { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities },
+      { key: 'status', label: 'Status', type: 'buttons', options: statuses },
       { key: 'agent', label: 'Agent', type: 'select', options: agents },
+      { key: 'vulnerability', label: 'Vulnerability Name', type: 'select', options: names },
     ];
-  }, [vulnerabilities]);
+  }, [filterOptions]);
 
-  const filteredVulns = useMemo(() => {
-    return vulnerabilities.filter((vuln) => {
-      const matchesSearch =
-        vuln.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vuln.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vuln.cveId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (vuln.ip && vuln.ip.toLowerCase().includes(searchTerm.toLowerCase()));
+  const handleApplyFilters = (filters: Record<string, string>) => {
+    setActiveFilters(filters);
+    setCurrentPage(1);
+  };
 
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : String(vuln.severity || '').toLowerCase() === activeFilters.severity.toLowerCase();
-
-      const matchesStatus =
-        !activeFilters.status || activeFilters.status === 'All'
-          ? true
-          : vuln.status === activeFilters.status;
-
-      const matchesClass =
-        !activeFilters.classification || activeFilters.classification === 'All'
-          ? true
-          : (vuln.classification || vuln.category) === activeFilters.classification;
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : vuln.agent === activeFilters.agent;
-
-      const matchesTime = isWithinTimeFilter(vuln.detectionDate, timeFilter, customRange);
-
-      return matchesSearch && matchesSeverity && matchesStatus && matchesClass && matchesAgent && matchesTime;
-    });
-  }, [vulnerabilities, searchTerm, activeFilters, timeFilter, customRange]);
-
-  const sortedVulns = useMemo(() => {
-    return [...filteredVulns].sort((a: any, b: any) => {
-      if (sortKey === 'detectionDate') {
-        const getTime = (v: any) => {
-          const raw = v.detected_at || v.last_seen || v.first_seen || v.detectionDate || v.date;
-          if (!raw) return 0;
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? 0 : d.getTime();
-        };
-        const aTime = getTime(a);
-        const bTime = getTime(b);
-        return sortDirection === 'desc' ? bTime - aTime : aTime - bTime;
-      }
-
-      let aVal: any = a[sortKey] || '';
-      let bVal: any = b[sortKey] || '';
-
-      if (sortKey === 'severity') {
-        const order: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-        aVal = order[String(aVal).toLowerCase()] || 0;
-        bVal = order[String(bVal).toLowerCase()] || 0;
-      }
-
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredVulns, sortKey, sortDirection]);
-
-  // Compute real metrics & dynamic Vuln Distribution by category
-  const { stats, vulnDistSegments } = useMemo(() => {
-    let c = 0, h = 0, m = 0, patched = 0;
-    const catMap = new Map<string, number>();
-
-    filteredVulns.forEach((v) => {
-      const sev = String(v.severity || '').toLowerCase();
-      if (sev === 'critical') c++;
-      else if (sev === 'high') h++;
-      else if (sev === 'medium') m++;
-
-      if (v.status === 'Patched') patched++;
-
-      const cat = v.category || v.classification || 'Packages';
-      catMap.set(cat, (catMap.get(cat) || 0) + 1);
-    });
-
-    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
-    let idx = 0;
-    const segments = Array.from(catMap.entries()).map(([label, value]) => ({
-      label,
-      value,
-      color: colors[idx++ % colors.length]
-    }));
-
-    return {
-      stats: {
-        total: filteredVulns.length,
-        critical: c,
-        high: h,
-        medium: m,
-        patched,
-      },
-      vulnDistSegments: segments.length ? segments : [{ label: 'Software', value: 1, color: '#3B82F6' }]
-    };
-  }, [filteredVulns]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedVulns.length / pageSize));
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedVulns = sortedVulns.slice(startIndex, startIndex + pageSize);
+  const activeCount = Object.keys(activeFilters).filter((k) => activeFilters[k] && activeFilters[k] !== 'All').length;
 
   const handleToggleDetail = (vuln: Vulnerability) => {
-    if (isDrawerOpen && selectedVuln?.id === vuln.id) {
+    const vulnId = vuln.id || vuln.cveId || vuln.name;
+    const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
+    if (isDrawerOpen && selectedId === vulnId) {
       setIsDrawerOpen(false);
       setSelectedVuln(null);
     } else {
@@ -239,14 +217,6 @@ export default function VulnerabilitiesPage() {
       setIsDrawerOpen(true);
     }
   };
-
-  const totalVulnSegments = [
-    { label: 'Medium', value: stats.medium, color: '#FFC700' },
-    { label: 'High', value: stats.high, color: '#FF6B00' },
-    { label: 'Critical', value: stats.critical, color: '#FF1E1E' },
-  ];
-
-  const activeCount = Object.values(activeFilters).filter((v) => v && v !== 'All').length;
 
   const renderSortIndicator = (key: SortKey) => {
     if (sortKey !== key) {
@@ -259,287 +229,469 @@ export default function VulnerabilitiesPage() {
     );
   };
 
+  const totalVulnSegments = useMemo(() => [
+    { label: 'Medium', value: stats.medium, color: '#5B9BD5' },
+    { label: 'High', value: stats.high, color: '#EA580C' },
+    { label: 'Critical', value: stats.critical, color: '#B8251B' },
+  ], [stats]);
+
+  const totalVulnsCount = stats.total || (stats.critical + stats.high + stats.medium);
+  const startIndex = (currentPage - 1) * pageSize;
+
   return (
-    <div className="h-full flex flex-row gap-3 w-full overflow-hidden">
-      {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0 h-full overflow-hidden">
-        {/* Top KPI Cards (3 columns) */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 flex-shrink-0">
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
+
+        {/* Top KPI Cards (3 equal columns, matching devices layout) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
           {/* Total Vulnerability */}
-          <div className="md:col-span-5 bg-white p-3.5 rounded-md border border-gray-200 flex items-center justify-around gap-3">
-            <BestDonutChart
-              segments={totalVulnSegments}
-              centerLabel={stats.total.toString()}
-              size={90}
-              strokeWidth={12}
-            />
-            <div className="space-y-1 text-xs font-bold">
-              <h4 className="text-xs font-black uppercase text-gray-500 tracking-wider border-b border-gray-100 pb-0.5">
-                Total Vulnerability
-              </h4>
-              <div className="flex items-center justify-between gap-4 text-red-700 font-extrabold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#FF1E1E]"></span>Critical</span>
-                <span className="text-gray-900 text-sm font-black">{stats.critical}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-orange-600 font-extrabold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#FF6B00]"></span>High</span>
-                <span className="text-gray-900 text-sm font-black">{stats.high}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-amber-600 font-extrabold">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#FFC700]"></span>Medium</span>
-                <span className="text-gray-900 text-sm font-black">{stats.medium}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Vuln Distribution Widget (Functional by Category) */}
-          <div className="md:col-span-4 bg-white p-3.5 rounded-md border border-gray-200 flex items-center gap-3">
-            <BestDonutChart
-              segments={vulnDistSegments}
-              centerLabel=""
-              size={90}
-              strokeWidth={12}
-            />
-            <div className="flex-1 text-xs">
-              <h4 className="font-black text-xs uppercase tracking-wider text-gray-500 mb-1.5 border-b border-gray-100 pb-0.5">
-                Vuln Distribution
-              </h4>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-bold text-gray-700 text-xs max-h-16 overflow-y-auto">
-                {vulnDistSegments.map((seg, idx) => (
-                  <span key={idx} className="flex items-center gap-1 truncate" title={`${seg.label}: ${seg.value}`}>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
-                    <span className="truncate">{seg.label} ({seg.value})</span>
-                  </span>
-                ))}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+              Total Vulnerability
+            </p>
+            <div className="flex items-center justify-start gap-3 sm:gap-5 flex-1 pl-1">
+              <BestDonutChart
+                segments={totalVulnSegments}
+                centerLabel={formatNumber(totalVulnsCount)}
+                size={82}
+                strokeWidth={11}
+              />
+              <div className="space-y-1 text-xs sm:text-xs xl:text-sm font-bold w-32 sm:w-36">
+                <div className="flex items-center justify-between gap-2 text-red-700 font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#B8251B]"></span>Critical</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.critical)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-orange-600 font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#EA580C]"></span>High</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.high)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[#0066B1] font-bold">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#5B9BD5]"></span>Medium</span>
+                  <span className="text-gray-900 text-sm sm:text-base font-black">{formatNumber(stats.medium)}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Patched Vuln */}
-          <div className="md:col-span-3 bg-white p-3.5 rounded-md border border-gray-200 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-md bg-emerald-50 border border-emerald-300 flex-shrink-0 flex items-center justify-center text-emerald-600">
-              <HiOutlineCheckCircle className="w-7 h-7" />
+          {/* Vuln Distribution Widget */}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+              Vuln Distribution
+            </p>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <BestDonutChart
+                segments={vulnDistSegments}
+                centerLabel=""
+                size={80}
+                strokeWidth={10}
+              />
+              <div className="flex-1 text-xs sm:text-xs xl:text-sm min-w-0">
+                {vulnDistSegments.length === 0 ? (
+                  <div className="text-xs text-gray-400 font-semibold italic py-2">
+                    No vulnerabilities detected
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-xs xl:text-sm max-h-24 overflow-y-auto pr-1">
+                    {vulnDistSegments.map((seg, idx) => (
+                      <span key={idx} className="flex items-center gap-1 min-w-0 overflow-hidden" title={`${seg.fullLabel || seg.label}: ${formatNumber(seg.value)} issues`}>
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
+                        <span className="truncate min-w-0">{seg.label}</span>
+                        <span className="flex-shrink-0 font-black text-gray-900">({formatNumber(seg.value)})</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-gray-500">Patched Vuln</h4>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-3xl font-black text-emerald-700">{stats.patched}</span>
+          </div>
+
+          {/* Vuln Status (Replaces Solved Vuln, shows Solved and Not Patched) */}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+              Vuln Status
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 items-center">
+              <div className="text-center bg-emerald-50/90 backdrop-blur-sm p-2 rounded-lg border border-emerald-300 shadow-sm flex flex-col justify-center h-full">
+                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Solved</span>
+                <span className="text-emerald-700 text-base sm:text-lg font-black">{formatNumber(stats.solved)}</span>
+              </div>
+              <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center h-full">
+                <span className="block text-xs sm:text-xs xl:text-sm text-gray-600 font-extrabold uppercase tracking-wider">Active</span>
+                <span className="text-[#B8251B] text-base sm:text-lg font-black">{formatNumber(Math.max(0, totalVulnsCount - (stats.solved || 0)))}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <HiOutlineMagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                placeholder="Search CVE / Agent / Package"
-                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy-800"
-              />
-            </div>
+        {/* Filter Toolbar - Responsive on Mobile & Desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="relative flex-1 order-2 sm:order-1">
+            <HiOutlineMagnifyingGlass className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search CVE / Agent / Package"
+              className="w-full bg-white/80 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-sm"
+            />
+          </div>
 
+          <div className="flex items-center gap-2 order-1 sm:order-2 justify-end">
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+              title="Filter"
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
             >
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
-              <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
+              <span className="hidden sm:inline">Filter</span>
+              {activeCount > 0 && <span className="text-blue-300 text-xs">({activeCount})</span>}
+            </button>
+
+            <button
+              onClick={() => loadData(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px]"
+              title="Refresh"
+            >
+              <HiOutlineArrowPath className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-
-          <button
-            onClick={() => loadData()}
-            className="bg-gray-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
-          >
-            <HiOutlineArrowPath className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
         </div>
 
-        {/* Data Table Container */}
-        <div className="bg-white rounded-md border border-gray-200 flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead>
-                <tr className="bg-navy-800 text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none">
-                  <th onClick={() => handleSort('name')} className="w-[30%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Vulnerability</span>
-                      {renderSortIndicator('name')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('severity')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Severity</span>
-                      {renderSortIndicator('severity')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('status')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Status</span>
-                      {renderSortIndicator('status')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('agent')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Agent</span>
-                      {renderSortIndicator('agent')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('cveId')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>CVE ID</span>
-                      {renderSortIndicator('cveId')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('detectionDate')} className="w-[16%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Detection Date</span>
-                      {renderSortIndicator('detectionDate')}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 text-xs font-semibold">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center font-bold text-gray-500">
-                      Loading vulnerabilities from database...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center font-bold text-red-600">
-                      Error: {error}
-                    </td>
-                  </tr>
-                ) : paginatedVulns.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center font-bold text-gray-500">
-                      No vulnerabilities found for the selected filter ({timeFilter}).
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedVulns.map((vuln) => {
-                    const isSelected = isDrawerOpen && selectedVuln?.id === vuln.id;
-                    const parts = (vuln.detectionDate || '').split(' ');
-                    const datePart = parts.slice(0, 3).join(' ');
-                    const timePart = parts.slice(3).join(' ');
+        {/* Active Filter Badges */}
+        {(activeCount > 0 || searchTerm.trim()) && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 uppercase tracking-wider">
+              Active Filters:
+            </span>
+            {activeFilters.severity && activeFilters.severity !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Severity:</span>
+                <strong className="text-amber-800 font-black">{activeFilters.severity}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.severity;
+                      return next;
+                    });
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove severity filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.status && activeFilters.status !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Status:</span>
+                <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.status;
+                      return next;
+                    });
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove status filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.agent && activeFilters.agent !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-sky-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Agent:</span>
+                <strong className="text-[#0066B1] font-black">{activeFilters.agent}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.agent;
+                      return next;
+                    });
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove agent filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.vulnerability && activeFilters.vulnerability !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-indigo-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Name:</span>
+                <strong className="text-indigo-800 font-black">{activeFilters.vulnerability}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.vulnerability;
+                      return next;
+                    });
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove vulnerability filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {searchTerm.trim() && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Search:</span>
+                <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong>
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Clear search"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setActiveFilters({});
+                setSearchTerm('');
+              }}
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
 
-                    return (
-                      <tr
-                        key={vuln.id}
-                        onClick={() => handleToggleDetail(vuln)}
-                        className={`cursor-pointer transition ${
-                          isSelected ? 'bg-blue-100/80 border-l-4 border-l-navy-800' : 'hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <td className="py-2 px-3.5 text-gray-900 font-extrabold">
-                          <div className="flex items-center gap-2">
-                            <HiOutlineShieldExclamation className="w-4 h-4 text-navy-800 flex-shrink-0" />
-                            <span className="truncate">{vuln.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3.5 font-bold">
-                          <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                            vuln.severity === 'Critical'
-                              ? 'bg-red-100 text-red-800 border border-red-300'
-                              : vuln.severity === 'High'
-                              ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                              : 'bg-amber-100 text-amber-800 border border-amber-300'
-                          }`}>
+        {/* Data Container */}
+        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+          {loading ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              Loading vulnerabilities...
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-red-600">
+              Error: {error}
+            </div>
+          ) : vulnerabilities.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              No vulnerabilities found.
+            </div>
+          ) : (
+            <>
+              {/* MOBILE CARD LIST VIEW (Phones: < md) */}
+              <div className="block md:hidden divide-y divide-gray-100 p-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+                {vulnerabilities.map((vuln) => {
+                  const vulnId = vuln.id || vuln.cveId || vuln.name;
+                  const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
+                  const isSelected = Boolean(isDrawerOpen && selectedId && vulnId && selectedId === vulnId);
+                  const { dateTime, timeAgo } = formatDateTimeAndAgo(vuln.detectionDate || vuln.detected_at);
+
+                  return (
+                    <div
+                      key={vuln.id}
+                      onClick={() => handleToggleDetail(vuln)}
+                      className={`p-3 rounded-xl transition cursor-pointer mb-2 border ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-[#002B9A]/30 shadow-sm'
+                          : 'bg-white/80 hover:bg-blue-50/50 border-white/80 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-black ${
+                              vuln.severity === 'Critical'
+                                ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
+                                : vuln.severity === 'High'
+                                ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                                : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
+                            }`}
+                          >
                             {vuln.severity}
                           </span>
-                        </td>
-
-                        <td className="py-2 px-3.5 font-bold">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                            vuln.status === 'Patched'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : 'bg-red-100 text-red-800 border border-red-300'
-                          }`}>
-                            {vuln.status === 'Patched' ? <HiOutlineCheckCircle className="w-3.5 h-3.5" /> : <HiOutlineXCircle className="w-3.5 h-3.5" />}
-                            {vuln.status}
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                              vuln.status === 'Solved' || vuln.status === 'Patched'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-red-100 text-red-800 border border-red-300'
+                            }`}
+                          >
+                            {vuln.status === 'Solved' || vuln.status === 'Patched' ? 'Solved' : 'Active'}
                           </span>
-                        </td>
+                        </div>
+                        <span className="text-xs text-[#002B9A] font-bold font-mono">
+                          {vuln.cveId}
+                        </span>
+                      </div>
 
-                        <td className="py-2 px-3.5 text-gray-900 font-bold">{vuln.agent}</td>
-                        <td className="py-2 px-3.5 text-navy-800 font-extrabold">{vuln.cveId}</td>
-                        <td className="py-2 px-3.5">
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs">{datePart}</span>
-                            <span className="text-[11px] text-gray-500 font-semibold">{timePart}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                      <p className="text-sm font-extrabold text-gray-900 leading-snug mb-2 break-words">
+                        {vuln.name}
+                      </p>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1 font-semibold text-gray-600">
+                          <span className="text-gray-500 font-bold">Agent:</span>
+                          <span className="text-[#0066B1] font-bold">{vuln.agent}</span>
+                        </div>
+                        <span className="text-[11px] text-gray-500 font-medium">
+                          {timeAgo || dateTime}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP DATA TABLE (md+) */}
+              <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
+                <table className="w-full text-left border-collapse min-w-[750px]">
+                  <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                      <th onClick={() => handleSort('name')} className="bg-[#002B9A] w-[30%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Vulnerability</span>
+                          {renderSortIndicator('name')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('severity')} className="bg-[#002B9A] w-[12%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Severity</span>
+                          {renderSortIndicator('severity')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('status')} className="bg-[#002B9A] w-[12%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Status</span>
+                          {renderSortIndicator('status')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Agent</span>
+                          {renderSortIndicator('agent')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('cveId')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>CVE ID</span>
+                          {renderSortIndicator('cveId')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('detectionDate')} className="bg-[#002B9A] w-[16%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Detection Date</span>
+                          {renderSortIndicator('detectionDate')}
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
+                    {vulnerabilities.map((vuln) => {
+                      const vulnId = vuln.id || vuln.cveId || vuln.name;
+                      const selectedId = selectedVuln?.id || selectedVuln?.cveId || selectedVuln?.name;
+                      const isSelected = Boolean(isDrawerOpen && selectedId && vulnId && selectedId === vulnId);
+                      const { dateTime, timeAgo } = formatDateTimeAndAgo(vuln.detectionDate || vuln.detected_at);
+
+                      return (
+                        <tr
+                          key={vuln.id}
+                          onClick={() => handleToggleDetail(vuln)}
+                          className={`cursor-pointer transition ${
+                            isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <td className="relative py-3 px-3.5 xl:px-4 text-gray-900 font-semibold">
+                            {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                            <div className="flex items-center gap-2">
+                              <span className="break-words whitespace-normal">{vuln.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 font-medium">
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
+                              vuln.severity === 'Critical'
+                                ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
+                                : vuln.severity === 'High'
+                                ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                                : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
+                            }`}>
+                              {vuln.severity}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3.5 xl:px-4 font-medium">
+                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
+                              vuln.status === 'Solved' || vuln.status === 'Patched'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-red-100 text-red-800 border border-red-300'
+                            }`}>
+                              {vuln.status === 'Solved' || vuln.status === 'Patched' ? 'Solved' : 'Active'}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3.5 xl:px-4 text-[#0066B1] font-semibold">{vuln.agent}</td>
+                          <td className="py-3 px-3.5 xl:px-4 text-[#002B9A] font-semibold">{vuln.cveId}</td>
+                          <td className="py-3 px-3.5 xl:px-4">
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white border-t border-gray-200 px-3.5 py-2 flex items-center justify-between text-xs font-bold text-gray-800 flex-shrink-0">
-            <div>
-              Showing {filteredVulns.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredVulns.length)} of {filteredVulns.length} Vulnerabilities
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>
+                Showing {filteredTotal === 0 ? 0 : formatNumber(startIndex + 1)}-{formatNumber(Math.min(startIndex + pageSize, filteredTotal))} of {formatNumber(filteredTotal)} Vulnerabilities
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ◄
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-2 py-0.5 rounded-md transition ${
-                      currentPage === pageNum
-                        ? 'bg-navy-800 text-white font-extrabold'
-                        : 'hover:bg-gray-100 text-gray-700 font-bold'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ►
-              </button>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>
 
-      {/* Right Container: Detail Drawer */}
+      {/* Slide-out Drawer */}
       <VulnerabilityDetailDrawer
-        vulnerability={selectedVuln}
         isOpen={isDrawerOpen}
-        onClose={() => { setIsDrawerOpen(false); setSelectedVuln(null); }}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedVuln(null);
+        }}
+        vulnerability={selectedVuln}
       />
 
+      {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={(filters) => { setActiveFilters(filters); setCurrentPage(1); }}
-        initialFilters={activeFilters}
-        sections={adaptiveFilterSections}
         title="Filter Vulnerabilities"
+        sections={adaptiveFilterSections}
+        initialFilters={activeFilters}
+        onApply={handleApplyFilters}
       />
     </div>
+  );
+}
+
+export default function VulnerabilitiesPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center text-sm font-semibold text-gray-500">Loading vulnerabilities...</div>}>
+      <VulnerabilitiesContent />
+    </Suspense>
   );
 }

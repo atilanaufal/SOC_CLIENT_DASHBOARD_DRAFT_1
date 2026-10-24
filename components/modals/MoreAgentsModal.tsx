@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { HiOutlineXMark, HiOutlineServer } from 'react-icons/hi2';
 
@@ -17,9 +18,14 @@ export const MoreAgentsModal: React.FC<MoreAgentsModalProps> = ({
   agents = [],
   incidentName = '',
 }) => {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleAgentClick = (agentName: string) => {
     onClose();
@@ -31,13 +37,19 @@ export const MoreAgentsModal: React.FC<MoreAgentsModalProps> = ({
 
   const displayedAgents = agents;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 backdrop-blur-xs">
-      <div className="bg-white rounded-xl border border-gray-200 max-w-md w-full overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-150">
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-slate-950/25 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white/85 backdrop-blur-2xl rounded-2xl border border-white/80 max-w-md w-full overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-150 cursor-default shadow-[0_20px_50px_rgba(0,43,154,0.12),inset_0_1px_2px_rgba(255,255,255,0.95)]"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-200">
-          <div className="flex items-center gap-2 text-navy-800 font-extrabold text-base">
-            <HiOutlineServer className="w-5 h-5 text-blue-700" />
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+          <div className="flex items-center gap-2 text-[#002B9A] font-extrabold text-base">
+            <HiOutlineServer className="w-5 h-5 text-[#0066B1]" />
             <span>Associated Agents</span>
           </div>
           <button
@@ -65,7 +77,7 @@ export const MoreAgentsModal: React.FC<MoreAgentsModalProps> = ({
               <button
                 key={idx}
                 onClick={() => handleAgentClick(agentName)}
-                className="bg-blue-50 hover:bg-navy-800 hover:text-white text-navy-800 font-extrabold text-xs px-3 py-1.5 rounded-md border border-blue-200 transition flex items-center gap-1.5"
+                className="bg-blue-50/80 hover:bg-[#002B9A] hover:text-white text-[#002B9A] font-extrabold text-xs px-3 py-1.5 rounded-md border border-blue-200 transition flex items-center gap-1.5"
               >
                 <HiOutlineServer className="w-3.5 h-3.5" />
                 <span>{agentName}</span>
@@ -74,6 +86,7 @@ export const MoreAgentsModal: React.FC<MoreAgentsModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -10,284 +10,378 @@ import {
   HiOutlineArrowDown,
   HiOutlineArrowTrendingUp,
   HiOutlineArrowTrendingDown,
-  HiOutlineShieldExclamation,
   HiOutlineAdjustmentsHorizontal,
+  HiOutlineRectangleGroup,
+  HiOutlineXMark,
   HiChevronUp,
   HiChevronDown
 } from 'react-icons/hi2';
-import { Incident } from '@/lib/mock-data';
-import { fetchIncidents } from '@/lib/api-client';
+import { Incident } from '@/lib/types';
+import { fetchIncidents, FetchIncidentsResponse } from '@/lib/api-client';
 import { IncidentDetailDrawer } from '@/components/drawers/IncidentDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
+import { GroupByModal, GroupByMode } from '@/components/modals/GroupByModal';
 import { useTimeFilter } from '@/lib/time-filter-context';
+import { Pagination } from '@/components/ui/Pagination';
+import { formatDateTimeAndAgo, getTimestamp, formatNumber } from '@/lib/date-utils';
+import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
-type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved';
+type SortKey = 'incidentName' | 'severity' | 'agent' | 'firstObserved' | 'lastObserved' | 'count';
 type SortDirection = 'asc' | 'desc';
-
-function isWithinTimeFilter(
-  dateStr: string,
-  filter: string,
-  customRange?: { startDate: string; endDate: string } | null
-): boolean {
-  if (!dateStr || dateStr === 'N/A') return true;
-  try {
-    const itemDate = new Date(dateStr);
-    if (isNaN(itemDate.getTime())) return true;
-
-    if (filter === 'Custom' || filter.toLowerCase().startsWith('custom')) {
-      if (customRange?.startDate && customRange?.endDate) {
-        const start = new Date(`${customRange.startDate}T00:00:00.000`);
-        const end = new Date(`${customRange.endDate}T23:59:59.999`);
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-          return itemDate >= start && itemDate <= end;
-        }
-      }
-      return true;
-    }
-
-    const now = Date.now();
-    const diffMs = now - itemDate.getTime();
-
-    if (filter === 'Today') {
-      return diffMs <= 24 * 60 * 60 * 1000 || itemDate.toDateString() === new Date().toDateString();
-    } else if (filter === 'This Week') {
-      return diffMs <= 7 * 24 * 60 * 60 * 1000;
-    } else if (filter === 'This Month') {
-      return diffMs <= 30 * 24 * 60 * 60 * 1000;
-    }
-  } catch {
-    return true;
-  }
-  return true;
-}
 
 function IncidentsContent() {
   const searchParams = useSearchParams();
-  const initialSearch = searchParams.get('search') || searchParams.get('agent') || '';
 
-  const { timeFilter, customRange, metrics } = useTimeFilter();
+  const { timeFilter, customRange } = useTimeFilter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalAlerts, setTotalAlerts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statsData, setStatsData] = useState<any>(null);
+  const [filterOptions, setFilterOptions] = useState<{
+    agents: string[];
+    incidentNames: string[];
+    severities: string[];
+    ipSources?: string[];
+    counts?: string[];
+  }>({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'], ipSources: [], counts: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [isTableFetching, setIsTableFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [groupByMode, setGroupByMode] = useState<GroupByMode>('alerts');
+  const [isGroupByModalOpen, setIsGroupByModalOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Sorting state
+  // Sorting state (default: newest first)
   const [sortKey, setSortKey] = useState<SortKey>('firstObserved');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const loadData = async () => {
+  // Cycle tracking to discard stale async responses
+  const cycleIdRef = React.useRef<number>(0);
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // When switching to alerts mode, automatically remove count filter
+  useEffect(() => {
+    if (groupByMode === 'alerts') {
+      setActiveFilters((prev) => {
+        if (!prev.count) return prev;
+        const { count, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [groupByMode]);
+
+  // Sync URL search parameters (e.g. from Dashboard Top Incidents view)
+  useEffect(() => {
+    const paramIncident = searchParams.get('incidentName') || searchParams.get('incident') || searchParams.get('incidentType');
+    const paramAgent = searchParams.get('agent');
+    const paramSeverity = searchParams.get('severity');
+    const paramSearch = searchParams.get('search');
+    const paramGroupBy = searchParams.get('groupBy');
+    const paramSourceIp = searchParams.get('sourceIp') || searchParams.get('ipSource');
+    const paramCount = searchParams.get('count');
+
+    const effectiveGroupBy = paramGroupBy === 'incidents' || paramGroupBy === 'alerts'
+      ? (paramGroupBy as GroupByMode)
+      : groupByMode;
+
+    if (paramGroupBy === 'incidents' || paramGroupBy === 'alerts') {
+      setGroupByMode(paramGroupBy as GroupByMode);
+    }
+
+    const newFilters: Record<string, string> = {};
+    if (paramIncident) newFilters.incidentName = paramIncident;
+    if (paramAgent) newFilters.agent = paramAgent;
+    if (paramSeverity) newFilters.severity = paramSeverity;
+    if (paramSourceIp) newFilters.sourceIp = paramSourceIp;
+    if (paramCount && effectiveGroupBy === 'incidents') {
+      newFilters.count = paramCount;
+    }
+
+    if (Object.keys(newFilters).length > 0) {
+      setActiveFilters(newFilters);
+      setCurrentPage(1);
+    }
+    if (paramSearch && !paramIncident) {
+      setSearchTerm(paramSearch);
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+
+  // Reset to page 1 whenever search or activeFilters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, activeFilters]);
+
+  // Clear incidents and reset page when time range or group mode changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setIncidents([]);
+    setFilterOptions({ agents: [], incidentNames: [], severities: ['Critical', 'High', 'Medium', 'Low'], ipSources: [], counts: [] });
+  }, [timeFilter, customRange, groupByMode]);
+
+  // Fetch server-side paginated & aggregated data with in-memory caching
+  const loadData = async (forceRefresh = false) => {
+    cycleIdRef.current += 1;
+    const currentCycle = cycleIdRef.current;
+
+    const cacheKey = `incidents:${groupByMode}:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}:${currentPage}:${sortKey}:${sortDirection}:${debouncedSearch}:${JSON.stringify(activeFilters)}`;
+
+    if (!forceRefresh) {
+      try {
+        const cached = await getClientCache<FetchIncidentsResponse>(cacheKey);
+        if (cycleIdRef.current !== currentCycle) return;
+        if (cached && Array.isArray(cached.data)) {
+          setIncidents(cached.data);
+          setTotal(cached.total);
+          setTotalAlerts(cached.totalAlerts);
+          setTotalPages(cached.totalPages);
+          if (cached.stats) setStatsData({ incidents: cached.stats });
+          if (cached.filterOptions) {
+            setFilterOptions((prev) => ({
+              agents: Array.from(new Set([...(prev.agents || []), ...(cached.filterOptions?.agents || [])])).filter(Boolean).sort(),
+              incidentNames: Array.from(new Set([...(prev.incidentNames || []), ...(cached.filterOptions?.incidentNames || [])])).filter(Boolean).sort(),
+              severities: ['Critical', 'High', 'Medium', 'Low'],
+              ipSources: Array.from(new Set([...(prev.ipSources || []), ...(cached.filterOptions?.ipSources || [])])).filter(Boolean).sort(),
+              counts: Array.from(new Set([...(prev.counts || []), ...(cached.filterOptions?.counts || [])])).filter(Boolean),
+            }));
+          }
+          setIsLoading(false);
+          setIsTableFetching(false);
+          return;
+        }
+      } catch (cacheErr) {
+        console.warn('[Incidents] Cache read notice:', cacheErr);
+      }
+    } else {
+      await invalidateClientCache(cacheKey);
+    }
+
     try {
-      setIsLoading(true);
+      if (incidents.length === 0) {
+        setIsLoading(true);
+      } else {
+        setIsTableFetching(true);
+      }
       setError(null);
-      const data = await fetchIncidents({
+
+      const res = await fetchIncidents({
+        page: currentPage,
+        limit: pageSize,
+        search: debouncedSearch,
+        severity: activeFilters.severity,
+        incidentType: activeFilters.incidentName,
+        agent: activeFilters.agent,
+        sourceIp: activeFilters.sourceIp,
+        count: groupByMode === 'incidents' ? activeFilters.count : undefined,
+        sortBy: sortKey,
+        sortOrder: sortDirection,
         timeRange: timeFilter,
         startDate: customRange?.startDate,
         endDate: customRange?.endDate,
+        groupBy: groupByMode,
       });
-      setIncidents(data);
+
+      if (cycleIdRef.current !== currentCycle) return;
+
+      setIncidents(res.data || []);
+      setTotal(res.total);
+      setTotalAlerts(res.totalAlerts);
+      setTotalPages(res.totalPages);
+      if (res.stats) setStatsData({ incidents: res.stats });
+      if (res.filterOptions) {
+        setFilterOptions((prev) => ({
+          agents: Array.from(new Set([...(prev.agents || []), ...(res.filterOptions?.agents || [])])).filter(Boolean).sort(),
+          incidentNames: Array.from(new Set([...(prev.incidentNames || []), ...(res.filterOptions?.incidentNames || [])])).filter(Boolean).sort(),
+          severities: ['Critical', 'High', 'Medium', 'Low'],
+          ipSources: Array.from(new Set([...(prev.ipSources || []), ...(res.filterOptions?.ipSources || [])])).filter(Boolean).sort(),
+          counts: Array.from(new Set([...(prev.counts || []), ...(res.filterOptions?.counts || [])])).filter(Boolean),
+        }));
+      }
+
+      setClientCache(cacheKey, res);
     } catch (err: any) {
-      console.error('Failed to load incidents:', err);
-      setError(err.message || 'Failed to load incidents from server');
+      if (cycleIdRef.current !== currentCycle) return;
+      console.error('Failed to load incidents data:', err);
+      setError(err.message || 'Failed to load incidents');
     } finally {
-      setIsLoading(false);
+      if (cycleIdRef.current === currentCycle) {
+        setIsLoading(false);
+        setIsTableFetching(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [timeFilter, customRange]);
-
-  useEffect(() => {
-    if (initialSearch && incidents.length > 0) {
-      setSearchTerm(initialSearch);
-      const matched = incidents.find(
-        (i) =>
-          i.incidentName.toLowerCase().includes(initialSearch.toLowerCase()) ||
-          i.agent.toLowerCase().includes(initialSearch.toLowerCase())
-      );
-      if (matched) {
-        setSelectedIncident(matched);
-        setIsDrawerOpen(true);
-      }
-    }
-  }, [initialSearch, incidents]);
+  }, [groupByMode, timeFilter, customRange, currentPage, sortKey, sortDirection, debouncedSearch, activeFilters]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      if (key === 'firstObserved') {
+      if (key === 'firstObserved' || key === 'lastObserved' || key === 'count') {
         setSortDirection('desc');
       } else {
         setSortDirection('asc');
       }
     }
+    setCurrentPage(1);
   };
 
-  const displayableIncidents = useMemo(() => {
-    return incidents.filter((inc) => {
-      const agentStr = String(inc.agent || inc.host || '').toLowerCase();
-      return agentStr !== '000' && agentStr !== 'health-checker' && !agentStr.includes('000');
+  const availableIpSources = useMemo(() => {
+    const set = new Set<string>(filterOptions.ipSources || []);
+    incidents.forEach((inc) => {
+      if (inc.sourceIp && inc.sourceIp !== '-' && inc.sourceIp !== 'N/A') set.add(inc.sourceIp);
+      if (inc.ip_source && inc.ip_source !== '-' && inc.ip_source !== 'N/A') set.add(inc.ip_source);
     });
-  }, [incidents]);
+    if (activeFilters.sourceIp && activeFilters.sourceIp !== 'All') {
+      set.add(activeFilters.sourceIp);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.ipSources, incidents, activeFilters.sourceIp]);
 
-  const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const severities = Array.from(new Set(displayableIncidents.map((i) => i.severity))).filter(Boolean);
-    const types = Array.from(new Set(displayableIncidents.map((i) => i.incidentName))).filter(Boolean);
-    const agents = Array.from(new Set(displayableIncidents.map((i) => i.agent))).filter(Boolean);
+  const availableCounts = useMemo(() => {
+    const set = new Set<number>();
+    (filterOptions.counts || []).forEach((c) => {
+      const num = Number(c);
+      if (!isNaN(num)) set.add(num);
+    });
+    incidents.forEach((inc) => {
+      if (typeof inc.count === 'number') set.add(inc.count);
+    });
+    if (activeFilters.count && activeFilters.count !== 'All') {
+      const num = Number(activeFilters.count);
+      if (!isNaN(num)) set.add(num);
+    }
+    return Array.from(set).sort((a, b) => a - b).map(String);
+  }, [filterOptions.counts, incidents, activeFilters.count]);
 
-    return [
-      { key: 'severity', label: 'Severity Level', type: 'buttons', options: severities.length ? severities : ['Critical', 'High', 'Medium'] },
-      { key: 'incidentType', label: 'Incident Type', type: 'buttons', options: types },
-      { key: 'agent', label: 'Agent', type: 'select', options: agents },
+  const availableAgents = useMemo(() => {
+    const set = new Set<string>(filterOptions.agents || []);
+    incidents.forEach((inc) => {
+      if (inc.agent) set.add(inc.agent);
+      if (inc.host) set.add(inc.host);
+    });
+    if (activeFilters.agent && activeFilters.agent !== 'All') {
+      set.add(activeFilters.agent);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.agents, incidents, activeFilters.agent]);
+
+  const availableIncidentNames = useMemo(() => {
+    const set = new Set<string>(filterOptions.incidentNames || []);
+    incidents.forEach((inc) => {
+      if (inc.incidentName) set.add(inc.incidentName);
+      if (inc.incident_type) {
+        if (Array.isArray(inc.incident_type)) {
+          inc.incident_type.forEach((t) => t && set.add(String(t).trim()));
+          if (inc.incident_type.length > 1) {
+            set.add(inc.incident_type.filter(Boolean).map((t) => String(t).trim()).join(', '));
+          }
+        } else {
+          String(inc.incident_type).split(',').forEach((t) => t.trim() && set.add(t.trim()));
+          set.add(String(inc.incident_type).trim());
+        }
+      }
+    });
+    if (activeFilters.incidentName && activeFilters.incidentName !== 'All') {
+      const parts = activeFilters.incidentName.split(',').map((p) => p.trim()).filter(Boolean);
+      parts.forEach((p) => set.add(p));
+      set.add(activeFilters.incidentName);
+    }
+    return Array.from(set).filter(Boolean).sort();
+  }, [filterOptions.incidentNames, incidents, activeFilters.incidentName]);
+
+  const dynamicFilterSections: FilterSection[] = useMemo(() => {
+    const groups: FilterSection[] = [
+      {
+        key: 'severity',
+        label: 'Severity Level',
+        type: 'buttons',
+        options: (filterOptions.severities && filterOptions.severities.length > 0
+          ? filterOptions.severities
+          : ['Critical', 'High', 'Medium']
+        ).filter((s) => s.toLowerCase() !== 'low'),
+      },
+      {
+        key: 'incidentName',
+        label: 'Incident Type',
+        type: 'select',
+        options: availableIncidentNames,
+        isMultiSelect: true,
+      },
+      {
+        key: 'agent',
+        label: 'Agent Affected',
+        type: 'select',
+        options: availableAgents,
+      },
+      {
+        key: 'sourceIp',
+        label: 'IP Source',
+        type: 'select',
+        options: availableIpSources,
+      },
     ];
-  }, [displayableIncidents]);
 
-  const filteredIncidents = useMemo(() => {
-    return displayableIncidents.filter((inc) => {
-      const matchesSearch =
-        inc.incidentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inc.agentsList?.some((ag) => ag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        inc.host.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inc.sourceIp && inc.sourceIp.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesSeverity =
-        !activeFilters.severity || activeFilters.severity === 'All'
-          ? true
-          : String(inc.severity || '').toLowerCase() === activeFilters.severity.toLowerCase();
-
-      const matchesType =
-        !activeFilters.incidentType || activeFilters.incidentType === 'All'
-          ? true
-          : inc.incidentName === activeFilters.incidentType;
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : inc.agent === activeFilters.agent;
-
-      return matchesSearch && matchesSeverity && matchesType && matchesAgent;
-    });
-  }, [displayableIncidents, searchTerm, activeFilters]);
-
-  const sortedIncidents = useMemo(() => {
-    return [...filteredIncidents].sort((a: any, b: any) => {
-      if (sortKey === 'firstObserved') {
-        const getTime = (i: any) => {
-          const raw = i.last_observed || i.first_observed || i.raw_first_observed || i.firstObserved || i.date;
-          if (!raw) return 0;
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? 0 : d.getTime();
-        };
-        const aTime = getTime(a);
-        const bTime = getTime(b);
-        return sortDirection === 'desc' ? bTime - aTime : aTime - bTime;
-      }
-
-      let aVal: any = a[sortKey] || '';
-      let bVal: any = b[sortKey] || '';
-
-      if (sortKey === 'severity') {
-        const order: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-        aVal = order[String(aVal).toLowerCase()] || 0;
-        bVal = order[String(bVal).toLowerCase()] || 0;
-      }
-
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredIncidents, sortKey, sortDirection]);
-
-  // Compute real counts & deltas for KPI from real MongoDB incidents data (1 document = 1 incident)
-  const kpiCounts = useMemo(() => {
-    let c = 0, h = 0, m = 0;
-    let cPrev = 0, hPrev = 0, mPrev = 0;
-
-    const now = new Date();
-    const lowerFilter = (timeFilter || 'today').toLowerCase();
-
-    let startOfCurrent: Date;
-    let startOfPrevious: Date;
-    let endOfPrevious: Date;
-
-    if (lowerFilter === 'today') {
-      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      startOfPrevious = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      endOfPrevious = startOfCurrent;
-    } else if (lowerFilter === 'this week' || lowerFilter === '7d') {
-      startOfCurrent = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      startOfPrevious = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-      endOfPrevious = startOfCurrent;
-    } else if (lowerFilter === 'this month' || lowerFilter === '30d') {
-      startOfCurrent = new Date(now.getFullYear(), now.getMonth(), 1);
-      startOfPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      endOfPrevious = startOfCurrent;
-    } else {
-      startOfCurrent = new Date(0);
-      startOfPrevious = new Date(0);
-      endOfPrevious = new Date(0);
+    if (groupByMode === 'incidents') {
+      groups.push({
+        key: 'count',
+        label: 'Count (Detected Alerts)',
+        type: 'select',
+        options: availableCounts,
+      });
     }
 
-    displayableIncidents.forEach((i: any) => {
-      const sev = String(i.severity || '').toLowerCase();
-      const rawDate = i.last_observed || i.first_observed || i.raw_first_observed || i.date;
-      const d = rawDate ? new Date(rawDate) : null;
+    return groups;
+  }, [filterOptions, groupByMode, availableIpSources, availableCounts, availableIncidentNames, availableAgents]);
 
-      const isCurrent = !d || isNaN(d.getTime()) || (lowerFilter === 'all' ? true : (d >= startOfCurrent));
-      const isPrevious = lowerFilter !== 'all' && d && !isNaN(d.getTime()) && (d >= startOfPrevious && d < endOfPrevious);
-
-      if (isCurrent) {
-        if (sev === 'critical') c++;
-        else if (sev === 'high') h++;
-        else if (sev === 'medium') m++;
-      }
-
-      if (isPrevious) {
-        if (sev === 'critical') cPrev++;
-        else if (sev === 'high') hPrev++;
-        else if (sev === 'medium') mPrev++;
-      }
-    });
-
-    return {
-      critical: c,
-      criticalPrev: cPrev,
-      criticalDelta: c - cPrev,
-      high: h,
-      highPrev: hPrev,
-      highDelta: h - hPrev,
-      medium: m,
-      mediumPrev: mPrev,
-      mediumDelta: m - mPrev,
-    };
-  }, [displayableIncidents, timeFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedIncidents.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedIncidents = sortedIncidents.slice(startIndex, startIndex + pageSize);
+  const paginatedIncidents = incidents;
 
-  const handleToggleDetail = (incident: Incident) => {
-    if (isDrawerOpen && selectedIncident?.id === incident.id) {
+  const handleApplyFilters = (filters: Record<string, string>) => {
+    const cleaned = { ...filters };
+    if (groupByMode === 'alerts' && cleaned.count) {
+      delete cleaned.count;
+    }
+    setActiveFilters(cleaned);
+    setCurrentPage(1);
+  };
+
+  const activeCount = Object.keys(activeFilters).filter((k) => {
+    if (k === 'count' && groupByMode !== 'incidents') return false;
+    return activeFilters[k] && activeFilters[k] !== 'All';
+  }).length;
+
+  const handleToggleDetail = (inc: Incident) => {
+    const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
+    const selectedId = selectedIncident?.id || selectedIncident?._id || (selectedIncident ? `${selectedIncident.incidentName}_${selectedIncident.firstObserved}` : null);
+    if (isDrawerOpen && selectedId === incId) {
       setIsDrawerOpen(false);
       setSelectedIncident(null);
     } else {
-      setSelectedIncident(incident);
+      setSelectedIncident(inc);
       setIsDrawerOpen(true);
     }
   };
-
-  const activeCount = Object.values(activeFilters).filter((v) => v && v !== 'All').length;
 
   const renderSortIndicator = (key: SortKey) => {
     if (sortKey !== key) {
@@ -300,285 +394,518 @@ function IncidentsContent() {
     );
   };
 
+  // Severity Stats (Live dynamic calculation)
+  const incStats = statsData?.incidents || {};
+  const criticalCount = typeof incStats.critical === 'number' ? incStats.critical : 0;
+  const highCount = typeof incStats.high === 'number' ? incStats.high : 0;
+  const mediumCount = typeof incStats.medium === 'number' ? incStats.medium : 0;
+
+  const criticalPrev = typeof incStats.criticalPrev === 'number' ? incStats.criticalPrev : 0;
+  const criticalDelta = typeof incStats.criticalDelta === 'number' ? incStats.criticalDelta : 0;
+
+  const highPrev = typeof incStats.highPrev === 'number' ? incStats.highPrev : 0;
+  const highDelta = typeof incStats.highDelta === 'number' ? incStats.highDelta : 0;
+
+  const mediumPrev = typeof incStats.mediumPrev === 'number' ? incStats.mediumPrev : 0;
+  const mediumDelta = typeof incStats.mediumDelta === 'number' ? incStats.mediumDelta : 0;
+
+  const renderTrend = (delta: number) => {
+    if (delta > 0) return <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-red-600 stroke-[3]" />;
+    if (delta < 0) return <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-emerald-600 stroke-[3]" />;
+    return <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-gray-400 stroke-[3]" />;
+  };
+
   const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-        <span className="bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" /> +{delta}
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-lg font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
+          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{formatNumber(delta)}
         </span>
       );
     }
     if (delta < 0) {
       return (
-        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" /> {delta}
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-lg font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
+          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {formatNumber(delta)}
         </span>
       );
     }
     return (
-      <span className="bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-        <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" /> 0
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2 sm:px-2.5 xl:px-3 py-0.5 sm:py-1 rounded-lg font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 whitespace-nowrap">
+        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
       </span>
     );
   };
 
-  const renderTrendComparison = (current: number, previous: number) => {
-    const diff = current - previous;
-    if (diff > 0) {
-      return (
-        <div className="flex items-center gap-1 text-xs font-black text-red-600 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-          <HiOutlineArrowTrendingUp className="w-4 h-4 text-red-600 stroke-[2.5]" />
-          <span>{previous}</span>
-        </div>
-      );
-    }
-    if (diff < 0) {
-      return (
-        <div className="flex items-center gap-1 text-xs font-black text-emerald-600 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-          <HiOutlineArrowTrendingDown className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-          <span>{previous}</span>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center gap-1 text-xs font-black text-gray-500 font-sans" title={`Data periode sebelumnya: ${previous}`}>
-        <HiOutlineMinus className="w-4 h-4 text-gray-400 stroke-[3]" />
-        <span>{previous}</span>
-      </div>
-    );
-  };
-
   return (
-    <div className="h-full flex flex-row gap-3 w-full overflow-hidden">
-      {/* Left Container: KPI Card + Search Bar + Table */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0 h-full overflow-hidden">
-        {/* Top Clean KPI Summary Card */}
-        <div className="bg-white rounded-md border border-gray-200 p-4 flex-shrink-0 shadow-xs">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-gray-200">
-            {/* Critical Column */}
-            <div className="md:pr-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#FF1E1E] text-white text-xs font-black px-2.5 py-0.5 rounded-md">
-                    Critical
-                  </span>
-                  {renderDeltaBadge(kpiCounts.criticalDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.critical, kpiCounts.criticalPrev)}
-              </div>
-              <p className="text-3xl font-black text-[#FF1E1E] tracking-tight">{kpiCounts.critical}</p>
-            </div>
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Top Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
 
-            {/* High Column */}
-            <div className="md:px-4 pt-2 md:pt-0">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#FF6B00] text-white text-xs font-black px-2.5 py-0.5 rounded-md">
-                    High
-                  </span>
-                  {renderDeltaBadge(kpiCounts.highDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.high, kpiCounts.highPrev)}
+        {/* Top KPI Cards (3 columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
+          {/* Critical Severity Card */}
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2 min-w-0 overflow-hidden">
+            <div className="min-w-0 flex-shrink-0">
+              <div className="inline-block bg-[#B8251B] text-white text-xs sm:text-sm font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm mb-1">
+                Critical
               </div>
-              <p className="text-3xl font-black text-[#FF6B00] tracking-tight">{kpiCounts.high}</p>
+              <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
+                {formatNumber(criticalCount)}
+              </p>
             </div>
-
-            {/* Medium Column */}
-            <div className="md:pl-4 pt-2 md:pt-0">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#FFC700] text-white text-xs font-black px-2.5 py-0.5 rounded-md">
-                    Medium
-                  </span>
-                  {renderDeltaBadge(kpiCounts.mediumDelta)}
-                </div>
-                {renderTrendComparison(kpiCounts.medium, kpiCounts.mediumPrev)}
+            <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(criticalPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
+                {renderTrend(criticalDelta)}
+                <span>{formatNumber(criticalPrev)}</span>
               </div>
-              <p className="text-3xl font-black text-[#FFC700] tracking-tight">{kpiCounts.medium}</p>
+              {renderDeltaBadge(criticalDelta)}
+            </div>
+          </div>
+
+          {/* High Severity Card */}
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2 min-w-0 overflow-hidden">
+            <div className="min-w-0 flex-shrink-0">
+              <div className="inline-block bg-[#EA580C] text-white text-xs sm:text-sm font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm mb-1">
+                High
+              </div>
+              <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
+                {formatNumber(highCount)}
+              </p>
+            </div>
+            <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(highPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
+                {renderTrend(highDelta)}
+                <span>{formatNumber(highPrev)}</span>
+              </div>
+              {renderDeltaBadge(highDelta)}
+            </div>
+          </div>
+
+          {/* Medium Severity Card */}
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 sm:p-4 xl:p-5 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2 min-w-0 overflow-hidden">
+            <div className="min-w-0 flex-shrink-0">
+              <div className="inline-block bg-[#5B9BD5] text-white text-xs sm:text-sm font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm mb-1">
+                Medium
+              </div>
+              <p className="text-2xl sm:text-3xl xl:text-3xl font-black text-gray-900 tracking-tight leading-none mt-1">
+                {formatNumber(mediumCount)}
+              </p>
+            </div>
+            <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0">
+              <div
+                className="flex items-center gap-1 sm:gap-1.5 text-sm sm:text-base xl:text-lg font-black text-gray-900 leading-none"
+                title={`Previous: ${formatNumber(mediumPrev)} (${incStats.periodLabel || 'Previous Period'})`}
+              >
+                {renderTrend(mediumDelta)}
+                <span>{formatNumber(mediumPrev)}</span>
+              </div>
+              {renderDeltaBadge(mediumDelta)}
             </div>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <HiOutlineMagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                placeholder="Search Incident / Agent / IP"
-                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy-800"
-              />
-            </div>
+        {/* Filter Toolbar - Responsive on Mobile & Desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="relative flex-1 order-2 sm:order-1">
+            <HiOutlineMagnifyingGlass className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search Incident / Agent / Description"
+              className="w-full bg-white/80 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-sm"
+            />
+          </div>
 
+          <div className="flex items-center gap-2 order-1 sm:order-2 justify-between sm:justify-end">
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+              title="Filter"
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] shrink-0"
             >
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
-              <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
+              <span className="hidden sm:inline">Filter</span>
+              {activeCount > 0 && <span className="text-blue-300 text-xs">({activeCount})</span>}
+            </button>
+
+            <button
+              onClick={() => setIsGroupByModalOpen(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] flex-1 sm:flex-initial"
+              title="Select Group By Mode"
+            >
+              <HiOutlineRectangleGroup className="w-4 h-4 text-blue-300" />
+              <span className="truncate">Group by: <strong className="text-blue-300 capitalize">{groupByMode}</strong></span>
+            </button>
+
+            <button
+              onClick={() => loadData(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] shrink-0"
+              title="Refresh"
+            >
+              <HiOutlineArrowPath className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-
-          <button
-            onClick={() => loadData()}
-            className="bg-gray-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
-          >
-            <HiOutlineArrowPath className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
         </div>
 
-        {/* Data Table Container */}
-        <div className="bg-white rounded-md border border-gray-200 flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead>
-                <tr className="bg-navy-800 text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none">
-                  <th onClick={() => handleSort('incidentName')} className="w-[45%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Incident</span>
-                      {renderSortIndicator('incidentName')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('severity')} className="w-[15%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Severity</span>
-                      {renderSortIndicator('severity')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('agent')} className="w-[20%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>Agent</span>
-                      {renderSortIndicator('agent')}
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('firstObserved')} className="w-[20%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                    <div className="flex items-center">
-                      <span>First Observed</span>
-                      {renderSortIndicator('firstObserved')}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 text-xs font-semibold">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center font-bold text-gray-500">
-                      Loading incidents from database...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center font-bold text-red-600">
-                      Error: {error}
-                    </td>
-                  </tr>
-                ) : paginatedIncidents.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center font-bold text-gray-500">
-                      No incidents found for the selected filter ({timeFilter}).
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedIncidents.map((inc) => {
-                    const isSelected = isDrawerOpen && selectedIncident?.id === inc.id;
-                    const parts = (inc.firstObserved || '').split(' ');
-                    const datePart = parts.slice(0, 3).join(' ');
-                    const timePart = parts.slice(3).join(' ');
-
-                    return (
-                      <tr
-                        key={inc.id}
-                        onClick={() => handleToggleDetail(inc)}
-                        className={`cursor-pointer transition ${
-                          isSelected
-                            ? 'bg-blue-100/80 border-l-4 border-l-navy-800'
-                            : 'hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <td className="py-2 px-3.5 text-gray-900 font-extrabold">
-                          <div className="flex items-center gap-2">
-                            <HiOutlineShieldExclamation className="w-4 h-4 text-navy-800 flex-shrink-0" />
-                            <span className="truncate">{inc.incidentName}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3.5 font-bold">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-extrabold ${
-                              inc.severity === 'Critical'
-                                ? 'bg-red-100 text-red-800 border border-red-300'
-                                : inc.severity === 'High'
-                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300'
-                            }`}
-                          >
-                            {inc.severity}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3.5 text-navy-800 font-extrabold">{inc.agent}</td>
-                        <td className="py-2 px-3.5">
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs">{datePart}</span>
-                            <span className="text-[11px] text-gray-500 font-semibold">{timePart}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        {/* Active Filter Badges */}
+        {(activeCount > 0 || searchTerm.trim()) && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 uppercase tracking-wider">
+              Active Filters:
+            </span>
+            {activeFilters.incidentName && activeFilters.incidentName !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Incident Type:</span>
+                <strong className="text-[#002B9A] font-black">{activeFilters.incidentName}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.incidentName;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove incident filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.agent && activeFilters.agent !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-sky-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Agent:</span>
+                <strong className="text-[#0066B1] font-black">{activeFilters.agent}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.agent;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove agent filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.sourceIp && activeFilters.sourceIp !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-emerald-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">IP Source:</span>
+                <strong className="text-emerald-700 font-black">{activeFilters.sourceIp}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.sourceIp;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove IP source filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {groupByMode === 'incidents' && activeFilters.count && activeFilters.count !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-purple-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Count:</span>
+                <strong className="text-purple-700 font-black">{activeFilters.count}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.count;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove count filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {activeFilters.severity && activeFilters.severity !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-amber-300/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Severity:</span>
+                <strong className="text-amber-800 font-black">{activeFilters.severity}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.severity;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove severity filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {searchTerm.trim() && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Search:</span>
+                <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Clear search"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setActiveFilters({});
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+            >
+              Clear all
+            </button>
           </div>
+        )}
+
+        {/* Data Container */}
+        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+          {isLoading && incidents.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              Loading incidents...
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-red-600">
+              Error: {error}
+            </div>
+          ) : paginatedIncidents.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              No incidents found.
+            </div>
+          ) : (
+            <div className={`flex-1 flex flex-col justify-between min-w-0 transition-opacity duration-150 ${isTableFetching ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
+              {/* MOBILE CARD LIST VIEW (Phones: < md) */}
+              <div className="block md:hidden divide-y divide-gray-100 p-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+                {paginatedIncidents.map((inc) => {
+                  const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
+                  const selectedId = selectedIncident?.id || selectedIncident?._id;
+                  const isSelected = Boolean(isDrawerOpen && selectedId && incId && selectedId === incId);
+                  const { dateTime, timeAgo } = formatDateTimeAndAgo(inc.firstObserved);
+
+                  return (
+                    <div
+                      key={inc.id}
+                      onClick={() => handleToggleDetail(inc)}
+                      className={`p-3 rounded-xl transition cursor-pointer mb-2 border ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-[#002B9A]/30 shadow-sm'
+                          : 'bg-white/80 hover:bg-blue-50/50 border-white/80 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-black ${
+                            inc.severity === 'Critical'
+                              ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
+                              : inc.severity === 'High'
+                              ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                              : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
+                          }`}
+                        >
+                          {inc.severity}
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-medium">
+                          {timeAgo || dateTime}
+                        </span>
+                      </div>
+
+                      <p className="text-sm font-extrabold text-gray-900 leading-snug mb-2 break-words">
+                        {inc.incidentName}
+                      </p>
+
+                      {groupByMode === 'incidents' && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2">
+                          <span className="bg-blue-50 text-[#002B9A] border border-blue-200/80 px-2 py-0.5 rounded-md font-bold">
+                            Count: <strong className="font-black">{inc.count || 1}</strong>
+                          </span>
+                          {inc.lastObserved && (
+                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-medium text-[11px]">
+                              Last: <strong className="font-bold text-gray-900">{inc.lastObserved}</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1 font-semibold text-gray-600">
+                          <span className="text-gray-500 font-bold">Agent:</span>
+                          <span className="text-[#0066B1] font-bold">{inc.agent}</span>
+                        </div>
+                        <span className="text-xs text-[#002B9A] font-extrabold hover:underline">
+                          View Details →
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP DATA TABLE (md+) */}
+              <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                      <th onClick={() => handleSort('incidentName')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[32%]' : 'w-[42%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
+                        <div className="flex items-center text-white">
+                          <span>{groupByMode === 'incidents' ? 'Incident Name' : 'Alert Name'}</span>
+                          {renderSortIndicator('incidentName')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('severity')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[12%]' : 'w-[15%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
+                        <div className="flex items-center text-white">
+                          <span>Severity</span>
+                          {renderSortIndicator('severity')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('agent')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[16%]' : 'w-[20%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
+                        <div className="flex items-center text-white">
+                          <span>Agent</span>
+                          {renderSortIndicator('agent')}
+                        </div>
+                      </th>
+                      {groupByMode === 'incidents' && (
+                        <th onClick={() => handleSort('count')} className="bg-[#002B9A] w-[10%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                          <div className="flex items-center text-white">
+                            <span>Count</span>
+                            {renderSortIndicator('count')}
+                          </div>
+                        </th>
+                      )}
+                      <th onClick={() => handleSort('firstObserved')} className={`bg-[#002B9A] ${groupByMode === 'incidents' ? 'w-[15%]' : 'w-[23%]'} py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition`}>
+                        <div className="flex items-center text-white">
+                          <span>First Observed</span>
+                          {renderSortIndicator('firstObserved')}
+                        </div>
+                      </th>
+                      {groupByMode === 'incidents' && (
+                        <th onClick={() => handleSort('lastObserved')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                          <div className="flex items-center text-white">
+                            <span>Last Observed</span>
+                            {renderSortIndicator('lastObserved')}
+                          </div>
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
+                    {paginatedIncidents.map((inc) => {
+                      const incId = inc.id || inc._id || `${inc.incidentName}_${inc.firstObserved}`;
+                      const selectedId = selectedIncident?.id || selectedIncident?._id;
+                      const isSelected = Boolean(isDrawerOpen && selectedId && incId && selectedId === incId);
+                      const { dateTime, timeAgo } = formatDateTimeAndAgo(inc.firstObserved);
+                      const lastFormatted = inc.lastObserved ? formatDateTimeAndAgo(inc.lastObserved) : null;
+
+                      return (
+                        <tr
+                          key={inc.id}
+                          onClick={() => handleToggleDetail(inc)}
+                          className={`cursor-pointer transition ${
+                            isSelected ? 'bg-blue-100/80' : 'hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <td className="relative py-3 px-3.5 xl:px-4 text-gray-900 font-semibold">
+                            {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                            <div className="flex items-center gap-2">
+                              <span className="break-words whitespace-normal">{inc.incidentName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 font-medium">
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
+                                inc.severity === 'Critical'
+                                  ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
+                                  : inc.severity === 'High'
+                                  ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                                  : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
+                              }`}
+                            >
+                              {inc.severity}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 text-[#0066B1] font-semibold">{inc.agent}</td>
+                          {groupByMode === 'incidents' && (
+                            <td className="py-3 px-3.5 xl:px-4 font-bold text-gray-900">
+                              {inc.count || 1}
+                            </td>
+                          )}
+                          <td className="py-3 px-3.5 xl:px-4">
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                            </div>
+                          </td>
+                          {groupByMode === 'incidents' && (
+                            <td className="py-3 px-3.5 xl:px-4">
+                              <div className="flex flex-col leading-tight">
+                                <span className="font-semibold text-gray-900 text-sm xl:text-base 2xl:text-lg">{lastFormatted?.dateTime || inc.lastObserved || '-'}</span>
+                                {lastFormatted?.timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{lastFormatted.timeAgo}</span>}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Interactive Pagination Controls */}
-          <div className="bg-white border-t border-gray-200 px-3.5 py-2 flex items-center justify-between text-xs font-bold text-gray-800 flex-shrink-0">
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
             <div>
-              Showing {filteredIncidents.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredIncidents.length)} of {filteredIncidents.length} Incidents
+              Showing {total === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, total)} of {formatNumber(total)} {groupByMode === 'incidents' ? 'Incidents' : 'Alerts'}
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="hover:text-blue-600 font-bold disabled:opacity-40 disabled:hover:text-gray-800 px-1"
-              >
-                ◄
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-2 py-0.5 rounded-md transition ${
-                      currentPage === pageNum
-                        ? 'bg-navy-800 text-white font-extrabold'
-                        : 'hover:bg-gray-100 text-gray-700 font-bold'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="hover:text-currentPage === totalPages"
-              >
-                ►
-              </button>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>
 
-      {/* Right Container: Detail Drawer */}
+      {/* Slide-out Drawer */}
       <IncidentDetailDrawer
         incident={selectedIncident}
         isOpen={isDrawerOpen}
         onClose={() => { setIsDrawerOpen(false); setSelectedIncident(null); }}
+        groupByMode={groupByMode}
       />
 
       <FilterModal
@@ -586,8 +913,25 @@ function IncidentsContent() {
         onClose={() => setIsFilterModalOpen(false)}
         onApply={(filters) => { setActiveFilters(filters); setCurrentPage(1); }}
         initialFilters={activeFilters}
-        sections={adaptiveFilterSections}
+        sections={dynamicFilterSections}
         title="Filter Incidents"
+      />
+
+      <GroupByModal
+        isOpen={isGroupByModalOpen}
+        onClose={() => setIsGroupByModalOpen(false)}
+        currentMode={groupByMode}
+        onSelectMode={(mode) => {
+          setGroupByMode(mode);
+          if (mode === 'alerts') {
+            setActiveFilters((prev) => {
+              if (!prev.count) return prev;
+              const { count, ...rest } = prev;
+              return rest;
+            });
+          }
+          setCurrentPage(1);
+        }}
       />
     </div>
   );
@@ -595,7 +939,7 @@ function IncidentsContent() {
 
 export default function IncidentsPage() {
   return (
-    <Suspense fallback={<div className="p-4 font-bold text-gray-700">Loading Incidents...</div>}>
+    <Suspense fallback={<div className="p-4 font-semibold text-gray-700">Loading Incidents...</div>}>
       <IncidentsContent />
     </Suspense>
   );

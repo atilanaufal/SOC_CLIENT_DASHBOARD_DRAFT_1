@@ -1,32 +1,43 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   HiOutlineMagnifyingGlass,
-  HiOutlineArrowPath,
-  HiOutlineComputerDesktop,
-  HiOutlineServer,
   HiOutlineAdjustmentsHorizontal,
-  HiOutlineExclamationCircle,
+  HiOutlineArrowPath,
+  HiOutlineXMark,
   HiChevronUp,
   HiChevronDown,
 } from 'react-icons/hi2';
-import { Device } from '@/lib/mock-data';
+import { Device } from '@/lib/types';
 import { fetchDevices, fetchDeviceRiskScores } from '@/lib/api-client';
 import { DeviceDetailDrawer } from '@/components/drawers/DeviceDetailDrawer';
 import { FilterModal, FilterSection } from '@/components/modals/FilterModal';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
-import { getRiskCategory } from '@/lib/risk-score';
 import { useTimeFilter } from '@/lib/time-filter-context';
+import { Pagination } from '@/components/ui/Pagination';
+import { formatDateTimeAndAgo, getTimestamp } from '@/lib/date-utils';
+import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
 
 type SortKey = 'agent' | 'os' | 'status' | 'score' | 'lastSeen';
 type SortDirection = 'asc' | 'desc';
 
+function getRiskCategory(score: number): { label: string; color: string; meaning: string } {
+  if (score >= 80) {
+    return { label: 'Critical', color: '#B8251B', meaning: 'Emergency mitigation required' };
+  } else if (score >= 60) {
+    return { label: 'High', color: '#EA580C', meaning: 'Urgent security attention required' };
+  } else if (score >= 40) {
+    return { label: 'Medium', color: '#5B9BD5', meaning: 'Scheduled attention and patching required' };
+  } else {
+    return { label: 'Low', color: '#16A34A', meaning: 'Condition relatively safe and monitored' };
+  }
+}
+
 function DevicesContent() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
-  const initialHighlight = searchParams.get('highlight') || '';
 
   const { timeFilter, customRange } = useTimeFilter();
   const [devices, setDevices] = useState<Device[]>([]);
@@ -40,33 +51,44 @@ function DevicesContent() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Sorting state
-  const [sortKey, setSortKey] = useState<SortKey>('agent');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortKey, setSortKey] = useState<SortKey>('score');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
+  // Interactive Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  // Real-time Database fetch with session caching
+  const loadData = async (forceRefresh = false) => {
+    const cacheKey = `devices:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+
+    if (!forceRefresh) {
+      try {
+        const cached = await getClientCache<Device[]>(cacheKey);
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          setDevices(cached);
+          setLoading(false);
+          return;
+        }
+      } catch {}
+    } else {
+      await invalidateClientCache(cacheKey);
+    }
 
     try {
-      // Step 1: Fetch Wazuh API Agents FIRST (Fast < 50ms) -> Display Table Immediately!
+      setLoading(true);
+      setError(null);
       const res = await fetchDevices();
       const loadedAgents = res.data || [];
       setDevices(loadedAgents);
-      setLoading(false); // Render UI immediately!
+      setLoading(false);
 
-      // Step 2: Background Async Fetch for MongoDB Risk Scores & Severity Breakdown (Filtered by timeFilter)
+      // Fetch Incident Risk Scores & Severity Breakdown per agent based on time filter
       fetchDeviceRiskScores(timeFilter, customRange)
         .then((riskRes) => {
-          if (!riskRes.mongoDbAvailable) {
-            return;
-          }
-
           const scoresMap = riskRes.scoresMap || {};
-          setDevices((prevDevices) =>
-            prevDevices.map((dev) => {
+          setDevices((prevDevices) => {
+            const mapped = prevDevices.map((dev) => {
               const idKey = String(dev.id).trim().toLowerCase();
               const nameKey = String(dev.agent).trim().toLowerCase();
               const ipKey = String(dev.ipAddress || '').trim().toLowerCase();
@@ -89,7 +111,7 @@ function DevicesContent() {
                   detectedIssues: stats.detectedIssues || [],
                 };
               }
-              // Reset if no incidents in current time filter
+
               return {
                 ...dev,
                 criticalCount: 0,
@@ -101,14 +123,17 @@ function DevicesContent() {
                 risk: 'Low (0)',
                 detectedIssues: [],
               };
-            })
-          );
+            });
+            setClientCache(cacheKey, mapped);
+            return mapped;
+          });
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[Devices] Failed to fetch device risk scores:', err);
+        });
     } catch (err: any) {
-      console.error('Failed to fetch devices:', err);
-      setError(err.message || 'Failed to fetch devices data');
-      setDevices([]);
+      console.error('Error fetching live devices from API:', err);
+      setError(err.message || 'Failed to load devices from database.');
       setLoading(false);
     }
   };
@@ -117,82 +142,72 @@ function DevicesContent() {
     loadData();
   }, [timeFilter, customRange]);
 
-  useEffect(() => {
-    if (initialSearch && devices.length > 0) {
-      setSearchTerm(initialSearch);
-      const matchedDevice = devices.find(
-        (d) => d.agent.toLowerCase().includes(initialSearch.toLowerCase())
-      );
-      if (matchedDevice) {
-        setSelectedDevice(matchedDevice);
-        setIsDrawerOpen(true);
-      }
-    }
-  }, [initialSearch, initialHighlight, devices]);
-
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDirection('asc');
+      setSortDirection(key === 'score' || key === 'lastSeen' ? 'desc' : 'asc');
     }
+    setCurrentPage(1);
   };
 
-  const adaptiveFilterSections: FilterSection[] = useMemo(() => {
-    const statuses = Array.from(new Set(devices.map((d) => d.status))).filter(Boolean);
-    const osList = Array.from(new Set(devices.map((d) => d.os))).filter(Boolean);
-    const agents = Array.from(new Set(devices.map((d) => d.agent))).filter(Boolean);
+  const dynamicFilterSections: FilterSection[] = useMemo(() => {
+    const rawStatuses = Array.from(new Set(devices.map((d) => d.status))).filter(Boolean);
+    const rawOs = Array.from(new Set(devices.map((d) => d.os))).filter(Boolean);
 
     return [
-      { key: 'status', label: 'Status', type: 'buttons', options: statuses.length ? statuses : ['Online', 'Offline'] },
-      { key: 'os', label: 'Operating System', type: 'select', options: osList },
-      { key: 'agent', label: 'Agent', type: 'select', options: agents },
+      {
+        key: 'status',
+        label: 'Device Status',
+        type: 'buttons',
+        options: rawStatuses.length ? rawStatuses : ['Online', 'Offline'],
+      },
+      {
+        key: 'os',
+        label: 'Operating System (OS)',
+        type: 'select',
+        options: rawOs.length ? rawOs : ['Ubuntu', 'Windows', 'Debian'],
+      },
     ];
   }, [devices]);
 
   const filteredDevices = useMemo(() => {
-    return devices.filter((device) => {
-      const isExactAgentMatch = devices.some(
-        (d) => d.agent.toLowerCase() === searchTerm.trim().toLowerCase()
-      );
+    return devices.filter((dev) => {
+      // Match text search across agent name, OS, and IP
+      const q = searchTerm.toLowerCase().trim();
+      if (q) {
+        const matchName = dev.agent.toLowerCase().includes(q);
+        const matchOs = dev.os.toLowerCase().includes(q);
+        const matchIp = (dev.ipAddress || '').toLowerCase().includes(q);
+        const matchId = String(dev.id).toLowerCase().includes(q);
+        if (!matchName && !matchOs && !matchIp && !matchId) return false;
+      }
 
-      const matchesSearch = isExactAgentMatch
-        ? device.agent.toLowerCase() === searchTerm.trim().toLowerCase()
-        : device.agent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          device.os.toLowerCase().includes(searchTerm.toLowerCase());
+      // Match dynamic filters
+      if (activeFilters.status && activeFilters.status !== 'All') {
+        if (dev.status.toLowerCase() !== activeFilters.status.toLowerCase()) return false;
+      }
+      if (activeFilters.os && activeFilters.os !== 'All') {
+        if (dev.os !== activeFilters.os) return false;
+      }
 
-      const matchesStatus =
-        !activeFilters.status || activeFilters.status === 'All'
-          ? true
-          : device.status === activeFilters.status;
-
-      const matchesOS =
-        !activeFilters.os || activeFilters.os === 'All'
-          ? true
-          : device.os === activeFilters.os;
-
-      const matchesAgent =
-        !activeFilters.agent || activeFilters.agent === 'All'
-          ? true
-          : device.agent === activeFilters.agent;
-
-      return matchesSearch && matchesStatus && matchesOS && matchesAgent;
+      return true;
     });
   }, [devices, searchTerm, activeFilters]);
 
-  // Accumulated severity breakdown across all filtered agents
+  // Accumulated severity breakdown across all agents for Devices At Risk KPI
   const totalCritical = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.criticalCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.criticalCount || 0), 0),
+    [devices]
   );
   const totalHigh = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.highCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.highCount || 0), 0),
+    [devices]
   );
   const totalMedium = useMemo(
-    () => filteredDevices.reduce((sum, d) => sum + (d.mediumCount || 0), 0),
-    [filteredDevices]
+    () => devices.reduce((sum, d) => sum + (d.mediumCount || 0), 0),
+    [devices]
   );
 
   const sortedDevices = useMemo(() => {
@@ -203,6 +218,11 @@ function DevicesContent() {
         const rawB = (b.criticalCount || 0) * 10 + (b.highCount || 0) * 6 + (b.mediumCount || 0) * 3;
         const scoreB = typeof b.score === 'number' ? b.score : Math.min(100, rawB);
         return sortDirection === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+      }
+      if (sortKey === 'lastSeen') {
+        const timeA = getTimestamp((a as any).lastSeenDate || a.lastSeen);
+        const timeB = getTimestamp((b as any).lastSeenDate || b.lastSeen);
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
       }
       const valA = (a[sortKey] || '').toString().toLowerCase();
       const valB = (b[sortKey] || '').toString().toLowerCase();
@@ -238,25 +258,19 @@ function DevicesContent() {
   const osChartSegments = useMemo(() => {
     const counts: Record<string, number> = {};
     devices.forEach((d) => {
-      if (d.os) {
-        let label = d.os;
-        if (label.toLowerCase().includes('ubuntu')) label = 'Ubuntu';
-        else if (label.toLowerCase().includes('windows')) label = 'Windows';
-        else if (label.toLowerCase().includes('fedora')) label = 'Fedora';
-        else if (label.toLowerCase().includes('freebsd')) label = 'FreeBSD';
-        else if (label.toLowerCase().includes('debian')) label = 'Debian';
-        else if (label.toLowerCase().includes('arch')) label = 'Arch Linux';
-        else if (label.toLowerCase().includes('amazon')) label = 'Amazon Linux';
-        else if (label.toLowerCase().includes('centos')) label = 'CentOS';
+      const label = (d.os || '').trim();
+      if (label) {
         counts[label] = (counts[label] || 0) + 1;
       }
     });
-    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
-    return Object.entries(counts).map(([label, value], i) => ({
-      label,
-      value,
-      color: colors[i % colors.length],
-    }));
+    const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1', '#EC4899', '#14B8A6'];
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({
+        label,
+        value,
+        color: colors[i % colors.length],
+      }));
   }, [devices]);
 
   const renderSortIndicator = (key: SortKey) => {
@@ -269,16 +283,16 @@ function DevicesContent() {
   };
 
   return (
-    <div className="h-full flex flex-row gap-3 w-full overflow-hidden">
-      {/* Left Container: KPI Cards + Search Bar + Table */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0 h-full overflow-hidden">
+    <div className="w-full flex-1 flex flex-col lg:flex-row gap-3 min-w-0 items-stretch">
+      {/* Container: KPI Cards + Search Bar + Table */}
+      <div className={`flex-1 flex flex-col gap-3 min-w-0 w-full ${isDrawerOpen ? "lg:mr-[402px] xl:mr-[442px] 2xl:mr-[492px]" : ""}`}>
         {/* Critical Error Banner */}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-900 px-3 py-2 rounded-md text-xs font-bold flex items-center justify-between flex-shrink-0">
             <span>❌ Error: {error}</span>
             <button
               onClick={() => loadData()}
-              className="bg-red-800 text-white px-2.5 py-1 rounded text-[11px] font-black hover:bg-red-900 transition"
+              className="bg-red-800 text-white px-2.5 py-1 rounded text-[11px] font-bold hover:bg-red-900 transition cursor-pointer"
             >
               Coba Lagi
             </button>
@@ -286,295 +300,421 @@ function DevicesContent() {
         )}
 
         {/* Top KPI Cards (3 columns) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 flex-shrink-0">
-          <div className="bg-white p-3.5 rounded-md border border-gray-200 flex items-center justify-between shadow-xs">
-            <div>
-              <p className="text-xs font-black text-gray-500 uppercase tracking-wider">Total Devices</p>
-              <p className="text-3xl font-black text-gray-900 mt-1 tracking-tight">{filteredDevices.length}</p>
-              <div className="flex items-center gap-2 mt-1 text-xs font-black">
-                <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5 xl:gap-4 2xl:gap-5 flex-shrink-0">
+          {/* Total Devices Card */}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between">
+            <div className="flex flex-col justify-between h-full gap-1.5 sm:gap-2">
+              <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+                Total Devices
+              </p>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-xs xl:text-sm font-bold">
+                <span className="bg-emerald-100/90 backdrop-blur-sm text-emerald-800 px-2.5 py-0.5 sm:py-1 rounded-md border border-emerald-300 shadow-sm">
                   {filteredDevices.filter((d) => d.status === 'Online').length} Online
                 </span>
-                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded border border-red-300">
+                <span className="bg-red-100/90 backdrop-blur-sm text-red-800 px-2.5 py-0.5 sm:py-1 rounded-md border border-red-300 shadow-sm">
                   {filteredDevices.filter((d) => d.status === 'Offline').length} Offline
                 </span>
               </div>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-navy-800 text-white flex items-center justify-center border border-navy-900 shadow-xs flex-shrink-0">
-              <HiOutlineComputerDesktop className="w-6 h-6 text-blue-300" />
-            </div>
+            <p className="text-3xl sm:text-4xl xl:text-4xl font-black text-gray-900 tracking-tight leading-none">
+              {filteredDevices.length}
+            </p>
           </div>
 
-          <div className="bg-white p-3 rounded-md border border-gray-200 flex items-center gap-3 shadow-xs">
-            <BestDonutChart
-              segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
-              centerLabel=""
-              size={70}
-              strokeWidth={10}
-            />
-            <div className="flex-1 text-xs space-y-0.5 overflow-hidden">
-              <p className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-0.5">Top OS Distribution</p>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-bold text-gray-700 text-xs">
+          {/* Top OS Distribution */}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
+              Top OS Distribution
+            </p>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <BestDonutChart
+                segments={osChartSegments.length ? osChartSegments : [{ label: 'No OS', value: 1, color: '#9CA3AF' }]}
+                centerLabel=""
+                size={80}
+                strokeWidth={10}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2.5 gap-y-1 font-bold text-gray-700 text-xs sm:text-xs xl:text-sm flex-1 min-w-0">
                 {osChartSegments.slice(0, 4).map((seg) => (
-                  <span key={seg.label} className="flex items-center gap-1 truncate" title={`${seg.label}: ${seg.value}`}>
+                  <span key={seg.label} className="flex items-center gap-1.5 min-w-0 overflow-hidden" title={`${seg.label}: ${seg.value}`}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></span>
-                    <span className="truncate">{seg.label}</span> ({seg.value})
+                    <span className="truncate min-w-0">{seg.label}</span>
+                    <span className="flex-shrink-0 font-black text-gray-900">({seg.value})</span>
                   </span>
                 ))}
-                {osChartSegments.length === 0 && <span className="text-gray-400 font-normal">Tidak ada data OS</span>}
+                {osChartSegments.length === 0 && <span className="text-gray-400 font-normal">No OS data available</span>}
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-3 rounded-md border border-gray-200 flex flex-col justify-between shadow-xs">
-            <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
+          {/* Devices At Risk ! */}
+          <div className="bg-white/70 backdrop-blur-xl p-3 sm:p-3.5 xl:p-4 rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex flex-col justify-between gap-1.5 sm:gap-2">
+            <p className="text-sm xl:text-base 2xl:text-lg font-bold text-gray-700 uppercase tracking-wider">
               Devices At Risk !
             </p>
-            <div className="grid grid-cols-3 gap-1.5 mt-1 text-xs font-black">
-              <div className="flex items-center gap-1 text-red-600 bg-red-50 p-1.5 rounded-md border border-red-200">
-                <HiOutlineExclamationCircle className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[10px] text-gray-500 font-bold uppercase">Critical</span>
-                  <span>{totalCritical}</span>
-                </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-xs font-bold">
+              <div className="text-center bg-[#FDE8E8]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#F8B4B4] shadow-sm flex flex-col justify-center">
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">Critical</span>
+                <span className="text-[#B8251B] text-base sm:text-lg font-black">{totalCritical}</span>
               </div>
-              <div className="flex items-center gap-1 text-orange-600 bg-orange-50 p-1.5 rounded-md border border-orange-200">
-                <HiOutlineExclamationCircle className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[10px] text-gray-500 font-bold uppercase">High</span>
-                  <span>{totalHigh}</span>
-                </div>
+              <div className="text-center bg-[#FFEDD5]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#FDBA74] shadow-sm flex flex-col justify-center">
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">High</span>
+                <span className="text-[#C2410C] text-base sm:text-lg font-black">{totalHigh}</span>
               </div>
-              <div className="flex items-center gap-1 text-amber-600 bg-amber-50 p-1.5 rounded-md border border-amber-200">
-                <HiOutlineExclamationCircle className="w-4 h-4 flex-shrink-0" />
-                <div>
-                  <span className="block text-[10px] text-gray-500 font-bold uppercase">Medium</span>
-                  <span>{totalMedium}</span>
-                </div>
+              <div className="text-center bg-[#EBF5FF]/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-lg border border-[#BFDBFE] shadow-sm flex flex-col justify-center">
+                <span className="block text-[10px] sm:text-xs text-gray-600 font-extrabold uppercase tracking-wider">Medium</span>
+                <span className="text-[#1E429F] text-base sm:text-lg font-black">{totalMedium}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <HiOutlineMagnifyingGlass className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search Agent / OS"
-                className="w-full bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md pl-8 pr-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy-800"
-              />
-            </div>
+        {/* Filter Toolbar - Responsive on Mobile & Desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="relative flex-1 order-2 sm:order-1">
+            <HiOutlineMagnifyingGlass className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search Agent / OS / IP / ID"
+              className="w-full bg-white/80 backdrop-blur-md text-gray-900 placeholder-gray-400 border border-white/80 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#002B9A] shadow-sm"
+            />
+          </div>
 
+          <div className="flex items-center gap-2 order-1 sm:order-2 justify-between sm:justify-end">
             <button
               onClick={() => setIsFilterModalOpen(true)}
-              className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs"
+              title="Filter"
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] shrink-0"
             >
               <HiOutlineAdjustmentsHorizontal className="w-4 h-4 text-blue-300" />
-              <span>Filter{activeCount > 0 ? ` (${activeCount})` : ''}</span>
+              <span className="hidden sm:inline">Filter</span>
+              {activeCount > 0 && <span className="text-blue-300 text-xs">({activeCount})</span>}
+            </button>
+
+            <button
+              onClick={() => loadData(true)}
+              className="bg-black/90 backdrop-blur-sm text-white text-xs sm:text-sm font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-black transition border border-white/20 shadow-sm cursor-pointer whitespace-nowrap min-h-[38px] shrink-0"
+              title="Refresh"
+            >
+              <HiOutlineArrowPath className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
             </button>
           </div>
-
-          <button
-            onClick={() => loadData()}
-            disabled={loading}
-            className="bg-gray-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-black transition shadow-xs disabled:opacity-50"
-          >
-            <HiOutlineArrowPath className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
         </div>
 
-        {/* Data Table Container */}
-        <div className="bg-white rounded-md border border-gray-200 flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto flex-1">
-            {loading ? (
-              <div className="p-8 text-center text-xs font-bold text-gray-500 flex flex-col items-center justify-center gap-2">
-                <HiOutlineArrowPath className="w-6 h-6 animate-spin text-navy-800" />
-                <span>Loading Devices from Wazuh API...</span>
-              </div>
-            ) : paginatedDevices.length === 0 ? (
-              <div className="p-8 text-center text-xs font-bold text-gray-500">
-                Tidak ada agent device yang ditemukan.
-              </div>
-            ) : (
-              <table className="w-full text-left border-collapse table-fixed">
-                <thead>
-                  <tr className="bg-navy-800 text-white text-xs font-black tracking-wider sticky top-0 z-10 select-none">
-                    <th onClick={() => handleSort('agent')} className="w-[18%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                      <div className="flex items-center">
-                        <span>Agent</span>
-                        {renderSortIndicator('agent')}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort('os')} className="w-[22%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                      <div className="flex items-center">
-                        <span>Operating System</span>
-                        {renderSortIndicator('os')}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort('status')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                      <div className="flex items-center">
-                        <span>Status</span>
-                        {renderSortIndicator('status')}
-                      </div>
-                    </th>
-                    <th className="w-[22%] py-2.5 px-3.5">Severity Breakdown</th>
-                    <th onClick={() => handleSort('score')} className="w-[14%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                      <div className="flex items-center">
-                        <span>Score</span>
-                        {renderSortIndicator('score')}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort('lastSeen')} className="w-[12%] py-2.5 px-3.5 cursor-pointer hover:bg-navy-700 transition">
-                      <div className="flex items-center">
-                        <span>Last Seen</span>
-                        {renderSortIndicator('lastSeen')}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 text-xs font-semibold">
-                  {paginatedDevices.map((dev) => {
-                    const isSelected = isDrawerOpen && selectedDevice?.id === dev.id;
-                    
-                    const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
-                    const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
-                    const cat = getRiskCategory(scoreVal);
-
-                    const datePart = (dev as any).lastSeenDate || dev.lastSeen.split('(')[0]?.trim() || dev.lastSeen;
-                    const agoPart = (dev as any).lastSeenAgo || (dev.lastSeen.includes('(') ? dev.lastSeen.split('(')[1]?.replace(')', '').trim() : '');
-
-                    return (
-                      <tr
-                        key={dev.id}
-                        onClick={() => handleToggleDetail(dev)}
-                        className={`cursor-pointer transition ${
-                          isSelected ? 'bg-blue-100/80 border-l-4 border-l-navy-800' : 'hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <td className="py-2 px-3.5 text-navy-800 font-black">
-                          <div className="flex items-center gap-2 truncate">
-                            <HiOutlineServer className="w-4 h-4 text-navy-800 flex-shrink-0" />
-                            <span className="truncate" title={dev.agent}>{dev.agent}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3.5 font-bold text-gray-900 truncate" title={dev.os}>
-                          {dev.os}
-                        </td>
-                        <td className="py-2 px-3.5 font-bold">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black ${
-                              dev.status === 'Online'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-red-100 text-red-800 border border-red-300'
-                            }`}
-                          >
-                            {dev.status}
-                          </span>
-                        </td>
-
-                        <td className="py-2 px-3.5 font-bold">
-                          <div className="flex items-center gap-1.5 text-[11px]">
-                            {dev.criticalCount ? (
-                              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded border border-red-300 font-black">
-                                Critical: {dev.criticalCount}
-                              </span>
-                            ) : null}
-                            <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded border border-orange-300 font-black">
-                              High: {dev.highCount || 0}
-                            </span>
-                            <span className="bg-yellow-100 text-yellow-900 px-2 py-0.5 rounded border border-yellow-300 font-black">
-                              Medium: {dev.mediumCount || 0}
-                            </span>
-                          </div>
-                        </td>
-
-                        <td className="py-2 px-3.5 font-bold">
-                          <div className="flex items-center gap-1.5 font-black">
-                            <span className="text-xs text-gray-900 font-black">{scoreVal}</span>
-                            <span
-                              style={{ backgroundColor: cat.color }}
-                              className="text-white text-[10px] font-black px-2 py-0.5 rounded shadow-xs"
-                              title={cat.meaning}
-                            >
-                              {cat.label}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Format Last Seen Vertically (Date & Time on top, Ago below) */}
-                        <td className="py-2 px-3.5">
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-extrabold text-gray-900 text-xs truncate" title={datePart}>
-                              {datePart}
-                            </span>
-                            {agoPart ? (
-                              <span className="text-[11px] text-gray-500 font-semibold truncate">
-                                {agoPart}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Table Footer / Pagination */}
-          <div className="p-2.5 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs font-bold text-gray-700 flex-shrink-0">
-            <span>
-              Showing {filteredDevices.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
-              {Math.min(currentPage * pageSize, sortedDevices.length)} of {sortedDevices.length} devices
+        {/* Active Filter Badges */}
+        {(activeCount > 0 || searchTerm.trim()) && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-1 flex-shrink-0">
+            <span className="text-xs sm:text-sm font-bold text-gray-600 uppercase tracking-wider">
+              Active Filters:
             </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-2.5 py-1 rounded bg-white border border-gray-300 font-bold hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white transition"
-              >
-                Previous
-              </button>
-              <span className="px-2 font-black">
-                {currentPage} / {totalPages}
+            {activeFilters.status && activeFilters.status !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-blue-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Status:</span>
+                <strong className="text-[#002B9A] font-black">{activeFilters.status}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.status;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove status filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
               </span>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1 rounded bg-white border border-gray-300 font-bold hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white transition"
-              >
-                Next
-              </button>
+            )}
+            {activeFilters.os && activeFilters.os !== 'All' && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-sky-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">OS:</span>
+                <strong className="text-[#0066B1] font-black">{activeFilters.os}</strong>
+                <button
+                  onClick={() => {
+                    setActiveFilters((prev) => {
+                      const next = { ...prev };
+                      delete next.os;
+                      return next;
+                    });
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Remove OS filter"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            {searchTerm.trim() && (
+              <span className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md text-gray-800 border border-gray-200 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold shadow-sm">
+                <span className="text-gray-500 font-semibold">Search:</span>
+                <strong className="text-gray-900 font-black">&quot;{searchTerm}&quot;</strong>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="text-gray-400 hover:text-red-600 rounded p-0.5 transition cursor-pointer ml-0.5"
+                  title="Clear search"
+                >
+                  <HiOutlineXMark className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setActiveFilters({});
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="bg-red-50/80 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/80 px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer shadow-sm ml-1 flex items-center gap-1"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+
+        {/* Devices Data Container */}
+        <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] flex-1 flex flex-col justify-between min-w-0 overflow-hidden">
+          {loading ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              Loading devices...
             </div>
+          ) : filteredDevices.length === 0 ? (
+            <div className="py-12 text-center text-xs sm:text-sm font-bold text-gray-500">
+              No devices found matching the filter or search criteria.
+            </div>
+          ) : (
+            <>
+              {/* MOBILE CARD LIST VIEW (Phones: < md) */}
+              <div className="block md:hidden divide-y divide-gray-100 p-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+                {paginatedDevices.map((dev) => {
+                  const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
+                  const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
+                  const cat = getRiskCategory(scoreVal);
+                  const isSelected = isDrawerOpen && selectedDevice?.id === dev.id;
+                  const { dateTime, timeAgo } = formatDateTimeAndAgo(dev.lastSeen);
+
+                  return (
+                    <div
+                      key={dev.id}
+                      onClick={() => handleToggleDetail(dev)}
+                      className={`p-3 rounded-xl transition cursor-pointer mb-2 border ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-[#002B9A]/30 shadow-sm'
+                          : 'bg-white/80 hover:bg-blue-50/50 border-white/80 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-sm font-extrabold text-[#002B9A] break-all">{dev.agent}</span>
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-bold ${
+                            dev.status === 'Online'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-red-100 text-red-800 border border-red-300'
+                          }`}
+                        >
+                          {dev.status}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-600 mb-2">
+                        <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">{dev.os}</span>
+                        {dev.ipAddress && <span className="text-gray-500 font-mono">IP: {dev.ipAddress}</span>}
+                      </div>
+
+                      {/* Severity breakdown pills */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2">
+                        {dev.criticalCount ? (
+                          <span className="bg-[#FDE8E8] text-[#B8251B] px-2 py-0.5 rounded-md border border-[#F8B4B4] font-bold">
+                            Critical: {dev.criticalCount}
+                          </span>
+                        ) : null}
+                        <span className="bg-[#FFEDD5] text-[#C2410C] px-2 py-0.5 rounded-md border border-[#FDBA74] font-bold">
+                          High: {dev.highCount || 0}
+                        </span>
+                        <span className="bg-[#EBF5FF] text-[#1E429F] px-2 py-0.5 rounded-md border border-[#BFDBFE] font-bold">
+                          Medium: {dev.mediumCount || 0}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="text-gray-500">Risk Score:</span>
+                          <span className="text-gray-900 font-black">{scoreVal}</span>
+                          <span
+                            style={{ backgroundColor: cat.color }}
+                            className="text-white text-xs font-bold px-2 py-0.5 rounded shadow-sm"
+                          >
+                            {cat.label}
+                          </span>
+                        </div>
+                        <div className="text-right text-gray-500 text-[11px] font-medium">
+                          <span>{timeAgo || dateTime}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP DATA TABLE (md+) */}
+              <div className="hidden md:block overflow-x-auto overflow-y-auto flex-1">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead className="sticky top-0 z-10 bg-[#002B9A] text-white select-none">
+                    <tr className="bg-[#002B9A] text-white text-sm xl:text-base 2xl:text-lg font-bold tracking-wider border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                      <th onClick={() => handleSort('agent')} className="bg-[#002B9A] w-[20%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Agent Name</span>
+                          {renderSortIndicator('agent')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('os')} className="bg-[#002B9A] w-[18%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Operating System</span>
+                          {renderSortIndicator('os')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('status')} className="bg-[#002B9A] w-[12%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Status</span>
+                          {renderSortIndicator('status')}
+                        </div>
+                      </th>
+                      <th className="bg-[#002B9A] w-[20%] py-3 px-3.5 xl:px-4">
+                        <div className="flex items-center text-white">
+                          <span>Severity Breakdown</span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('score')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Risk Score</span>
+                          {renderSortIndicator('score')}
+                        </div>
+                      </th>
+                      <th onClick={() => handleSort('lastSeen')} className="bg-[#002B9A] w-[15%] py-3 px-3.5 xl:px-4 cursor-pointer hover:bg-[#002175] transition">
+                        <div className="flex items-center text-white">
+                          <span>Last Seen</span>
+                          {renderSortIndicator('lastSeen')}
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 text-sm xl:text-base 2xl:text-lg font-normal">
+                    {paginatedDevices.map((dev) => {
+                      const raw = (dev.criticalCount || 0) * 10 + (dev.highCount || 0) * 6 + (dev.mediumCount || 0) * 3;
+                      const scoreVal = typeof dev.score === 'number' ? dev.score : Math.min(100, raw);
+                      const cat = getRiskCategory(scoreVal);
+                      const isSelected = isDrawerOpen && selectedDevice?.id === dev.id;
+                      const { dateTime, timeAgo } = formatDateTimeAndAgo(dev.lastSeen);
+
+                      return (
+                        <tr
+                          key={dev.id}
+                          onClick={() => handleToggleDetail(dev)}
+                          className={`cursor-pointer transition ${
+                            isSelected
+                              ? 'bg-blue-100/80'
+                              : 'hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <td className="relative py-3 px-3.5 xl:px-4 text-[#0066B1] font-bold">
+                            {isSelected && <div className="absolute inset-y-0 left-0 w-1 sm:w-1.5 bg-[#002B9A]" />}
+                            <div className="flex items-center gap-2">
+                              <span>{dev.agent}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 text-gray-800 font-medium">{dev.os}</td>
+                          <td className="py-3 px-3.5 xl:px-4 font-bold">
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-md text-xs xl:text-sm 2xl:text-base font-bold ${
+                                dev.status === 'Online'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-red-100 text-red-800 border border-red-300'
+                              }`}
+                            >
+                              {dev.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 font-bold">
+                            <div className="flex items-center gap-1.5 text-xs xl:text-sm 2xl:text-base">
+                              {dev.criticalCount ? (
+                                <span className="bg-[#FDE8E8] text-[#B8251B] px-2 py-0.5 rounded border border-[#F8B4B4] font-bold">
+                                  Critical: {dev.criticalCount}
+                                </span>
+                              ) : null}
+                              <span className="bg-[#FFEDD5] text-[#C2410C] px-2 py-0.5 rounded border border-[#FDBA74] font-bold">
+                                High: {dev.highCount || 0}
+                              </span>
+                              <span className="bg-[#EBF5FF] text-[#1E429F] px-2 py-0.5 rounded border border-[#BFDBFE] font-bold">
+                                Medium: {dev.mediumCount || 0}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4">
+                            <div className="flex items-center gap-2 font-bold">
+                              <span className="text-sm xl:text-base 2xl:text-lg text-gray-900 font-bold w-7 text-right flex-shrink-0 tabular-nums">{scoreVal}</span>
+                              <span
+                                style={{ backgroundColor: cat.color }}
+                                className="text-white text-xs xl:text-sm 2xl:text-base font-bold px-2 py-0.5 rounded shadow-sm flex-shrink-0 min-w-16 text-center"
+                                title={cat.meaning}
+                              >
+                                {cat.label}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 xl:px-4 text-gray-900 font-medium">
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-semibold text-sm xl:text-base 2xl:text-lg">{dateTime}</span>
+                              {timeAgo && <span className="text-xs xl:text-sm text-gray-500 font-medium">{timeAgo}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Interactive Pagination Controls */}
+          <div className="bg-white/80 backdrop-blur-md border-t border-white/60 px-3.5 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-center justify-between text-sm xl:text-base 2xl:text-lg font-semibold text-gray-800 flex-shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+            <div>
+              Showing {filteredDevices.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredDevices.length)} of {filteredDevices.length} Devices
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </div>
 
-      {/* Right Drawer Panel */}
+      {/* Slide-out Drawer */}
       <DeviceDetailDrawer
-        device={selectedDevice}
         isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        highlightIssue={initialHighlight}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setSelectedDevice(null);
+        }}
+        device={selectedDevice}
       />
 
-      {/* Adaptive Filter Modal */}
+      {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
         title="Filter Devices"
-        sections={adaptiveFilterSections}
+        sections={dynamicFilterSections}
         initialFilters={activeFilters}
         onApply={handleApplyFilters}
       />
@@ -584,7 +724,7 @@ function DevicesContent() {
 
 export default function DevicesPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-xs font-bold text-gray-500">Loading Devices...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-sm font-semibold text-gray-500">Loading devices...</div>}>
       <DevicesContent />
     </Suspense>
   );

@@ -13,6 +13,7 @@ interface BestDonutChartProps {
   centerLabel: string;
   size?: number;
   strokeWidth?: number;
+  customFontSizeClass?: string;
 }
 
 export const BestDonutChart: React.FC<BestDonutChartProps> = ({
@@ -26,6 +27,7 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
   centerLabel,
   size = 130,
   strokeWidth = 14,
+  customFontSizeClass,
 }) => {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   const radius = (100 - strokeWidth) / 2;
@@ -33,13 +35,43 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
 
   let currentOffset = 0;
 
-  // Scale center label font size with chart size
-  const fontSizeClass =
-    size >= 140
-      ? 'text-3xl font-black'
-      : size >= 100
-      ? 'text-2xl font-black'
-      : 'text-lg font-black';
+  // Scale center label font size cleanly so numbers never overlap chart stroke
+  const textLength = String(centerLabel || '').trim().length;
+  let dynamicFontSize = 'text-base sm:text-lg font-black';
+
+  if (size >= 120) {
+    if (textLength <= 2) {
+      dynamicFontSize = 'text-3xl sm:text-4xl xl:text-4xl 2xl:text-5xl font-black';
+    } else if (textLength === 3) {
+      dynamicFontSize = 'text-2xl sm:text-3xl xl:text-3xl 2xl:text-4xl font-black';
+    } else if (textLength <= 5) {
+      dynamicFontSize = 'text-xl sm:text-2xl xl:text-2xl 2xl:text-3xl font-black';
+    } else if (textLength <= 7) {
+      dynamicFontSize = 'text-lg sm:text-xl xl:text-xl 2xl:text-2xl font-black';
+    } else {
+      dynamicFontSize = 'text-sm sm:text-base xl:text-lg font-black';
+    }
+  } else if (size >= 80) {
+    if (textLength <= 2) {
+      dynamicFontSize = 'text-xl sm:text-2xl xl:text-3xl font-black';
+    } else if (textLength <= 4) {
+      dynamicFontSize = 'text-lg sm:text-xl xl:text-2xl font-black';
+    } else if (textLength <= 6) {
+      dynamicFontSize = 'text-sm sm:text-base xl:text-lg font-bold';
+    } else {
+      dynamicFontSize = 'text-xs sm:text-sm font-bold';
+    }
+  } else {
+    if (textLength <= 3) {
+      dynamicFontSize = 'text-sm sm:text-base font-black';
+    } else if (textLength <= 5) {
+      dynamicFontSize = 'text-xs sm:text-sm font-bold';
+    } else {
+      dynamicFontSize = 'text-[10px] sm:text-xs font-bold';
+    }
+  }
+
+  const fontSizeClass = customFontSizeClass || dynamicFontSize;
 
   return (
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
@@ -49,7 +81,7 @@ export const BestDonutChart: React.FC<BestDonutChartProps> = ({
           cx="50"
           cy="50"
           r={radius}
-          stroke="#f1f5f9"
+          stroke={total === 0 ? "#cbd5e1" : "#e2e8f0"}
           strokeWidth={strokeWidth}
           fill="none"
         />

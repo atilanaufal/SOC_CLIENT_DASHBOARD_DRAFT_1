@@ -93,9 +93,9 @@ export const RISK_CATEGORIES: RiskCategory[] = [
 
 /**
  * Severity weight lookup based on Wazuh rule.level (0-15)
- * - 12–15: Critical -> Weight 10
- * - 8–11: High -> Weight 6
- * - 4–7: Medium -> Weight 3
+ * - 12–15: Critical -> Weight 6
+ * - 8–11: High -> Weight 3
+ * - 4–7: Medium -> Weight 1
  * - 0–3: Low / Info -> Weight 0 (no low in breakdown)
  */
 export function getSeverityWeight(val: any): number {
@@ -103,17 +103,17 @@ export function getSeverityWeight(val: any): number {
 
   if (typeof val === 'number' || (!isNaN(Number(val)) && String(val).trim() !== '')) {
     const num = Number(val);
-    if (num >= 12) return 10;
-    if (num >= 8) return 6;
-    if (num >= 4) return 3;
+    if (num >= 12) return 6;
+    if (num >= 8) return 3;
+    if (num >= 4) return 1;
     return 0;
   }
 
   if (typeof val === 'string') {
     const lower = val.trim().toLowerCase();
-    if (lower === 'critical') return 10;
-    if (lower === 'high') return 6;
-    if (lower === 'medium') return 3;
+    if (lower === 'critical') return 6;
+    if (lower === 'high') return 3;
+    if (lower === 'medium') return 1;
     return 0;
   }
 
@@ -142,7 +142,7 @@ export interface AgentScoreResult {
 
 /**
  * Calculate Agent Score (AS) per agent:
- * AS(e) = min(100, (Critical * 10) + (High * 6) + (Medium * 3))
+ * AS(e) = min(100, (Critical * 6) + (High * 3) + (Medium * 1))
  */
 export function calculateAgentScores(incidents: any[]): AgentScoreResult[] {
   const agentMap = new Map<string, { rawScore: number; alertCount: number }>();

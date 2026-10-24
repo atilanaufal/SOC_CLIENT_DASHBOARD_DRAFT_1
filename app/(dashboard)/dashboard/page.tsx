@@ -1,51 +1,104 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   HiOutlineChevronDown,
-  HiOutlineArrowUpRight,
-  HiOutlineExclamationCircle,
   HiOutlineArrowUp,
   HiOutlineArrowDown,
   HiOutlineMinus,
   HiOutlineArrowTrendingUp,
-  HiOutlineArrowTrendingDown
+  HiOutlineArrowTrendingDown,
+  HiOutlineArrowUpRight,
 } from 'react-icons/hi2';
-import { Incident } from '@/lib/mock-data';
-import { fetchDashboardStats } from '@/lib/api-client';
-import { MoreAgentsModal } from '@/components/modals/MoreAgentsModal';
-import { useTimeFilter } from '@/lib/time-filter-context';
 import { BestDonutChart } from '@/components/charts/BestDonutChart';
 import { RiskScoreWidget } from '@/components/widgets/RiskScoreWidget';
+import { useTimeFilter } from '@/lib/time-filter-context';
+import { fetchDashboardStats } from '@/lib/api-client';
+import { getClientCache, setClientCache, invalidateClientCache } from '@/lib/client-cache';
+import { formatStandardDate } from '@/lib/date-utils';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { timeFilter, customRange } = useTimeFilter();
+
   const [statsData, setStatsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [isMoreAgentsOpen, setIsMoreAgentsOpen] = useState(false);
-  const [selectedMoreAgentsIncident, setSelectedMoreAgentsIncident] = useState<Incident | null>(null);
-  const [severityFilter, setSeverityFilter] = useState('Critical');
+  // Top Incident Severity Filter Dropdown state
+  const [severityFilter, setSeverityFilter] = useState<'All Severity' | 'Critical' | 'High' | 'Medium'>('All Severity');
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
+  const [severityCoords, setSeverityCoords] = useState<{ top: number; right: number } | null>(null);
+  const severityButtonRef = useRef<HTMLButtonElement>(null);
+  const severityDropdownRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    async function loadStats() {
+    setMounted(true);
+  }, []);
+
+  const updateSeverityPosition = () => {
+    if (severityButtonRef.current) {
+      const rect = severityButtonRef.current.getBoundingClientRect();
+      setSeverityCoords({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isSeverityDropdownOpen) {
+      updateSeverityPosition();
+      window.addEventListener('resize', updateSeverityPosition);
+      window.addEventListener('scroll', updateSeverityPosition);
+      return () => {
+        window.removeEventListener('resize', updateSeverityPosition);
+        window.removeEventListener('scroll', updateSeverityPosition);
+      };
+    }
+  }, [isSeverityDropdownOpen]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        severityDropdownRef.current &&
+        !severityDropdownRef.current.contains(event.target as Node) &&
+        severityButtonRef.current &&
+        !severityButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsSeverityDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch live metrics strictly based on active Time Filter and Custom Range
+  useEffect(() => {
+    async function loadStats(forceRefresh = false) {
+      const cacheKey = `dashboard_stats:${timeFilter}:${customRange?.startDate || ''}:${customRange?.endDate || ''}`;
+
+      if (!forceRefresh) {
+        try {
+          const cached = await getClientCache<any>(cacheKey);
+          if (cached) {
+            setStatsData(cached);
+            setIsLoading(false);
+            return;
+          }
+        } catch {}
+      } else {
+        await invalidateClientCache(cacheKey);
+      }
+
       try {
         setIsLoading(true);
         const data = await fetchDashboardStats(timeFilter, customRange);
         setStatsData(data);
-        if (data?.topIncidents?.length > 0) {
-          const hasCritical = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'critical');
-          const hasHigh = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'high');
-          const hasMedium = data.topIncidents.some((inc: any) => String(inc.severity).toLowerCase() === 'medium');
-          if (!hasCritical && hasHigh) {
-            setSeverityFilter('High');
-          } else if (!hasCritical && !hasHigh && hasMedium) {
-            setSeverityFilter('Medium');
-          }
-        }
+        setClientCache(cacheKey, data);
       } catch (err) {
         console.error('Failed to load dashboard stats from DB:', err);
       } finally {
@@ -90,56 +143,91 @@ export default function DashboardPage() {
   const mediumDelta = typeof incStats.mediumDelta === 'number' ? incStats.mediumDelta : 0;
 
   const donutSegments = [
-    { label: 'Medium', value: mediumCount, color: '#FFC700' },
-    { label: 'High', value: highCount, color: '#FF6B00' },
-    { label: 'Critical', value: criticalCount, color: '#FF1E1E' },
+    { label: 'Medium', value: mediumCount, color: '#5B9BD5' },
+    { label: 'High', value: highCount, color: '#EA580C' },
+    { label: 'Critical', value: criticalCount, color: '#B8251B' },
   ];
 
   // Top Incidents (Real DB)
-  const topIncidentsSource: any[] = statsData?.topIncidents || [];
-  const rawFiltered = topIncidentsSource.filter((inc) => String(inc.severity || '').toLowerCase() === severityFilter.toLowerCase());
-  const maxItems = severityFilter === 'Critical' ? 5 : severityFilter === 'High' ? 3 : 2;
-  const filteredIncidents = rawFiltered.slice(0, maxItems);
+  const topIncidentsSource: any[] = useMemo(() => statsData?.topIncidents || [], [statsData]);
+  const filteredIncidents = useMemo(() => {
+    const sortByCountAndDate = (a: any, b: any) => {
+      const countDiff = (Number(b.count) || 0) - (Number(a.count) || 0);
+      if (countDiff !== 0) return countDiff;
+      const dateA = a.rawDate ? Number(a.rawDate) : (a.lastObserved ? new Date(a.lastObserved).getTime() : 0);
+      const dateB = b.rawDate ? Number(b.rawDate) : (b.lastObserved ? new Date(b.lastObserved).getTime() : 0);
+      return dateB - dateA;
+    };
 
-  // Recommended Actions (Real DB) - Sorted by highest severity, then most recent date
+    if (severityFilter === 'All Severity') {
+      const criticalList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'critical')
+        .sort(sortByCountAndDate);
+      const highList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'high')
+        .sort(sortByCountAndDate);
+      const mediumList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'medium')
+        .sort(sortByCountAndDate);
+      const lowList = topIncidentsSource
+        .filter((inc) => String(inc.severity || '').trim().toLowerCase() === 'low')
+        .sort(sortByCountAndDate);
+      return [...criticalList, ...highList, ...mediumList, ...lowList].slice(0, 5);
+    }
+    const targetSev = (severityFilter || '').trim().toLowerCase();
+    return topIncidentsSource
+      .filter((inc) => String(inc.severity || '').trim().toLowerCase() === targetSev)
+      .sort(sortByCountAndDate)
+      .slice(0, 5);
+  }, [topIncidentsSource, severityFilter]);
+
+  // Recommended Actions (Real DB) - Strictly only reports with genuine recommended actions
   const SEVERITY_RANK_MAP: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
   const rawRecs: any[] = statsData?.recommendedActions || [];
-  const recommendedActionsSource = [...rawRecs].sort((a, b) => {
-    const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
-    const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
-    if (rankB !== rankA) return rankB - rankA;
-    const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
-    const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
-    return timeB - timeA;
-  });
+  const recommendedActionsSource = useMemo(() => {
+    return [...rawRecs]
+      .filter((act) => {
+        const text = String(act.action || '').trim();
+        return text !== '' && text.toLowerCase() !== 'no recommended action specified.' && text.toLowerCase() !== 'n/a' && text.toLowerCase() !== '-';
+      })
+      .sort((a, b) => {
+        const rankA = SEVERITY_RANK_MAP[String(a.severity || '').toLowerCase()] || 0;
+        const rankB = SEVERITY_RANK_MAP[String(b.severity || '').toLowerCase()] || 0;
+        if (rankB !== rankA) return rankB - rankA;
+        const timeA = a.rawDate ? Number(a.rawDate) : (a.date ? new Date(a.date).getTime() : 0);
+        const timeB = b.rawDate ? Number(b.rawDate) : (b.date ? new Date(b.date).getTime() : 0);
+        return timeB - timeA;
+      })
+      .slice(0, 3);
+  }, [rawRecs]);
 
   const renderSeverityBadge = (sev: string) => {
     const s = String(sev || '').toLowerCase();
-    if (s === 'critical') return <span className="bg-[#FF1E1E] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Critical</span>;
-    if (s === 'high') return <span className="bg-[#FF6B00] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">High</span>;
-    if (s === 'medium') return <span className="bg-[#FFC700] text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Medium</span>;
-    if (s === 'low') return <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Low</span>;
-    return <span className="bg-slate-600 text-white text-xs font-black px-3 py-1 rounded-md min-w-[75px] text-center shadow-xs">Info</span>;
+    if (s === 'critical') return <span className="bg-[#B8251B] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(184,37,27,0.3)]">Critical</span>;
+    if (s === 'high') return <span className="bg-[#EA580C] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(234,88,12,0.3)]">High</span>;
+    if (s === 'medium') return <span className="bg-[#5B9BD5] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center shadow-[0_2px_6px_rgba(91,155,213,0.3)]">Medium</span>;
+    if (s === 'low') return <span className="bg-[#0066B1] text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Low</span>;
+    return <span className="bg-slate-600 text-white text-xs sm:text-sm md:text-sm xl:text-base 2xl:text-lg font-black px-2.5 sm:px-3 xl:px-3.5 2xl:px-4 py-0.5 sm:py-1 xl:py-1.5 2xl:py-2 rounded-md min-w-[70px] sm:min-w-[75px] xl:min-w-[85px] 2xl:min-w-[95px] text-center">Info</span>;
   };
 
   const renderDeltaBadge = (delta: number) => {
     if (delta > 0) {
       return (
-        <span className="bg-red-50 text-red-600 border border-red-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" /> +{delta}
+        <span className="bg-red-50/90 text-red-600 border border-red-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
+          <HiOutlineArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> +{delta}
         </span>
       );
     }
     if (delta < 0) {
       return (
-        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-          <HiOutlineArrowDown className="w-3.5 h-3.5 stroke-[3]" /> {delta}
+        <span className="bg-emerald-50/90 text-emerald-600 border border-emerald-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] whitespace-nowrap">
+          <HiOutlineArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> {delta}
         </span>
       );
     }
     return (
-      <span className="bg-gray-100 text-gray-700 border border-gray-200 px-3 py-0.5 rounded-md font-black text-xs flex items-center gap-0.5">
-        <HiOutlineMinus className="w-3.5 h-3.5 stroke-[3]" /> 0
+      <span className="bg-gray-100/90 text-gray-700 border border-gray-200 px-2 sm:px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm xl:text-base flex items-center gap-1 whitespace-nowrap">
+        <HiOutlineMinus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" /> 0
       </span>
     );
   };
@@ -147,54 +235,55 @@ export default function DashboardPage() {
   const renderTrendComparison = (trend: number) => {
     if (trend > 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-red-600">
-          <HiOutlineArrowTrendingUp className="w-4 h-4 text-red-600 stroke-[2.5]" />
+        <div className="flex items-center gap-1 font-black text-red-600">
+          <HiOutlineArrowTrendingUp className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-red-600 stroke-[3]" />
         </div>
       );
     }
     if (trend < 0) {
       return (
-        <div className="flex items-center gap-1 text-xs font-black text-emerald-600">
-          <HiOutlineArrowTrendingDown className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+        <div className="flex items-center gap-1 font-black text-emerald-600">
+          <HiOutlineArrowTrendingDown className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-emerald-600 stroke-[3]" />
         </div>
       );
     }
     return (
-      <div className="flex items-center gap-1 text-xs font-black text-gray-400">
-        <HiOutlineMinus className="w-4 h-4 text-gray-400 stroke-[3]" />
+      <div className="flex items-center gap-1 font-black text-gray-400">
+        <HiOutlineMinus className="w-4 h-4 sm:w-5 sm:h-5 xl:w-5 xl:h-5 text-gray-400 stroke-[3]" />
       </div>
     );
   };
 
   return (
-    <div className="h-full flex flex-col gap-3 overflow-hidden w-full">
+    <div className="w-full flex flex-col gap-3.5 sm:gap-4 md:gap-4.5 xl:gap-5 2xl:gap-6">
       {/* Top Row: Total Severity | Risk Score | Top Incident */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 sm:gap-4 md:gap-4.5 xl:gap-5 2xl:gap-6 items-stretch w-full">
         {/* 1. Total Severity */}
-        <div className="lg:col-span-4 xl:col-span-3.5 bg-white rounded-md border border-gray-200 overflow-hidden flex flex-col justify-between">
-          <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base flex-shrink-0">
+        <div className="md:col-span-1 lg:col-span-4 xl:col-span-4 2xl:col-span-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 flex flex-col justify-between overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center text-xs sm:text-sm md:text-sm xl:text-base flex-shrink-0 border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
             Total Severity
           </div>
 
-          <div className="p-3.5 flex-1 flex flex-col justify-start gap-3">
-            <div className="flex items-center justify-around py-1">
+          <div className="p-3.5 sm:p-4 xl:p-4.5 2xl:p-5 flex-1 flex flex-col justify-between gap-3 sm:gap-3">
+            {/* Donut Chart & Previous Period Summary */}
+            <div className="flex flex-row items-center justify-around gap-2 py-1">
               <BestDonutChart
                 segments={donutSegments}
-                centerLabel={totalSeverity.toString()}
-                size={140}
-                strokeWidth={14}
+                centerLabel={totalSeverity.toLocaleString()}
+                size={135}
+                strokeWidth={13}
               />
-              <div className="text-center bg-gray-50/80 px-5 py-2.5 rounded-md border border-gray-200 flex flex-col items-center gap-1 min-w-[120px]">
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
-                <div className="flex items-center justify-center gap-1.5 text-gray-900 font-black text-2xl my-0.5">
+              <div className="text-center bg-white/75 backdrop-blur-md px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_4px_16px_rgba(0,0,0,0.02)] flex flex-col items-center gap-1 min-w-[105px] sm:min-w-[120px] xl:min-w-[135px]">
+                <p className="text-xs sm:text-xs xl:text-sm font-black text-gray-500 uppercase tracking-wider">{periodLabel}</p>
+                <div className="flex items-center justify-center gap-1 text-gray-900 font-black text-2xl sm:text-2xl xl:text-3xl my-0.5">
                   <span>{lastPeriodCount}</span>
                 </div>
-                <div className={`px-3 py-0.5 rounded-md font-black text-xs border flex items-center gap-1 ${
+                <div className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-md font-black text-xs sm:text-xs xl:text-sm border flex items-center gap-1 ${
                   totalDelta > 0
-                    ? 'bg-red-50 text-red-600 border-red-200'
+                    ? 'bg-red-50/80 backdrop-blur-sm text-red-600 border-red-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]'
                     : totalDelta < 0
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                    : 'bg-gray-100 text-gray-700 border-gray-200'
+                    ? 'bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border-emerald-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]'
+                    : 'bg-gray-100/80 backdrop-blur-sm text-gray-700 border-gray-200'
                 }`}>
                   {totalDelta > 0 ? (
                     <HiOutlineArrowUp className="w-3.5 h-3.5 stroke-[3]" />
@@ -209,13 +298,18 @@ export default function DashboardPage() {
             </div>
 
             {/* Breakdown Cards */}
-            <div className="flex flex-col gap-2.5 border-t border-gray-100 pt-2.5">
-              {/* Critical Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FF1E1E] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
-                  Critical: {criticalCount}
-                </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+            <div className="flex flex-col gap-2 sm:gap-2.5 border-t border-gray-200/60 pt-2.5 sm:pt-3">
+              {/* Critical Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#B8251B] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(184,37,27,0.25)]">
+                    Critical
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {criticalCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(criticalDelta)}
                   <span>{criticalPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -223,12 +317,17 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* High Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FF6B00] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
-                  High: {highCount}
-                </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+              {/* High Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#EA580C] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(234,88,12,0.25)]">
+                    High
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {highCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(highDelta)}
                   <span>{highPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -236,12 +335,17 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Medium Row */}
-              <div className="p-2 px-3.5 rounded-md bg-gray-50/60 border border-gray-100 flex items-center justify-between">
-                <span className="bg-[#FFC700] text-white text-xs font-black py-1.5 px-3.5 rounded-md">
-                  Medium: {mediumCount}
-                </span>
-                <div className="flex items-center gap-2 text-base font-black text-gray-900">
+              {/* Medium Card */}
+              <div className="p-2 sm:p-2.5 px-3 sm:px-3.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.85)] flex items-center justify-between">
+                <div>
+                  <span className="inline-block bg-[#5B9BD5] text-white text-xs font-black px-2.5 py-0.5 rounded shadow-[0_2px_4px_rgba(91,155,213,0.25)]">
+                    Medium
+                  </span>
+                  <p className="text-xl sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-tight mt-0.5">
+                    {mediumCount}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-black text-gray-900">
                   {renderTrendComparison(mediumDelta)}
                   <span>{mediumPrev}</span>
                   <span className="text-gray-400 font-bold">-</span>
@@ -253,7 +357,7 @@ export default function DashboardPage() {
         </div>
 
         {/* 2. Risk Score Widget */}
-        <div className="lg:col-span-3 xl:col-span-3">
+        <div className="md:col-span-1 lg:col-span-3 xl:col-span-3 2xl:col-span-3 h-full">
           <RiskScoreWidget
             score={typeof statsData?.riskScore === 'number' ? statsData.riskScore : (statsData?.riskScore?.score ?? 0)}
             lastMonthScore={statsData?.riskLastMonth ?? 0}
@@ -261,117 +365,143 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* 3. Top Incident */}
-        <div className="lg:col-span-5 xl:col-span-5.5 bg-white rounded-md border border-gray-200 overflow-hidden flex flex-col justify-between h-full">
-          <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base flex items-center justify-between flex-shrink-0">
-            <span>Top Incident</span>
-            <div className="relative">
+        {/* 3. Top 5 Incidents */}
+        <div className="md:col-span-2 lg:col-span-5 xl:col-span-5 2xl:col-span-5 bg-white/80 backdrop-blur-xl rounded-xl border border-white/80 flex flex-col relative z-20 overflow-hidden h-full shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)]">
+          <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between flex-shrink-0 border-b border-white/10 rounded-t-xl relative z-30 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+            <span className="text-xs sm:text-sm md:text-sm xl:text-base">Top 5 Incidents</span>
+            <div className="relative z-30">
               <button
+                ref={severityButtonRef}
                 onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-                className="bg-white text-gray-900 text-xs font-bold px-3 py-1 rounded-md flex items-center gap-1 hover:bg-gray-100 transition"
+                className="bg-white/90 backdrop-blur-md text-gray-900 text-xs sm:text-sm font-bold px-3 py-1 sm:py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-white transition border border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.06)] cursor-pointer min-h-[30px]"
               >
                 <span>{severityFilter}</span>
-                <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                <HiOutlineChevronDown className="w-4 h-4 text-gray-700" />
               </button>
 
-              {isSeverityDropdownOpen && (
-                <div className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50 text-gray-800 text-xs font-semibold">
-                  {['Critical', 'High', 'Medium'].map((sev) => (
+              {isSeverityDropdownOpen && mounted && severityCoords && createPortal(
+                <div
+                  ref={severityDropdownRef}
+                  style={{ position: 'fixed', top: `${severityCoords.top}px`, right: `${severityCoords.right}px` }}
+                  className="w-40 bg-white/95 backdrop-blur-2xl rounded-xl border border-white/80 py-1 z-50 text-gray-800 text-xs sm:text-sm font-semibold shadow-[0_20px_50px_rgba(0,43,154,0.15),inset_0_1px_1px_rgba(255,255,255,0.95)] space-y-0.5 p-1"
+                >
+                  {['All Severity', 'Critical', 'High', 'Medium'].map((sev) => (
                     <button
                       key={sev}
                       onClick={() => {
-                        setSeverityFilter(sev);
+                        setSeverityFilter(sev as 'All Severity' | 'Critical' | 'High' | 'Medium');
                         setIsSeverityDropdownOpen(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-gray-100 rounded-md font-bold"
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition cursor-pointer ${
+                        severityFilter === sev ? 'bg-blue-50/90 text-[#002B9A] font-black' : 'text-gray-700 hover:bg-blue-50/80'
+                      }`}
                     >
                       {sev}
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>
 
-          {/* Item Container */}
-          <div className="divide-y divide-gray-100 flex-1 flex flex-col justify-start px-1 overflow-hidden">
+          {/* Item Container - Responsive layout on mobile and desktop with internal scroll */}
+          <div className="divide-y divide-gray-100/80 flex-1 min-h-0 flex flex-col justify-start px-1 overflow-y-auto max-h-[380px] sm:max-h-[400px] lg:max-h-[425px] xl:max-h-[445px] 2xl:max-h-[465px] rounded-b-xl relative z-10">
             {isLoading ? (
-              <div className="p-4 text-center text-xs font-bold text-gray-500">Loading top incidents from database...</div>
+              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading top incidents...</div>
             ) : filteredIncidents.length === 0 ? (
-              <div className="p-4 text-center text-xs font-bold text-gray-500">No {severityFilter} incidents recorded in database.</div>
+              <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">
+                {severityFilter === 'All Severity' ? 'No incidents found.' : `No ${severityFilter} incidents found.`}
+              </div>
             ) : (
               filteredIncidents.map((inc) => (
                 <div
                   key={inc.id}
-                  className="p-2.5 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 hover:bg-blue-50/40 transition flex-shrink-0"
+                  className="p-3 sm:p-2.5 md:p-3 xl:p-3.5 px-3 sm:px-4 hover:bg-blue-50/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 flex-shrink-0"
                 >
-                  <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <div className="mt-0.5 flex-shrink-0">
-                      <HiOutlineExclamationCircle
-                        className={`w-3.5 h-3.5 ${
+                  {/* Incident Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2 sm:hidden">
+                      <span
+                        className={`text-xs font-black px-2 py-0.5 rounded-md ${
                           inc.severity === 'Critical'
-                            ? 'text-red-600'
+                            ? 'bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]'
                             : inc.severity === 'High'
-                            ? 'text-orange-600'
-                            : 'text-amber-600'
+                            ? 'bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]'
+                            : 'bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]'
                         }`}
-                      />
+                      >
+                        {inc.severity}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const agentParam = inc.agent || inc.host || '';
+                          const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
+                          const countVal = inc.count || 1;
+                          const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
+                            agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
+                          }&count=${encodeURIComponent(countVal)}&groupBy=incidents`;
+                          router.push(targetUrl);
+                        }}
+                        className="bg-[#002B9A] hover:bg-[#002175] text-white font-bold text-xs px-3 py-1 rounded-md transition shadow-sm cursor-pointer"
+                      >
+                        View
+                      </button>
                     </div>
-                    <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-xs font-extrabold text-gray-900 leading-tight truncate">
-                        <span
-                          className={
-                            inc.severity === 'Critical'
-                              ? 'text-red-600 font-black'
-                              : inc.severity === 'High'
-                              ? 'text-orange-600 font-black'
-                              : 'text-amber-600 font-black'
-                          }
-                        >
-                          {inc.severity}:
-                        </span>{' '}
-                        {inc.incidentName}
-                      </p>
 
-                      <div className="flex items-center gap-1 text-[11px] text-gray-600 truncate">
-                        <span className="font-bold text-gray-500">Agent:</span>
-                        {(inc.agentsList || [inc.agent]).slice(0, 3).map((ag: string, idx: number) => (
-                          <React.Fragment key={idx}>
-                            <button
-                              onClick={() => handleAgentClick(ag, inc.incidentName)}
-                              className="text-blue-700 hover:text-blue-900 hover:underline font-extrabold transition"
-                            >
-                              {ag}
-                            </button>
-                            {idx < (inc.agentsList?.length || 1) - 1 && <span className="text-gray-400">-</span>}
-                          </React.Fragment>
-                        ))}
-                      </div>
+                    <p className="text-xs sm:text-sm xl:text-base font-extrabold text-gray-900 leading-snug">
+                      <span
+                        className={`hidden sm:inline font-black mr-1 ${
+                          inc.severity === 'Critical'
+                            ? 'text-[#B8251B]'
+                            : inc.severity === 'High'
+                            ? 'text-[#EA580C]'
+                            : 'text-[#5B9BD5]'
+                        }`}
+                      >
+                        {inc.severity}:
+                      </span>
+                      {inc.incidentName}
+                    </p>
 
-                      <div className="flex items-center gap-2.5 text-[10px]">
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 font-extrabold border border-gray-200">
-                          Count: <span className="font-black text-gray-900">{inc.count || 1} Detected</span>
-                        </span>
-                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 font-extrabold border border-gray-200">
-                          Observed: <span className="font-black text-gray-900">{inc.lastObserved || inc.firstObserved || 'Recently'}</span>
-                        </span>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-1 text-xs text-gray-600">
+                      <span className="font-bold text-gray-500">Agent:</span>
+                      {(inc.agentsList || [inc.agent]).slice(0, 3).map((ag: string, idx: number) => (
+                        <React.Fragment key={idx}>
+                          <button
+                            onClick={() => handleAgentClick(ag, inc.incidentName)}
+                            className="text-[#0066B1] hover:text-[#002B9A] hover:underline font-extrabold transition"
+                          >
+                            {ag}
+                          </button>
+                          {idx < (inc.agentsList?.length || 1) - 1 && <span className="text-gray-400">-</span>}
+                        </React.Fragment>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="bg-white/80 backdrop-blur-md px-2 py-0.5 rounded-md text-gray-800 font-bold border border-white/80 shadow-sm">
+                        Count: <span className="font-black text-gray-900">{inc.count || 1} Detected</span>
+                      </span>
+                      <span className="bg-white/80 backdrop-blur-md px-2 py-0.5 rounded-md text-gray-800 font-bold border border-white/80 shadow-sm">
+                        Observed: <span className="font-black text-gray-900">{formatStandardDate(inc.lastObserved || inc.firstObserved)}</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 self-end sm:self-auto flex-shrink-0">
+                  {/* Desktop Action Buttons */}
+                  <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => {
-                        setSelectedMoreAgentsIncident(inc);
-                        setIsMoreAgentsOpen(true);
+                        const agentParam = inc.agent || inc.host || '';
+                        const incName = inc.incidentName || (Array.isArray(inc.incident_type) ? inc.incident_type.join(', ') : inc.incident_type) || '';
+                        const countVal = inc.count || 1;
+                        const targetUrl = `/incidents?incidentName=${encodeURIComponent(incName)}${
+                          agentParam ? `&agent=${encodeURIComponent(agentParam)}` : ''
+                        }&count=${encodeURIComponent(countVal)}&groupBy=incidents`;
+                        router.push(targetUrl);
                       }}
-                      className="bg-gray-800 hover:bg-gray-900 text-white font-black text-xs px-3 py-1 rounded-md transition"
-                    >
-                      More Agents
-                    </button>
-                    <button
-                      onClick={() => router.push(`/incidents?search=${encodeURIComponent(inc.incidentName)}`)}
-                      className="bg-navy-800 hover:bg-navy-900 text-white font-black text-xs px-3.5 py-1 rounded-md transition"
+                      className="bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-xs xl:text-sm px-3.5 py-1.5 rounded-lg transition shadow-[0_2px_6px_rgba(0,43,154,0.25)] cursor-pointer"
                     >
                       View
                     </button>
@@ -383,58 +513,64 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom Row: Recommended Action - Latest */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden flex-shrink-0">
-        <div className="bg-navy-800 text-white font-black px-4 py-2.5 text-base">
-          Recommended Action - Latest
+      {/* Bottom Row: Recommended Action - Top 3 */}
+      <div className="bg-white/70 backdrop-blur-xl rounded-xl border border-white/70 shadow-[0_8px_32px_0_rgba(31,38,135,0.04),inset_0_1px_1px_0_rgba(255,255,255,0.9)] overflow-hidden flex-shrink-0">
+        <div className="h-11 sm:h-12 md:h-12 xl:h-13 bg-[#002B9A]/95 backdrop-blur-md text-white font-black px-4 sm:px-4.5 xl:px-5 2xl:px-6 flex items-center justify-between text-xs sm:text-sm md:text-sm xl:text-base border-b border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <span>Recommended Action</span>
+          {recommendedActionsSource.length > 0 && (
+            <span className="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md">
+              {recommendedActionsSource.length} Actions
+            </span>
+          )}
         </div>
 
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-200/50 max-h-[380px] overflow-y-auto">
           {isLoading ? (
-            <div className="p-4 text-center text-xs font-bold text-gray-500">Loading recommended actions...</div>
+            <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">Loading recommended actions...</div>
           ) : recommendedActionsSource.length === 0 ? (
-            <div className="p-4 text-center text-xs font-bold text-gray-500">No recommended actions available in database.</div>
+            <div className="p-5 text-center text-xs sm:text-sm font-bold text-gray-500">No recommended actions found.</div>
           ) : (
             recommendedActionsSource.slice(0, 3).map((act, idx) => (
-              <div key={idx} className="p-2.5 px-4 flex items-center justify-between gap-4 hover:bg-gray-50/80 transition">
-                <div className="flex items-center gap-3 min-w-0">
-                  {renderSeverityBadge(act.severity)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-extrabold text-gray-900 truncate">
+              <div key={idx} className="p-3 sm:p-3.5 md:p-4 px-3.5 sm:px-4 md:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-white/60 transition">
+                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                  <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                    {renderSeverityBadge(act.severity)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm md:text-base font-normal text-gray-900 leading-snug">
                       {act.action}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mt-0.5">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 font-semibold mt-1">
                       <span>{act.date}</span>
-                      {act.time && <span>{act.time}</span>}
+                      {act.customerName && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[#002B9A] font-bold">{act.customerName}</span>
+                        </>
+                      )}
+                      {act.reportName && (
+                        <>
+                          <span>•</span>
+                          <span className="text-gray-600 truncate max-w-[200px] sm:max-w-[300px]">{act.reportName}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRecommendedActionView(act.id || act.reportId)}
-                  className="bg-navy-800 hover:bg-navy-900 text-white font-bold text-xs px-3.5 py-1.5 rounded-md transition flex items-center gap-1.5 flex-shrink-0"
-                >
-                  <span>View Report</span>
-                  <HiOutlineArrowUpRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex justify-end sm:justify-auto flex-shrink-0">
+                  <button
+                    onClick={() => handleRecommendedActionView(act.id || act.reportId)}
+                    className="w-full sm:w-auto bg-[#002B9A]/95 backdrop-blur-sm hover:bg-[#002175] text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2 rounded-lg transition flex items-center justify-center gap-1.5 flex-shrink-0 shadow-[0_2px_8px_rgba(0,43,154,0.2)] cursor-pointer"
+                  >
+                    <span>View Report</span>
+                    <HiOutlineArrowUpRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
-
-      {/* More Agents Modal */}
-      <MoreAgentsModal
-        isOpen={isMoreAgentsOpen}
-        onClose={() => {
-          setIsMoreAgentsOpen(false);
-          setSelectedMoreAgentsIncident(null);
-        }}
-        agents={
-          selectedMoreAgentsIncident?.agentsList ||
-          (selectedMoreAgentsIncident ? [selectedMoreAgentsIncident.agent] : [])
-        }
-        incidentName={selectedMoreAgentsIncident?.incidentName}
-      />
     </div>
   );
 }

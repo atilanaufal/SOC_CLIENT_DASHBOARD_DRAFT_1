@@ -1,29 +1,200 @@
-import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/mock-data';
+import { Incident, Vulnerability, SecurityReport, Device } from '@/lib/types';
+
+let isHandlingAuth401 = false;
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401 && typeof window !== 'undefined') {
+    if (isHandlingAuth401) return res;
+    isHandlingAuth401 = true;
+
+    if (!window.location.pathname.startsWith('/login')) {
+      const authReason = res.headers.get('x-auth-reason');
+      let isConcurrent = authReason === 'concurrent_login';
+      if (!isConcurrent) {
+        try {
+          const clone = res.clone();
+          const data = await clone.json();
+          if (data?.code === 'CONCURRENT_LOGIN') {
+            isConcurrent = true;
+          }
+        } catch {}
+      }
+
+      const noticeType = isConcurrent ? 'concurrent' : 'expired';
+      try {
+        document.cookie = `asoc_notice=${noticeType}; path=/; max-age=15; SameSite=Lax`;
+        sessionStorage.setItem('asoc_notice', noticeType);
+        sessionStorage.removeItem('user_session');
+        sessionStorage.removeItem('asoc_browser_session');
+        sessionStorage.removeItem('auth_me_cache');
+        localStorage.removeItem('user_session');
+      } catch {}
+
+      // Proactively clear cookie via logout endpoint non-blockingly before replacing location
+      try {
+        navigator.sendBeacon?.('/api/auth/logout') || fetch('/api/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+      } catch {}
+
+      window.location.replace('/login');
+    }
+  }
+  return res;
+}
+
+export interface FetchIncidentsResponse {
+  data: Incident[];
+  total: number;
+  totalAlerts: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    critical: number;
+    criticalPrev: number;
+    criticalDelta: number;
+    high: number;
+    highPrev: number;
+    highDelta: number;
+    medium: number;
+    mediumPrev: number;
+    mediumDelta: number;
+    low: number;
+    lowPrev: number;
+    lowDelta: number;
+    total: number;
+    totalPrev: number;
+    totalDelta: number;
+    periodLabel: string;
+  };
+  filterOptions?: {
+    agents: string[];
+    incidentNames: string[];
+    severities: string[];
+    ipSources?: string[];
+    counts?: string[];
+  };
+  groupBy?: 'alerts' | 'incidents';
+  tenant?: string;
+  database?: string;
+}
 
 export async function fetchIncidents(filters?: {
   search?: string;
   severity?: string;
   incidentType?: string;
   agent?: string;
+  sourceIp?: string;
+  count?: string | number;
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Incident[]> {
+  groupBy?: 'alerts' | 'incidents';
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<FetchIncidentsResponse> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
   if (filters?.incidentType && filters.incidentType !== 'All') params.set('incidentType', filters.incidentType);
   if (filters?.agent && filters.agent !== 'All') params.set('agent', filters.agent);
+  if (filters?.sourceIp && filters.sourceIp !== 'All') params.set('sourceIp', filters.sourceIp);
+  if (filters?.count && filters.count !== 'All') params.set('count', String(filters.count));
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
+  if (filters?.groupBy) params.set('groupBy', filters.groupBy);
+  if (typeof filters?.page === 'number') params.set('page', String(filters.page));
+  if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
+  if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
 
-  const res = await fetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/incidents?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch incidents: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  return {
+    data: json.data || [],
+    total: typeof json.total === 'number' ? json.total : (json.data || []).length,
+    totalAlerts: typeof json.totalAlerts === 'number' ? json.totalAlerts : (json.total || 0),
+    page: json.page || 1,
+    limit: json.limit || 10,
+    totalPages: json.totalPages || 1,
+    stats: json.incidents || {
+      critical: 0,
+      criticalPrev: 0,
+      criticalDelta: 0,
+      high: 0,
+      highPrev: 0,
+      highDelta: 0,
+      medium: 0,
+      mediumPrev: 0,
+      mediumDelta: 0,
+      low: 0,
+      lowPrev: 0,
+      lowDelta: 0,
+      total: 0,
+      totalPrev: 0,
+      totalDelta: 0,
+      periodLabel: 'PREVIOUS PERIOD',
+    },
+    filterOptions: json.filterOptions || { agents: [], incidentNames: [], severities: [] },
+    groupBy: json.groupBy,
+    tenant: json.tenant,
+    database: json.database,
+  };
+}
+
+export async function fetchIncidentDetail(
+  id: string,
+  options?: { sampleId?: string }
+): Promise<Incident> {
+  const params = new URLSearchParams();
+  if (options?.sampleId) {
+    params.set('sampleId', options.sampleId);
+  }
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const res = await apiFetch(`/api/incidents/${encodeURIComponent(id)}${queryString}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch incident detail: ${res.statusText}`);
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export interface FetchVulnerabilitiesResponse {
+  data: Vulnerability[];
+  total: number;
+  filteredTotal: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    solved: number;
+  };
+  distribution: Array<{
+    label: string;
+    value: number;
+    color: string;
+    fullLabel: string;
+  }>;
+  filterOptions: {
+    agents: string[];
+    categories: string[];
+    vulnerabilities: string[];
+  };
+  offset?: number;
+  hasMore?: boolean;
 }
 
 export async function fetchVulnerabilities(filters?: {
@@ -31,27 +202,58 @@ export async function fetchVulnerabilities(filters?: {
   severity?: string;
   status?: string;
   category?: string;
+  vulnerability?: string;
   agent?: string;
   timeRange?: string;
   startDate?: string;
   endDate?: string;
-}): Promise<Vulnerability[]> {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  offset?: number;
+}): Promise<FetchVulnerabilitiesResponse> {
   const params = new URLSearchParams();
   if (filters?.search) params.set('search', filters.search);
   if (filters?.severity && filters.severity !== 'All') params.set('severity', filters.severity);
   if (filters?.status && filters.status !== 'All') params.set('status', filters.status);
   if (filters?.category && filters.category !== 'All') params.set('category', filters.category);
+  if (filters?.vulnerability && filters.vulnerability !== 'All') params.set('vulnerability', filters.vulnerability);
   if (filters?.agent && filters.agent !== 'All') params.set('agent', filters.agent);
   if (filters?.timeRange && filters.timeRange !== 'All') params.set('timeRange', filters.timeRange);
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
+  if (typeof filters?.page === 'number') params.set('page', String(filters.page));
+  if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
+  if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (typeof filters?.offset === 'number') params.set('offset', String(filters.offset));
 
-  const res = await fetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/vulnerabilities?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch vulnerabilities: ${res.statusText}`);
   }
   const json = await res.json();
-  return json.data || [];
+  return {
+    data: json.data || [],
+    total: json.total ?? (json.data || []).length,
+    filteredTotal: json.filteredTotal ?? json.total ?? (json.data || []).length,
+    page: json.page || 1,
+    limit: json.limit || 10,
+    totalPages: json.totalPages || 1,
+    stats: json.stats || {
+      total: json.total || 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      solved: 0,
+    },
+    distribution: json.distribution || [],
+    filterOptions: json.filterOptions || { agents: [], categories: [], vulnerabilities: [] },
+    offset: json.offset || 0,
+    hasMore: Boolean(json.hasMore),
+  };
 }
 
 export async function fetchReports(filters?: {
@@ -68,7 +270,7 @@ export async function fetchReports(filters?: {
   if (filters?.startDate) params.set('startDate', filters.startDate);
   if (filters?.endDate) params.set('endDate', filters.endDate);
 
-  const res = await fetch(`/api/reports?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/reports?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch reports: ${res.statusText}`);
   }
@@ -85,7 +287,7 @@ export async function fetchDashboardStats(
   if (customRange?.startDate) params.set('startDate', customRange.startDate);
   if (customRange?.endDate) params.set('endDate', customRange.endDate);
 
-  const res = await fetch(`/api/dashboard/stats?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/dashboard/stats?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch dashboard stats: ${res.statusText}`);
   }
@@ -94,7 +296,7 @@ export async function fetchDashboardStats(
 }
 
 export async function fetchDevices(): Promise<{ data: Device[]; meta?: any }> {
-  const res = await fetch('/api/devices', { cache: 'no-store' });
+  const res = await apiFetch('/api/devices', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch devices: ${res.statusText}`);
   }
@@ -115,7 +317,7 @@ export async function fetchDeviceRiskScores(
   if (customRange?.startDate) params.set('startDate', customRange.startDate);
   if (customRange?.endDate) params.set('endDate', customRange.endDate);
 
-  const res = await fetch(`/api/devices/risk-scores?${params.toString()}`, { cache: 'no-store' });
+  const res = await apiFetch(`/api/devices/risk-scores?${params.toString()}`, { cache: 'no-store' });
   if (!res.ok) {
     return {
       mongoDbAvailable: false,
@@ -137,7 +339,7 @@ export async function fetchDeviceHardware(agentId: string): Promise<{
   ramTotal: string;
 }> {
   try {
-    const res = await fetch(`/api/devices/${agentId}/hardware`, { cache: 'no-store' });
+    const res = await apiFetch(`/api/devices/${agentId}/hardware`, { cache: 'no-store' });
     if (!res.ok) return { cpuName: 'N/A', cores: 'N/A', ramTotal: 'N/A' };
     const json = await res.json();
     return json.data || { cpuName: 'N/A', cores: 'N/A', ramTotal: 'N/A' };
@@ -147,7 +349,7 @@ export async function fetchDeviceHardware(agentId: string): Promise<{
 }
 
 export async function fetchDevicesSummary() {
-  const res = await fetch('/api/devices/summary', { cache: 'no-store' });
+  const res = await apiFetch('/api/devices/summary', { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Failed to fetch devices summary: ${res.statusText}`);
   }

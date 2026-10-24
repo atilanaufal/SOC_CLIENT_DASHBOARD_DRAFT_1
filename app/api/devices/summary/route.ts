@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { fetchWazuhAgents, WazuhAgent } from '@/lib/wazuh-api';
 import { getIncidentsCollection } from '@/lib/db';
 import { parseSeverity } from '@/lib/severity';
+import { getTenantContextWithStatus, createAuthErrorResponse } from '@/lib/tenant-context';
+import { getTenantDeviceSummary } from '@/lib/wazuh-agent-store';
 
 export const dynamic = 'force-dynamic';
 
 function matchesTimeRange(doc: any, range: string, startDateParam?: string | null, endDateParam?: string | null): boolean {
-  if (!range || range === 'All') return true;
+  if (!range || range.toLowerCase() === 'all') return true;
 
   const rawDate = doc.last_observed || doc.first_observed || doc.detected_at || doc.date || doc.created_at || (doc._id && typeof doc._id.getTimestamp === 'function' ? doc._id.getTimestamp() : null);
   if (!rawDate) return true;
@@ -43,8 +44,10 @@ function matchesTimeRange(doc: any, range: string, startDateParam?: string | nul
   }
 
   if (lower === 'this week' || lower === '7d') {
-    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return d >= startOfWeek;
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    return d >= mondayThisWeek;
   }
 
   if (lower === 'this month' || lower === '30d') {
@@ -62,43 +65,26 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let totalDevices = 0;
-    let onlineDevices = 0;
-    let offlineDevices = 0;
-    const osCounts: Record<string, number> = {};
 
-    let wazuhApiAvailable = true;
-    let mongoDbAvailable = true;
-
-    // 1. Get Wazuh agents list fast
-    try {
-      const agents: WazuhAgent[] = await fetchWazuhAgents();
-      totalDevices = agents.length;
-
-      agents.forEach((agent: WazuhAgent) => {
-        const st = (agent.status || '').toLowerCase();
-        if (st === 'active') {
-          onlineDevices++;
-        } else {
-          offlineDevices++;
-        }
-
-        const osName = agent.os?.name || agent.os?.platform || 'Unknown OS';
-        osCounts[osName] = (osCounts[osName] || 0) + 1;
-      });
-    } catch (err: any) {
-      console.warn('[API /api/devices/summary] Wazuh API error:', err.message);
-      wazuhApiAvailable = false;
+    const { tenant, error } = await getTenantContextWithStatus(request);
+    if (!tenant) {
+      return createAuthErrorResponse(error);
     }
 
-    // 2. Fetch severity breakdown from MongoDB with timeout
+
+    // Prioritas 1: Redis (<tenant.redisPrefix>:devices:summary) -> < 1ms
+    // Prioritas 2 (Fallback): MongoDB (<tenant.databaseName>.device_summary) -> 5-10ms
+    const { data: summaryData, source } = await getTenantDeviceSummary(tenant);
+
+    // 2. Fetch severity breakdown from MongoDB
     let totalCritical = 0;
     let totalHigh = 0;
     let totalMedium = 0;
+    let mongoDbAvailable = true;
 
     try {
       const mongoPromise = (async () => {
-        const incCol = await getIncidentsCollection();
+        const incCol = await getIncidentsCollection(tenant.databaseName);
         return incCol.find({}, { projection: { full_logs: 0 } }).maxTimeMS(800).toArray();
       })();
 
@@ -111,19 +97,19 @@ export async function GET(request: Request) {
 
       incidents.forEach((inc) => {
         const sev = parseSeverity(inc.severity).toLowerCase();
-        const count = 1; // 1 document = 1 incident count!
+        const count = 1;
         if (sev === 'critical') totalCritical += count;
         else if (sev === 'high') totalHigh += count;
         else if (sev === 'medium') totalMedium += count;
       });
-    } catch (err: any) {
+    } catch {
       mongoDbAvailable = false;
     }
 
     const colors = ['#3B82F6', '#A855F7', '#F97316', '#10B981', '#F59E0B', '#6366F1'];
     let colorIdx = 0;
 
-    const osDistribution = Object.entries(osCounts).map(([label, value]) => ({
+    const osDistribution = Object.entries(summaryData.os_distribution || {}).map(([label, value]) => ({
       label,
       value,
       color: colors[colorIdx++ % colors.length],
@@ -131,10 +117,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      tenant: tenant.campusName,
       data: {
-        totalDevices,
-        onlineDevices,
-        offlineDevices,
+        totalDevices: summaryData.total_devices || 0,
+        onlineDevices: summaryData.online_devices || 0,
+        offlineDevices: summaryData.offline_devices || 0,
         osDistribution,
         devicesAtRisk: {
           critical: totalCritical,
@@ -142,15 +129,16 @@ export async function GET(request: Request) {
           medium: totalMedium,
         },
       },
-      meta: {
-        wazuhApiAvailable,
-        mongoDbAvailable,
-      },
     });
   } catch (error: any) {
     console.error('[API /api/devices/summary] Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch devices summary' },
+      {
+        success: false,
+        error: process.env.NODE_ENV === 'production'
+          ? 'Gagal memuat ringkasan perangkat.'
+          : error.message || 'Failed to fetch devices summary',
+      },
       { status: 500 }
     );
   }

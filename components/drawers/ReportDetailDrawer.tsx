@@ -1,8 +1,13 @@
 'use client';
 
-import React from 'react';
-import { SecurityReport } from '@/lib/mock-data';
-import { HiOutlineXMark, HiOutlineDocumentText, HiOutlineArrowTopRightOnSquare } from 'react-icons/hi2';
+import React, { useState } from 'react';
+import {
+  HiOutlineXMark,
+  HiOutlineArrowsPointingOut,
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
+} from 'react-icons/hi2';
+import { SecurityReport } from '@/lib/types';
 
 interface ReportDetailDrawerProps {
   report: SecurityReport | null;
@@ -11,20 +16,36 @@ interface ReportDetailDrawerProps {
   onOpenFullSummary?: (report: SecurityReport) => void;
 }
 
-function truncateSummary(text: string, maxLength: number = 180): string {
-  if (!text) return 'No summary provided.';
-  const cleanText = text.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '[Image]').replace(/[#*`_]/g, '');
-  if (cleanText.length <= maxLength) return cleanText;
-  return cleanText.substring(0, maxLength) + '...';
+const SUMMARY_HEADING_RE = /^[ \t]*(?:#{1,3}\s*|\*{2}\s*|[0-9]+[.)]\s*)*(?:[0-9]+[.)]\s*)?.*(?:ringkasan\s*insiden|ringkasan|summary|executive\s*summary).*$/im;
+const NEXT_HEADING_RE = /\n[ \t]*(?:#{1,6}\s+|[0-9]+[.)]\s*(?:\*{1,2})?[A-Z]{2,}|\*{1,2}[0-9.]*\s*[A-Z\s0-9]{2,}\*{1,2})/;
+
+function extractIncidentSummary(rawText?: string): string {
+  if (!rawText) return 'No summary provided.';
+  
+  const m = SUMMARY_HEADING_RE.exec(rawText);
+  let targetBlock = rawText;
+  if (m) {
+    const rest = rawText.slice(m.index + m[0].length);
+    const nm = NEXT_HEADING_RE.exec(rest);
+    const sec = (nm ? rest.slice(0, nm.index) : rest).trim();
+    if (sec) {
+      targetBlock = sec;
+    }
+  }
+
+  return targetBlock
+    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '[Image]')
+    .replace(/[#*`_]/g, '')
+    .trim();
 }
 
 function renderSeverityBadge(sev: string) {
   const s = String(sev || '').toLowerCase();
-  if (s === 'critical') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs bg-red-100 text-red-800 border border-red-300">Critical</span>;
-  if (s === 'high') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs bg-orange-100 text-orange-800 border border-orange-300">High</span>;
-  if (s === 'medium') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs bg-amber-100 text-amber-800 border border-amber-300">Medium</span>;
-  if (s === 'low') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs bg-blue-100 text-blue-800 border border-blue-300">Low</span>;
-  return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs bg-slate-100 text-slate-800 border border-slate-300">Info</span>;
+  if (s === 'critical') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs sm:text-sm bg-[#FDE8E8] text-[#B8251B] border border-[#F8B4B4]">Critical</span>;
+  if (s === 'high') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs sm:text-sm bg-[#FFEDD5] text-[#C2410C] border border-[#FDBA74]">High</span>;
+  if (s === 'medium') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs sm:text-sm bg-[#EBF5FF] text-[#1E429F] border border-[#BFDBFE]">Medium</span>;
+  if (s === 'low') return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs sm:text-sm bg-blue-100 text-blue-800 border border-blue-300">Low</span>;
+  return <span className="inline-block px-2.5 py-0.5 rounded-md font-bold text-xs sm:text-sm bg-slate-100 text-slate-800 border border-slate-300">Info</span>;
 }
 
 export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
@@ -33,123 +54,151 @@ export const ReportDetailDrawer: React.FC<ReportDetailDrawerProps> = ({
   onClose,
   onOpenFullSummary,
 }) => {
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+
   if (!isOpen || !report) return null;
 
   const socIdDisplay = report.soc_id || 'N/A';
   const uuidDisplay = report.report_uuid || report.id;
-  const isLongSummary = (report.summary || '').length > 150;
+  const recommendedActionText = report.recommendedAction || report.recommended_action || '';
+
+  const fullCleanSummary = extractIncidentSummary(report.summary);
+  const isLongSummary = fullCleanSummary.length > 220;
+  const displayedSummary = isLongSummary && !isSummaryExpanded
+    ? fullCleanSummary.substring(0, 220) + '...'
+    : fullCleanSummary;
 
   return (
     <>
       {/* Mobile Backdrop (< lg) */}
       <div
         onClick={onClose}
-        className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-150 cursor-pointer"
+        className="lg:hidden fixed inset-0 bg-slate-950/30 backdrop-blur-sm z-40 animate-in fade-in duration-150 cursor-pointer"
       />
 
-      {/* Detail Panel Container */}
+      {/* Slide-out Drawer Panel */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="fixed inset-y-0 right-0 z-50 lg:z-0 lg:relative lg:inset-auto h-full w-[85vw] max-w-sm lg:w-[380px] bg-white border border-gray-300 rounded-md flex flex-col flex-shrink-0 overflow-hidden animate-in slide-in-from-right duration-200"
+        className="fixed inset-y-0 right-0 z-50 lg:z-30 lg:inset-auto lg:top-[84px] lg:bottom-3.5 lg:right-6 w-full max-w-full sm:max-w-md lg:max-w-none lg:w-[390px] xl:w-[430px] 2xl:w-[480px] bg-white/90 backdrop-blur-2xl border-l border-white/80 lg:border lg:border-white/80 rounded-none lg:rounded-xl shadow-[-12px_0_40px_rgba(0,43,154,0.12),inset_0_1px_1px_rgba(255,255,255,0.95)] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-gray-900 px-4 py-3 flex-shrink-0 bg-white">
-          <h3 className="text-lg font-black text-gray-900 tracking-tight">Report Details</h3>
+        <div className="flex items-center justify-between border-b border-gray-200/60 px-4 sm:px-5 xl:px-6 py-3.5 xl:py-4 flex-shrink-0 bg-white/90 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <h3 className="text-base sm:text-lg xl:text-xl font-bold text-gray-900 tracking-tight">Report Details</h3>
           <button
             onClick={onClose}
-            className="text-gray-900 font-bold hover:text-gray-600 p-1 rounded-md transition"
-            aria-label="Close report details"
+            className="text-gray-700 font-bold hover:text-gray-900 p-1.5 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+            aria-label="Close details panel"
           >
-            <HiOutlineXMark className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5 xl:w-6 xl:h-6" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-gray-900">
-          {/* Report Name */}
-          <div>
-            <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Report Name</p>
-            <p className="text-sm font-black text-navy-800">{report.reportName}</p>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 xl:p-6 space-y-4 xl:space-y-5 text-gray-900">
+          <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Report Name</p>
+            <p className="text-base sm:text-lg font-black text-[#002B9A] break-words">{report.reportName}</p>
           </div>
 
-          {/* Report UUID (placed right after Report Name) */}
-          <div className="pt-2">
-            <p className="font-extrabold text-xs text-gray-500 uppercase tracking-wider mb-0.5">Report UUID</p>
-            <p className="font-mono text-[11px] text-gray-700 bg-gray-50 p-2 rounded-md border border-gray-200 break-all font-semibold">
+          {/* Customer Name */}
+          <div className="bg-white/80 backdrop-blur-sm p-3.5 xl:p-4 rounded-xl border border-gray-200/80 shadow-sm">
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Customer Name</p>
+            <p className="text-sm sm:text-base font-extrabold text-gray-900 break-words">
+              {report.customerName || report.customer_name || report.client_name || report.tenant || 'N/A'}
+            </p>
+          </div>
+
+          {/* Report UUID */}
+          <div>
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Report UUID</p>
+            <p className="font-mono text-xs sm:text-xs xl:text-sm text-gray-700 bg-white/80 backdrop-blur-sm p-2.5 rounded-xl border border-gray-200/80 break-all font-medium">
               {uuidDisplay}
             </p>
           </div>
 
           {/* Severity & SOC ID */}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200 text-xs">
+          <div className="grid grid-cols-2 gap-3 pt-3 xl:pt-4 border-t border-gray-200/80 text-xs xl:text-sm">
             <div>
-              <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">Severity</p>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">Severity</p>
               {renderSeverityBadge(report.severity)}
             </div>
             <div>
-              <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">SOC ID</p>
-              <p className="font-black text-gray-900 mt-0.5">{socIdDisplay}</p>
+              <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-1">SOC ID</p>
+              <p className="font-bold text-gray-900 mt-0.5">{socIdDisplay}</p>
             </div>
           </div>
 
           {/* Date Generated */}
-          <div className="pt-3 border-t border-gray-200 text-xs">
-            <p className="font-extrabold text-gray-500 uppercase tracking-wider mb-0.5">Date Generated</p>
-            <p className="font-bold text-gray-800">{report.dateGenerated}</p>
+          <div className="pt-3 xl:pt-4 border-t border-gray-200/80 text-xs xl:text-sm">
+            <p className="font-bold text-xs xl:text-sm text-gray-500 uppercase tracking-wider mb-0.5">Date Generated</p>
+            <p className="font-semibold text-gray-800">{report.dateGenerated}</p>
           </div>
 
-          {/* Summary Preview Section */}
-          <div className="pt-3 border-t border-gray-200">
+          {/* Summary Section */}
+          <div className="pt-3 xl:pt-4 border-t border-gray-200/80">
             <div className="flex items-center justify-between mb-1.5">
-              <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider">Summary Preview</h4>
-              {onOpenFullSummary && (
+              <h4 className="font-bold text-xs xl:text-sm text-gray-900 uppercase tracking-wider">Summary</h4>
+            </div>
+            <div className="bg-blue-50/70 p-3.5 xl:p-4 rounded-xl border border-blue-100 max-h-80 overflow-y-auto">
+              <p className="text-xs sm:text-sm xl:text-base text-gray-700 font-normal leading-relaxed whitespace-pre-line">
+                {displayedSummary}
+              </p>
+              {isLongSummary && (
                 <button
-                  onClick={() => onOpenFullSummary(report)}
-                  className="text-[11px] font-extrabold text-navy-800 hover:text-blue-700 flex items-center gap-1"
+                  onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                  className="mt-2 text-xs sm:text-sm xl:text-base font-semibold text-[#002B9A] hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Expand</span>
-                  <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
+                  <span>{isSummaryExpanded ? 'Show Less' : 'Read More'}</span>
+                  {isSummaryExpanded ? (
+                    <HiOutlineChevronUp className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                  ) : (
+                    <HiOutlineChevronDown className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
+                  )}
                 </button>
               )}
             </div>
+          </div>
 
-            <div
-              onClick={() => onOpenFullSummary && onOpenFullSummary(report)}
-              className="group cursor-pointer bg-blue-50/60 hover:bg-blue-100/70 p-3 rounded-md border border-blue-200 transition relative"
-            >
-              <p className="text-xs text-gray-800 font-medium leading-relaxed">
-                {truncateSummary(report.summary, 160)}
-              </p>
-
-              {isLongSummary && (
-                <div className="mt-2 pt-2 border-t border-blue-200/80 flex items-center justify-between text-navy-800 font-extrabold text-xs group-hover:text-blue-900">
-                  <span className="flex items-center gap-1.5">
-                    <HiOutlineDocumentText className="w-4 h-4 text-blue-600" />
-                    Read Full Summary
-                  </span>
-                  <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
-                </div>
-              )}
+          {/* Recommended Action Section (Under Summary) */}
+          {recommendedActionText && (
+            <div className="pt-3 xl:pt-4 border-t border-gray-200/80">
+              <h4 className="font-bold text-xs xl:text-sm text-emerald-900 uppercase tracking-wider mb-1.5">Recommended Action</h4>
+              <div className="bg-emerald-50/70 p-3.5 xl:p-4 rounded-xl border border-emerald-200 max-h-56 overflow-y-auto space-y-2">
+                {recommendedActionText.split('\n').map((l) => l.trim()).filter(Boolean).map((line, idx) => (
+                  <p key={idx} className="text-xs sm:text-sm xl:text-base font-normal text-emerald-900 leading-relaxed">
+                    {line}
+                  </p>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Recommended Action */}
-          <div className="pt-3 border-t border-gray-200">
-            <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-wider mb-1">Recommended Action</h4>
-            <p className="text-xs font-bold text-gray-800 bg-amber-50/50 p-2.5 rounded-md border border-amber-200 leading-relaxed">
-              {report.recommendedAction || 'No specific recommended action.'}
-            </p>
-          </div>
+          {/* Affected Devices */}
+          {report.affectedDevices && report.affectedDevices.length > 0 && (
+            <div className="pt-3 xl:pt-4 border-t border-gray-200/80">
+              <h4 className="font-bold text-xs xl:text-sm text-gray-900 uppercase tracking-wider mb-1.5">
+                Affected Devices ({report.affectedDevices.length})
+              </h4>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                {report.affectedDevices.map((dev, idx) => (
+                  <div key={idx} className="bg-white/80 backdrop-blur-sm p-2.5 rounded-xl border border-gray-200/80 text-xs sm:text-sm">
+                    <p className="font-bold text-[#002B9A]">{dev.agent || dev.hostname}</p>
+                    {dev.ip && <p className="text-xs text-gray-500 font-mono font-medium">{dev.ip}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Action Button to Open Full Modal */}
-        <div className="p-3.5 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+        <div className="border-t border-gray-200/60 p-4 xl:p-5 bg-white/90 backdrop-blur-md flex-shrink-0">
           <button
             onClick={() => onOpenFullSummary && onOpenFullSummary(report)}
-            className="w-full bg-navy-800 hover:bg-navy-900 text-white font-extrabold py-2.5 rounded-md text-sm transition shadow-xs flex items-center justify-center gap-2"
+            className="w-full bg-[#002B9A] text-white py-2.5 sm:py-3 xl:py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm xl:text-base 2xl:text-lg hover:bg-[#002175] transition flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(0,43,154,0.3)] cursor-pointer"
           >
-            <HiOutlineDocumentText className="w-4 h-4 text-blue-300" />
-            <span>View Full Report Summary</span>
+            <HiOutlineArrowsPointingOut className="w-4 h-4 sm:w-5 sm:h-5 text-blue-300" />
+            <span>Read Full Report</span>
           </button>
         </div>
       </div>
